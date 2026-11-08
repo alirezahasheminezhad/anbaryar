@@ -1,0 +1,161 @@
+<!--## CSS سراسری، importmap، <body>، راه‌اندازی آیکن‌ها و باز شدن تگ <script type=text/babel>. (خطوط 66–225 نسخه‌ی اولیه) -->
+      (function(){
+        var s = document.createElement('style');
+        s.textContent = "@font-face{font-family:'Vazirmatn';src:url(data:font/woff2;base64," + window.__VAZIRMATN_FONT_B64 + ") format('woff2');font-weight:100 900;font-style:normal;font-display:swap;}";
+        document.head.appendChild(s);
+      })();
+    </script>
+    <style>
+      body { 
+          font-family: 'Vazirmatn', sans-serif; 
+          background-color: #f8f8fc;
+          background-image: radial-gradient(1200px 600px at 100% -10%, rgba(67,53,222,0.05), transparent 60%);
+          background-attachment: fixed;
+          overflow-x: hidden;
+          color: #334155;
+          font-weight: 500; /* پیش‌فرض کمی ضخیم‌تر از normal تا متن‌های ریز (text-[9px]/text-[10px]/text-xs) کم‌خون و نازک دیده نشوند؛
+                                کلاس‌های صریح tailwind مثل font-bold/font-black/font-medium روی خودِ عنصر همچنان اولویت دارند و بازنویسی می‌شوند */
+      }
+      input[type=number]::-webkit-inner-spin-button, 
+      input[type=number]::-webkit-outer-spin-button { 
+        -webkit-appearance: none; 
+        margin: 0; 
+      }
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      
+      .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background: #c99f5e; border-radius: 2px; }
+
+      .animate-in { animation: fadeIn 0.3s ease-out; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+      /* ------- لایه‌ی جزئیات ظریف طراحی (فقط بصری؛ هیچ منطقی تغییر نمی‌کند) -------
+         ۱) اعداد مالی/موجودی هم‌عرض (tabular) می‌شوند تا در ستون‌های جدول زیر هم ردیف بمانند.
+         ۲) دکمه‌ها یک واکنش لمسی ظریف (فشردگی خفیف) هنگام کلیک می‌گیرند.
+         ۳) حالت focus برای صفحه‌کلید واضح‌تر و هماهنگ با هویت رنگی جدید می‌شود. */
+      body, input, select, textarea, button { font-variant-numeric: tabular-nums; }
+      button:not(:disabled) { transition: transform .12s ease, filter .12s ease, box-shadow .15s ease, background-color .15s ease; }
+      button:not(:disabled):active { transform: scale(0.97); }
+      :focus-visible { outline: 2px solid #4335de; outline-offset: 2px; border-radius: 4px; }
+
+        /* چاپ استاندارد: A4 افقی و بدون اسکرول افقی */
+        .print-invoice { width:100%; max-width:1120px; margin:0 auto; box-sizing:border-box; overflow:visible!important; }
+        .print-invoice table { width:100%!important; table-layout:fixed; }
+        .print-invoice th, .print-invoice td { word-break:break-word; overflow-wrap:anywhere; }
+        @media print {
+          @page { size:A4 landscape; margin:5mm; }
+          html, body { width:100%!important; min-width:0!important; overflow:visible!important; }
+          .print-invoice { width:100%!important; max-width:none!important; font-size:9px!important; }
+          .print-invoice table { width:100%!important; table-layout:fixed!important; }
+          .print-invoice th, .print-invoice td { padding:3px!important; }
+
+        /* روش قبلی: کلاس no-print روی خودِ کادر پیش‌نمایش چاپ هم بود، پس کل فاکتور مخفی می‌شد
+           و مرورگر همان صفحه پشت پاپ‌آپ را چاپ می‌کرد. راه‌حل: مخفی‌سازی کل صفحه به‌جز #print-area. */
+        body * { visibility: hidden !important; }
+        #print-area, #print-area * { visibility: visible !important; }
+        /* ریشه‌ی باگ «۷-۹ صفحه خالی قبل از فاکتور»: صرفاً visibility:hidden کردنِ بقیه‌ی صفحه، جای آن‌ها
+           را در چیدمان (لِی‌اوت) صفحه حفظ می‌کند. main (لیست کالاها/فاکتورها و ...) با overflow:visible
+           و ارتفاع واقعیِ محتوا، هر چقدر بلند باشد همچنان در ارتفاع سند حساب می‌شود؛ به همراه min-h-screen
+           روی کانتینر اصلی، همین باعث چند صفحه‌ی سفید/خالی قبل از رسیدن نوبت به فاکتور می‌شد (که با
+           «چاپ فقط صفحه ۷» درست می‌شد چون فاکتور دقیقاً همان‌جا افتاده بود). راه‌حل قطعی: به‌جای فقط
+           نامرئی‌کردن، تمام محتوای پشت مودال چاپ را با display:none کاملاً از لِی‌اوت حذف می‌کنیم تا
+           هیچ ارتفاعی برای صفحه‌بندی باقی نماند و فاکتور همیشه دقیقاً از صفحه ۱ شروع شود. */
+        #root:has(.print-modal-backdrop) .app-shell > main {
+          display: none !important;
+        }
+        .print-modal-backdrop, .print-modal-panel {
+          position: absolute !important; top: 0 !important; right: 0 !important; left: 0 !important; inset: auto !important; display: block !important;
+          background: none !important; backdrop-filter: none !important; box-shadow: none !important;
+          padding: 0 !important; margin: 0 !important; max-width: none !important; width: 100% !important;
+          overflow: visible !important; height: auto !important; max-height: none !important;
+        }
+        #print-area {
+          position: static !important; width: 100% !important; height: auto !important; max-height: none !important;
+          overflow: visible !important; padding: 0 !important; margin: 0 !important; background: white !important;
+          display: flex !important; justify-content: center !important;
+        }
+        /* باقی صفحه (داشبورد پشت پاپ‌آپ) هرچند نامرئی است اما اگر ارتفاعش صفر نشود همچنان صفحات
+           خالی اضافه در انتهای چاپ ایجاد می‌کند؛ با صفر کردن ارتفاعِ ریشه‌ی اپ این مشکل هم برطرف می‌شود. */
+        #root { height: 0 !important; min-height: 0 !important; overflow: hidden !important; }
+        #root:has(.print-modal-backdrop) { height: auto !important; min-height: 0 !important; overflow: visible !important; }
+        #root:has(.print-modal-backdrop) > div { min-height: 0 !important; height: auto !important; display: block !important; }
+        .no-print { display: none !important; }
+        .print-only { display: block !important; }
+        body { background-color: white; font-family: 'Vazirmatn', sans-serif; height: auto !important; min-height: 0 !important; }
+        html { height: auto !important; }
+        /* کاغذِ فاکتور همیشه با عرض کامل و وسط صفحه چاپ می‌شود. سایز/جهت کاغذ (A4/A5، عمودی/افقی)
+           را دیگر از اینجا تحمیل نمی‌کنیم — همان چیزی که کاربر لحظه‌ی چاپ در پنجره‌ی پرینتر انتخاب
+           می‌کند اعمال می‌شود و چون عرض فاکتور نسبی (100%) است، همیشه کامل داخل کاغذ انتخابی جا می‌شود. */
+        .invoice-paper {
+          box-shadow: none !important; border: none !important; margin: 0 auto !important; padding: 0 !important;
+          width: 100% !important; max-width: 100% !important;
+        }
+        main { height: auto !important; overflow: visible !important; }
+        @page { margin: 1.2cm; }
+      }
+      
+      .invoice-paper { box-sizing:border-box; width:794px; max-width:794px; margin:0 auto; background:#fff; color:#111827; }
+      .invoice-paper table { width:100%; table-layout:fixed; border-collapse:collapse; }
+      .invoice-paper th, .invoice-paper td { box-sizing:border-box; vertical-align:middle; }
+      .invoice-paper img { max-width:100%; height:auto; }
+      .invoice-paper, .invoice-paper * { overflow-wrap:anywhere; }
+
+      /* Toast animation */
+      @keyframes slideInUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      @keyframes slideOutDown { from { transform: translateY(0); opacity: 1; } to { transform: translateY(20px); opacity: 0; } }
+      .toast-enter { animation: slideInUp 0.3s ease-out forwards; }
+      .toast-exit { animation: slideOutDown 0.3s ease-in forwards; }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "xlsx": "https://esm.sh/xlsx@^0.18.5",
+    "lucide-react": "https://esm.sh/lucide-react@^0.564.0",
+    "uuid": "https://esm.sh/uuid@^13.0.0",
+    "path": "https://esm.sh/path@^0.12.7",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4",
+    "url": "https://esm.sh/url@^0.11.4"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+      // Initialize Icons
+      window.initIcons = function() {
+        window.lucideReact = {};
+        if (window.lucide && window.lucide.icons) {
+            const { createElement } = React;
+            const toCamel = (s) => s.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+            const createChild = ([tag, attrs, children]) => {
+                const reactAttrs = {};
+                for (const key in attrs) reactAttrs[key === 'class' ? 'className' : toCamel(key)] = attrs[key];
+                reactAttrs.key = Math.random().toString(36).substr(2, 9);
+                return createElement(tag, reactAttrs, ...(children || []).map(createChild));
+            };
+            Object.keys(window.lucide.icons).forEach(key => {
+                window.lucideReact[key] = (props) => {
+                    const { color = "currentColor", size = 24, className, children, ...rest } = props;
+                    return createElement('svg', {
+                        xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24",
+                        fill: "none", stroke: color, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round",
+                        className: `lucide lucide-${key.toLowerCase()} ${className || ''}`, ...rest
+                    }, ...(window.lucide.icons[key] || []).map(createChild), children);
+                };
+            });
+        }
+      };
+      window.initIcons();
+    </script>
+
+    <script type="text/babel">
