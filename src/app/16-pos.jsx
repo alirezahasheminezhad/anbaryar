@@ -19,6 +19,12 @@
             const [showConfirm, setShowConfirm] = useState(false);
             const [pendingMode, setPendingMode] = useState(false);
             const [showLoadingReview, setShowLoadingReview] = useState(false);
+            // پاپ‌آپ «تولید و کپی توضیحات»: کلیدهای نمایش بخش‌ها + حالت محاسبه‌ی وزن/تعداد (فقط روی متن، نه روی فاکتور)
+            const DESC_DEFAULTS = { weight: true, brand: true, tag: true, motherBag: true, totals: false };
+            const [showDescModal, setShowDescModal] = useState(false);
+            const [descOpts, setDescOpts] = useState(DESC_DEFAULTS);
+            const [descTab, setDescTab] = useState('view'); // 'view' | 'calc'
+            const [calcRows, setCalcRows] = useState({}); // itemId → { weight?, qty?, choice? ('split'|'none') }
             const [loadingReviewMode, setLoadingReviewMode] = useState(false);
             // انتخاب فقط برای همین فاکتور؛ هیچ ترجیحی برای مشتری ذخیره نمی‌شود. موقع ویرایش یک فاکتور قبلی،
             // همان انتخابِ قبلی‌اش حفظ می‌شود (نه همیشه روشن)؛ فقط برای فاکتور کاملاً جدید پیش‌فرض روشن است.
@@ -226,30 +232,35 @@
             // تولید خودکار متن توضیحات فاکتور از روی اقلام سبد خرید (برای اعلام به انبار / انتشار در فضای مجازی)
             // هر کالا در یک خط جدا با یک بولت مشخص می‌شود تا در کپی/پیست به تلگرام، اینستاگرام و... مرتب و خوانا بماند،
             // و در انتها یک خط جمع‌بندی (تعداد قلم، تعداد کیسه، وزن کل) اضافه می‌شود.
-            const generateAutoDescription = () => {
+            // o: کدام بخش‌ها نمایش داده شوند (پیش‌فرض = رفتار قبلی). calcRows: اصلاحِ دستیِ وزن/تعداد فقط برای همین متن.
+            const generateAutoDescription = (o = DESC_DEFAULTS) => {
                 if (cart.length === 0) return '';
+                const eff = cart.map(c => { const ov = calcRows[c.itemId]; return ov ? { ...c, weight: ov.weight ?? c.weight, qty: ov.qty ?? c.qty, _choice: ov.choice } : c; });
                 const RLM = '\u200F'; // اول هر خط، تا در تلگرام/واتساپ همه‌ی خط‌ها راست‌چین بمانند
-                const blocks = cart.map(item => {
+                const blocks = eff.map(item => {
                     // تعیین اینکه آیا این ردیف باید معادل کیسه‌ی مادر بگیرد یا نه، دیگر هیچ ربطی به داشتنِ
                     // کلمه‌ی «سابیده» در نام/تگ ندارد: فقط کالایی که کاربر خودش در «موجودی کیسه مادر» ثبت/لینک
                     // کرده باشد (با هر نامی — مثلاً «فلفل قرمز ایرانی درجه یک») همان فرمول (هر ۶ واحد = یک
                     // کیسه‌ی مادر) را می‌گیرد؛ کالاهایی که در آن لیست ثبت نشده‌اند، هیچ معادل‌سازیِ خودکاری نمی‌گیرند.
                     const motherBagEntry = findMotherBagStockFor(item.name, settings?.motherBagStock);
                     const motherBagDescOn = motherBagEntry ? (motherBagEntry.descriptionEnabled !== false) : false;
-                    const isGround = motherBagDescOn && item.weight > 0;
+                    const isGround = o.motherBag && motherBagDescOn && item.weight > 0;
                     // هر کالا یک بلوک: نامِ کالا در سطر اول، و هر مشخصه (تعداد / وزن / معادل کیسه مادر) در سطر جدا
                     const details = [];
                     // سطر اول مثل قبل با جزئیات: «۱۵۰ کیسه ۵ کیلویی نامِ کالا» — وزن هر کیسه = وزن کل ÷ تعداد (فقط اگر عدد گرد/تمیز شد)
                     const perBag = item.qty > 0 && item.weight > 0 ? item.weight / item.qty : 0;
                     const perBagClean = perBag > 0 && Math.abs(perBag * 100 - Math.round(perBag * 100)) < 1e-6;
-                    const qtyText = item.qty ? `${formatNumber(item.qty)} کیسه${perBagClean ? ` ${formatNumber(Math.round(perBag * 100) / 100)} کیلویی` : ''} ` : '';
-                    if (item.weight > 0) details.push(`وزن کل: ${formatNumber(item.weight)} کیلوگرم`);
+                    // انتخاب دستی «دو دسته» برای وقتی که تقسیم گرد نیست (مثلاً ۱ کیسه ۳۴ و ۲ کیسه ۳۳ کیلویی)
+                    const sp = splitWeightIntoBags(item.weight, item.qty);
+                    const splitText = item._choice === 'split' && !sp.clean && sp.groups.length ? sp.groups.map(g => `${formatNumber(g.count)} کیسه ${formatNumber(g.kg)} کیلویی`).join(' و ') + ' ' : null;
+                    const qtyText = splitText ?? (item.qty ? `${formatNumber(item.qty)} کیسه${perBagClean ? ` ${formatNumber(Math.round(perBag * 100) / 100)} کیلویی` : ''} ` : '');
+                    if (o.weight && item.weight > 0) details.push(`وزن کل: ${formatNumber(item.weight)} کیلوگرم`);
                     // ریز جزئیاتِ ثبت‌شده در موجودی انبار (برند / مشخصه) — مقدارهای عمومی و تکراریِ نام نمایش داده نمی‌شوند
                     const extra = (v) => { v = String(v || '').trim(); return v && !['متفرقه', 'عمومی'].includes(v) && !String(item.name || '').includes(v) ? v : ''; };
-                    if (extra(item.brand)) details.push(`برند: ${extra(item.brand)}`);
+                    if (o.brand && extra(item.brand)) details.push(`برند: ${extra(item.brand)}`);
                     // کالای ثبت‌شده در «موجودی کیسه مادر»: سطر مشخصه و عنوان از قالب‌های خودِ ردیف ساخته می‌شود
                     const tplVars = { BAGS: formatNumber(item.qty || 0), PERBAG: perBagClean ? formatNumber(Math.round(perBag * 100) / 100) : '', NAME: item.name || '', BRAND: extra(item.brand), TAG: extra(item.tag), WEIGHT: formatNumber(item.weight || 0) };
-                    if (extra(item.tag)) details.push(motherBagEntry ? applyMotherBagTemplate(motherBagEntry.tagTemplate, tplVars, DEFAULT_TAG_TEMPLATE) : `مشخصه: ${extra(item.tag)}`);
+                    if (o.tag && extra(item.tag)) details.push(motherBagEntry ? applyMotherBagTemplate(motherBagEntry.tagTemplate, tplVars, DEFAULT_TAG_TEMPLATE) : `مشخصه: ${extra(item.tag)}`);
                     const titleText = motherBagEntry && item.qty && perBagClean ? applyMotherBagTemplate(motherBagEntry.titleTemplate, tplVars, DEFAULT_TITLE_TEMPLATE) : null;
                     if (isGround) {
                         // معادل‌سازی کیسه‌های ورودی (مثلاً ۵ کیلویی) با کیسه‌های مادر ۳۰ کیلویی، بر اساس وزن کل —
@@ -262,13 +273,20 @@
                     }
                     return [`▪️ ${titleText ?? `${qtyText}${item.name || ''}`}`, ...details.filter(Boolean).map(d => `   ◽ ${d}`)].map(l => RLM + l).join('\n');
                 });
-                return blocks.join('\n' + RLM + '┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n');
+                const text = blocks.join('\n' + RLM + '┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n');
+                if (!o.totals) return text;
+                const bags = eff.reduce((a, b) => a + (Number(b.qty) || 0), 0), kg = eff.reduce((a, b) => a + (Number(b.weight) || 0), 0);
+                return `${text}\n${RLM}━━━━━━━━━━━━━━\n${RLM}📦 جمع کل: ${formatNumber(eff.length)} قلم${bags ? ` | ${formatNumber(bags)} کیسه` : ''} | ${formatNumber(kg)} کیلوگرم`;
             };
 
-            const handleCopyDescription = async () => {
-                const text = generateAutoDescription();
-                if (!text) { toast.show('سبد خرید خالی است'); return; }
+            const handleCopyDescription = () => {
+                if (cart.length === 0) { toast.show('سبد خرید خالی است'); return; }
+                setCalcRows({}); setDescTab('view'); setShowDescModal(true);
+            };
+            const commitDescription = async () => {
+                const text = generateAutoDescription(descOpts);
                 setDescription(text);
+                setShowDescModal(false);
                 try {
                     await navigator.clipboard.writeText(text);
                     toast.show('📋 توضیحات تولید و در کلیپ‌بورد کپی شد');
@@ -822,6 +840,70 @@
                                 </div>
                             </div>
                         )}
+                        {showDescModal && (() => {
+                            const previewText = generateAutoDescription(descOpts);
+                            const toggles = [['weight', 'وزن کل'], ['brand', 'برند'], ['tag', 'مشخصه'], ['motherBag', 'معادل کیسه مادر'], ['totals', 'جمع کل (قلم / کیسه / وزن)']];
+                            const setRow = (id, patch) => setCalcRows(r => ({ ...r, [id]: { ...r[id], ...patch } }));
+                            const tabCls = (t) => `flex-1 py-2 rounded-xl text-xs font-black transition ${descTab === t ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:bg-white'}`;
+                            return <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setShowDescModal(false)}>
+                                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200" onClick={e => e.stopPropagation()}>
+                                    <div className="px-5 py-3 border-b flex items-center justify-between">
+                                        <h3 className="font-black text-slate-800 text-sm flex items-center gap-2"><ClipboardList size={16}/> تولید و کپی توضیحات</h3>
+                                        <button type="button" onClick={() => setShowDescModal(false)} className="text-slate-400 hover:text-slate-700 text-lg leading-none px-2">✕</button>
+                                    </div>
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-5 overflow-auto">
+                                        <div className="flex flex-col gap-3">
+                                            <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl">
+                                                <button type="button" className={tabCls('view')} onClick={() => setDescTab('view')}>نمایش اطلاعات</button>
+                                                <button type="button" className={tabCls('calc')} onClick={() => setDescTab('calc')}>محاسبه وزن / تعداد</button>
+                                            </div>
+                                            {descTab === 'view' ? (
+                                                <div className="flex flex-col gap-2">
+                                                    {toggles.map(([k, label]) => (
+                                                        <label key={k} className="flex items-center gap-2 text-sm font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 cursor-pointer select-none">
+                                                            <input type="checkbox" checked={!!descOpts[k]} onChange={e => setDescOpts(o => ({ ...o, [k]: e.target.checked }))} className="w-4 h-4 accent-indigo-600"/> {label}
+                                                        </label>
+                                                    ))}
+                                                    <div className="text-[11px] text-slate-400 leading-5">خاموش‌کردن هر بخش فقط متن را کوتاه می‌کند؛ اطلاعات فاکتور تغییری نمی‌کند.</div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="text-[11px] text-slate-500 leading-5">وزن کل و تعداد را بنویسید تا وزن هر کیسه حساب شود. این اصلاح فقط روی متن توضیحات اثر دارد، نه روی ردیف‌های فاکتور.</div>
+                                                    {cart.map(c => {
+                                                        const ov = calcRows[c.itemId] || {};
+                                                        const w = ov.weight ?? c.weight, q = ov.qty ?? c.qty;
+                                                        const sp = splitWeightIntoBags(w, q);
+                                                        const inCls = 'w-full h-9 px-3 rounded-xl border border-slate-300 text-sm bg-white outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100';
+                                                        return <div key={c.itemId} className="border border-slate-200 rounded-2xl p-3 flex flex-col gap-2 bg-slate-50/60">
+                                                            <div className="font-black text-xs text-slate-800">{c.name}</div>
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                <label className="text-[11px] text-slate-500 font-bold">وزن کل (کیلو)<input type="number" step="any" min="0" className={inCls} value={w || ''} onChange={e => setRow(c.itemId, { weight: parseDecimal(e.target.value) })}/></label>
+                                                                <label className="text-[11px] text-slate-500 font-bold">تعداد کیسه<input type="number" step="any" min="0" className={inCls} value={q || ''} onChange={e => setRow(c.itemId, { qty: parseDecimal(e.target.value) })}/></label>
+                                                            </div>
+                                                            {w > 0 && q > 0 && (sp.clean
+                                                                ? <div className="text-xs font-bold text-emerald-700">✓ {formatNumber(q)} کیسه {formatNumber(sp.perBag)} کیلویی</div>
+                                                                : <div className="text-xs bg-amber-50 border border-amber-200 rounded-xl p-2 flex flex-col gap-1.5">
+                                                                    <div className="font-bold text-amber-800">تقسیم گرد نمی‌شود (حدود {formatNumber(Math.round(sp.perBag * 100) / 100)} کیلو برای هر کیسه). کدام در متن بیاید؟</div>
+                                                                    {sp.groups.length > 0 && <label className="flex items-center gap-2 cursor-pointer"><input type="radio" className="accent-indigo-600" checked={ov.choice === 'split'} onChange={() => setRow(c.itemId, { choice: 'split' })}/> دو دسته: {sp.groups.map(g => `${formatNumber(g.count)} کیسه ${formatNumber(g.kg)} کیلویی`).join(' و ')}</label>}
+                                                                    <label className="flex items-center gap-2 cursor-pointer"><input type="radio" className="accent-indigo-600" checked={ov.choice !== 'split'} onChange={() => setRow(c.itemId, { choice: 'none' })}/> فقط تعداد کیسه، بدون وزن هر کیسه</label>
+                                                                </div>)}
+                                                        </div>;
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col gap-2">
+                                            <div className="text-xs font-black text-slate-700">پیش‌نمایش متن</div>
+                                            <textarea readOnly value={previewText} className="w-full flex-1 min-h-[300px] p-3 border border-slate-200 rounded-2xl text-sm leading-7 bg-slate-50 outline-none resize-none" dir="rtl"/>
+                                        </div>
+                                    </div>
+                                    <div className="px-5 py-3 border-t flex justify-end gap-2">
+                                        <button type="button" onClick={() => setShowDescModal(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">انصراف</button>
+                                        <button type="button" onClick={commitDescription} className="px-4 py-2 rounded-xl text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 transition flex items-center gap-1.5"><ClipboardList size={14}/> درج در توضیحات و کپی</button>
+                                    </div>
+                                </div>
+                            </div>;
+                        })()}
                         {showManualModal && <ManualItemModal onClose={() => setShowManualModal(false)} onAdd={addManualItem} items={items} />}
                         {showPrint && <PrintInvoiceModal invoice={{id: initialData?.id || 'draft', date, customer, items: cart, description, settlementTerm, dueDate, includeLoadingCost: includeLoadingCostChoice, loadingCostAmount: includeLoadingCostChoice ? getLoadingCostAmount() : 0, totalPrice: getTotal(), status: initialData?.status || 'draft', notices: getSelectedNoticeTexts()}} settings={settings} inventoryItems={items} onClose={() => setShowPrint(false)} />}
                         {editingCartItem && (

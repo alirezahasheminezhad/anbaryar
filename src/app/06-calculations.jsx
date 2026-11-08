@@ -130,3 +130,19 @@
                 .replace(/ {2,}/g, ' ').trim();
         };
 
+
+        // تقسیم وزن کل بر تعداد کیسه برای «تولید توضیحات».
+        // clean=true  → وزن هر کیسه عددِ گرد (حداکثر ۲ رقم اعشار) است؛ perBag همان است.
+        // clean=false → groups = دو دسته که جمعشان دقیقاً برابر وزن کل می‌شود
+        //   (مثلاً ۱۰۰ کیلو در ۳ کیسه ← ۱ کیسه ۳۴ + ۲ کیسه ۳۳). اگر تعداد صحیح نباشد، groups خالی است.
+        const splitWeightIntoBags = (weight, qty) => {
+            const w = Number(weight) || 0, n = Number(qty) || 0;
+            if (w <= 0 || n <= 0) return { clean: false, perBag: 0, groups: [] };
+            const per = w / n;
+            if (Math.abs(per * 100 - Math.round(per * 100)) < 1e-6) return { clean: true, perBag: Math.round(per * 100) / 100, groups: [] };
+            if (!Number.isInteger(n)) return { clean: false, perBag: per, groups: [] };
+            const unit = Number.isInteger(w) ? 1 : 0.01; // وزن صحیح ← تقسیم با دقت ۱ کیلو، وگرنه ۰٫۰۱
+            const wu = Math.round(w / unit), base = Math.floor(wu / n), r = wu - base * n;
+            const kg = (u) => Math.round(u * unit * 100) / 100;
+            return { clean: false, perBag: per, groups: [{ count: r, kg: kg(base + 1) }, { count: n - r, kg: kg(base) }].filter(g => g.count > 0) };
+        };
