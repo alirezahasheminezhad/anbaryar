@@ -1,5 +1,5 @@
 //## ═══ app/12-navigation-critical-stats.jsx ═══
-//## ناوبری (VIEW_GROUPS، GroupTabs، Sidebar)، اقلام بحرانی، آمار موجودی.
+//## ناوبری (VIEW_GROUPS، GroupTabs)، اقلام بحرانی، آمار موجودی.
 //## ترتیب فایل‌ها در build.py مهم است؛ همه‌ی بخش‌ها یک scope مشترک دارند.
         const VIEW_GROUPS = [
             { id: 'flows', label: 'گردش کالا', tabs: [{ id: 'purchases', group: 'flows', label: 'گردش کالا', icon: ArrowDownLeft }, { id: 'processing', label: 'آنالیز / پردازش', icon: RefreshCw }, { id: 'consignments', label: 'امانی (قرض بار)', icon: Handshake }] },
@@ -15,74 +15,6 @@
                     {g.tabs.map(t => (
                         <button key={t.id} role="tab" aria-selected={view === t.id} onClick={() => setView(t.id)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap border-r-4 transition-all cursor-pointer ${view === t.id ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/20 border-brass-400' : 'border-transparent text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'}`}><t.icon size={16}/>{t.label}</button>
                     ))}
-                </div>
-            );
-        };
-
-        const Sidebar = ({ view, setView, items, invoices, reservedCounts, lowStockThreshold = 100 }) => {
-            const menu = [
-                { id: 'dashboard', label: 'داشبورد و موجودی', icon: LayoutDashboard },
-                { id: 'mahak-import', label: 'همگام‌سازی موجودی محک', icon: FileSpreadsheet },
-                { id: 'pos', label: 'فاکتور فروش (وزنی)', icon: Scale },
-                { id: 'history', label: 'گزارش فاکتورها', icon: History },
-                { id: 'purchases', label: 'خرید کالا (در راه)', icon: ArrowDownLeft },
-                { id: 'reminders', label: 'سررسیدها و پیگیری', icon: Bell },
-                { id: 'check-rass', label: 'راس‌گیری چک', icon: Landmark },
-                { id: 'inventory-master', label: 'گزارش مرکزی موجودی', icon: Table2 },
-                { id: 'estelam', label: 'استعلام', icon: FileText },
-                { id: 'notes', label: 'یادداشت‌ها', icon: ClipboardList },
-                { id: 'settings', group: 'settings', label: 'تنظیمات', icon: Settings },
-            ];
-            // اعلان فعال سررسید: تعداد فاکتورهای نسیه‌ی تسویه‌نشده که سررسیدشان امروز یا گذشته است
-            const dueAlertCount = (invoices || []).filter(inv => {
-                if (!inv.dueDate || inv.status === 'cancelled' || inv.paymentStatus === 'settled') return false;
-                const u = getDueUrgency(inv.dueDate);
-                return u === 'overdue' || u === 'today';
-            }).length;
-            // بارهای بحرانی: صفر/منفی یا رسیدن موجودی آزاد به آستانه هشدار عمومی/اختصاصی کالا
-            const settings = loadSettings();
-            const muteMap = settings.criticalMutes || {};
-            const now = Date.now();
-            const criticalItems = (items || []).filter(i => {
-                const reserved = (reservedCounts && reservedCounts[i.id]) || 0;
-                const low = getLowStockState(i, reserved, lowStockThreshold);
-                const isCritical = Number(i.quantity) <= 0 || low.isLowStock;
-                const muteUntil = Number(muteMap[i.id] || 0);
-                const isMuted = muteUntil === -1 || muteUntil > now;
-                return isCritical && !isMuted;
-            });
-            return (
-                <div className="w-full md:w-64 bg-white text-slate-600 flex flex-col md:h-screen md:sticky md:top-0 z-40 no-print shrink-0 md:m-2 md:rounded-3xl md:border md:border-slate-200/70 shadow-md shadow-indigo-900/5 overflow-hidden">
-                    <div className="hidden md:block h-[3px] w-full bg-gradient-to-l from-indigo-700 via-brass-400 to-indigo-700 shrink-0" />
-                    <div className="p-5 flex items-center gap-3 text-slate-800 border-b border-slate-100">
-                        <div className="bg-gradient-to-br from-brass-400 to-brass-600 p-2 rounded-xl shadow-lg shadow-brass-900/20 ring-1 ring-brass-300/40"><Store size={22} className="text-white"/></div>
-                        <div><h1 className="font-bold text-lg tracking-tight">انبار یار</h1><p className="text-[10px] text-brass-500/90 tracking-wide">نسخه جامع</p></div>
-                    </div>
-                    {/* رفع باگ ساید‌بار: با اضافه‌شدن آیتم‌های جدید، تعداد کل آیتم‌ها از ارتفاع صفحه بیشتر شده بود؛
-                        قبلاً overflow-visible بود (یعنی هیچ اسکرولی نداشت) و آیتم‌های پایینی از صفحه بیرون/روی هم می‌افتادند.
-                        حالا خودِ منو در دسکتاپ به‌صورت مستقل اسکرول می‌شود، هدر بالا ثابت می‌ماند. */}
-                    <nav className="flex-1 min-h-0 p-3 space-y-2 overflow-x-auto flex md:flex-col md:overflow-y-auto md:overflow-x-visible">
-                        {menu.map(item => (
-                            <React.Fragment key={item.id}>
-                                {item.id === 'settings' && criticalItems.length > 0 && (
-                                    /* فقط یک دکمه با تعداد نشان داده می‌شود؛ لیست کامل با کلیک، در یک
-                                       بخش/صفحه‌ی جداگانه (view === 'critical') باز می‌شود، نه از قبل داخل ساید‌بار. */
-                                    <button
-                                        type="button"
-                                        onClick={() => setView('critical')}
-                                        className={`w-full flex items-center justify-between gap-2 text-xs font-bold rounded-xl p-3 md:my-1 shrink-0 border transition-colors cursor-pointer ${view === 'critical' ? 'bg-red-100 border-red-300 text-red-800' : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'}`}
-                                    >
-                                        <span className="flex items-center gap-1.5"><AlertTriangle size={14}/> بارهای بحرانی ({criticalItems.length})</span>
-                                        <ChevronLeft size={14} className="opacity-70"/>
-                                    </button>
-                                )}
-                                <button onClick={() => setView(item.id)} className={`flex items-center gap-3 pr-3 pl-4 py-3 rounded-xl transition-all w-full text-sm font-medium whitespace-nowrap border-r-4 cursor-pointer ${(item.group ? getViewGroup(view)?.id === item.group : view === item.id) ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30 border-brass-400' : item.id === 'reminders' && dueAlertCount > 0 ? 'border-transparent text-amber-700 bg-amber-50 hover:bg-amber-100' : 'border-transparent text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'}`}>
-                                    <item.icon size={18} /> {item.label}
-                                    {item.id === 'reminders' && dueAlertCount > 0 && <span className={`mr-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${view === 'reminders' ? 'bg-white/20 text-white' : 'bg-amber-200 text-amber-800'}`}>{dueAlertCount}</span>}
-                                </button>
-                            </React.Fragment>
-                        ))}
-                    </nav>
                 </div>
             );
         };
@@ -215,38 +147,30 @@
             const sellableIncomingMap = getPurchaseSellableIncomingMap(purchases);
             const totalSellableIncoming = Object.values(sellableIncomingMap).reduce((a, b) => a + b, 0);
 
+            const freePct = totalPhysical > 0 ? Math.max(0, Math.round(availableQuantity / totalPhysical * 100)) : 0;
+            // کارت آمار هم‌شکل رابط مرجع: نوار کوچک کنار برچسب، آیکن در قاب گرد‌گوشه، عدد درشت و توضیح ریز.
+            const StatCard = ({ label, value, hint, icon: Icon, dark, pill, wide }) => (
+                <div className={`rounded-3xl p-4 md:p-5 shadow-sm flex flex-col justify-between min-h-[128px] ${wide ? 'col-span-2 xl:col-span-1' : ''} ${dark ? 'bg-indigo-900 text-white' : 'bg-white'}`}>
+                    <div className="flex items-start justify-between gap-3">
+                        <p className={`text-xs font-medium border-r-2 pr-2 leading-5 ${dark ? 'text-white/80 border-white/40' : 'text-slate-500 border-indigo-600'}`}>{label}</p>
+                        <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${dark ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-600'}`}><Icon size={17}/></span>
+                    </div>
+                    <p className={`text-2xl md:text-3xl font-black tabular-nums mt-2 ${dark ? 'text-white' : 'text-indigo-900'}`}>{value}</p>
+                    <div className="flex items-end justify-between gap-2 mt-2">
+                        <p className={`text-[11px] ${dark ? 'text-white/60' : 'text-slate-400'}`}>{hint}</p>
+                        {pill && <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg ${dark ? 'bg-white/15 text-white' : 'bg-emerald-50 text-emerald-700'}`}>{pill}</span>}
+                    </div>
+                </div>
+            );
+
             return (
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
-                    <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col justify-between">
-                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2"><Layers size={14}/></div>
-                        <p className="text-slate-400 text-xs mb-1">تنوع کالا</p>
-                        <p className="text-xl font-black text-slate-700">{totalItems}</p>
-                    </div>
-                    <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col justify-between">
-                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2"><PackageOpen size={14}/></div>
-                        <p className="text-slate-400 text-xs mb-1">موجودی فیزیکی کل</p>
-                        <p className="text-xl font-black text-slate-700">{formatNumber(totalPhysical)}</p>
-                    </div>
-                    <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100 shadow-sm flex flex-col justify-between">
-                        <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-2"><Truck size={14} /></div>
-                        <p className="text-amber-600 text-xs mb-1">در صف خروج</p>
-                        <p className="text-xl font-black text-amber-700">{formatNumber(totalReserved)}</p>
-                    </div>
-                    <div className="bg-sky-50 rounded-2xl p-4 border border-sky-100 shadow-sm flex flex-col justify-between">
-                        <div className="w-8 h-8 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center mb-2"><ArrowDownLeft size={14} /></div>
-                        <p className="text-sky-600 text-xs mb-1">خرید در راه (نرسیده)</p>
-                        <p className="text-xl font-black text-sky-700">{formatNumber(totalIncoming)}</p>
-                    </div>
-                    <div className="bg-teal-50 rounded-2xl p-4 border border-teal-100 shadow-sm flex flex-col justify-between">
-                        <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center mb-2"><Package size={14} /></div>
-                        <p className="text-teal-600 text-xs mb-1">قابل پیش‌فروش (در راه)</p>
-                        <p className="text-xl font-black text-teal-700">{formatNumber(totalSellableIncoming)}</p>
-                    </div>
-                    <div className="bg-gradient-to-br from-brass-500 to-brass-600 rounded-2xl p-4 text-white shadow-lg shadow-brass-900/20 flex flex-col justify-between">
-                        <div className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center mb-2"><CheckCircle size={14}/></div>
-                        <p className="text-white/80 text-xs mb-1">موجودی قابل فروش</p>
-                        <p className="text-2xl font-black">{formatNumber(availableQuantity)}</p>
-                    </div>
+                <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+                    <StatCard dark wide label="موجودی قابل فروش" value={formatNumber(availableQuantity)} hint={`از ${formatNumber(totalPhysical)} موجودی فیزیکی`} icon={CheckCircle} pill={`${formatNumber(freePct)}٪ آزاد`} />
+                    <StatCard label="موجودی فیزیکی کل" value={formatNumber(totalPhysical)} hint="مجموع همه‌ی اقلام" icon={PackageOpen} />
+                    <StatCard label="تنوع کالا" value={totalItems} hint="کالای ثبت‌شده" icon={Layers} />
+                    <StatCard label="در صف خروج" value={formatNumber(totalReserved)} hint="رزرو فاکتور و پردازش" icon={Truck} />
+                    <StatCard label="خرید در راه (نرسیده)" value={formatNumber(totalIncoming)} hint="هنوز وارد انبار نشده" icon={ArrowDownLeft} />
+                    <StatCard wide label="قابل پیش‌فروش (در راه)" value={formatNumber(totalSellableIncoming)} hint="از محموله‌های در راه" icon={Package} />
                 </div>
             );
         };

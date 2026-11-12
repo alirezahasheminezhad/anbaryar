@@ -27,12 +27,12 @@ CI (`.github/workflows/check.yml`) با `python3 build.py --check` مطمئن م
 | `src/app/04-excel-services.jsx` | 11 KB | سرویس‌های اکسل: خروجی موجودی/فاکتورها و خواندن فایل اکسل. |
 | `src/app/05-storage-security.jsx` | 16 KB | ذخیره‌سازی (localStorage + IndexedDB رمزنگاری‌شده)، قفل امنیتی، تنظیمات، loadData/saveData. |
 | `src/app/06-calculations.jsx` | 12 KB | قوانین محاسبه: هزینه‌ی بارگیری، وزن مؤثر ردیف، کیسه‌ی مادر و قالب‌های توضیحات. |
-| `src/app/07-header.jsx` | 3 KB | کامپوننت Header (نوار بالا). |
+| `src/app/07-header.jsx` | 3 KB | کامپوننت TopNav (نوار بالا: لوگو، منوی گرد شناور، اعلان بحرانی، قفل). |
 | `src/app/08-mahak-import.jsx` | 83 KB | ورود/همگام‌سازی از محک: نرمال‌سازی نام، smartSearchMatch، MahakImportView، parseMahakExcelFile. |
 | `src/app/09-mother-bag-row.jsx` | 17 KB | ردیف تنظیمات کیسه‌ی مادر (MotherBagRow). |
 | `src/app/10-app-docs.jsx` | 29 KB | مستندات داخلی برنامه (APP_DOCS_MD) و AppDocsView. با هر تغییر، نسخه/تاریخ این مستندات را به‌روز کن. |
 | `src/app/11-mother-bag-stock.jsx` | 10 KB | موجودی کیسه‌ی مادر/کیسه‌ی خالی (EmptyBagPanel، MotherBagStockView). |
-| `src/app/12-navigation-critical-stats.jsx` | 24 KB | ناوبری (VIEW_GROUPS، GroupTabs، Sidebar)، اقلام بحرانی، آمار موجودی. |
+| `src/app/12-navigation-critical-stats.jsx` | 24 KB | ناوبری (VIEW_GROUPS، GroupTabs)، اقلام بحرانی، آمار موجودی. |
 | `src/app/13-pending-outputs.jsx` | 34 KB | خروجی‌های در انتظار: جزئیات سند، گزارش خروجی‌های در انتظار، PendingOrders. |
 | `src/app/14-inventory.jsx` | 94 KB | موجودی کالا: کارت/گروه اقلام، ادغام، افزودن/ویرایش، تاریخچه، شمارش موجودی، پیش‌نمایش اکسل. |
 | `src/app/15-invoice-modals.jsx` | 61 KB | مودال جزئیات فاکتور (InvoiceDetailsModal) و تأیید ارسال (ConfirmShipmentModal). |

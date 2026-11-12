@@ -29,7 +29,8 @@
             // نادرست موجودی (برگشت/کسر اشتباه) می‌شد. navigateTo تضمین می‌کند هر پیمایش عادی این حالت را ریست کند.
             const navigateTo = (v) => { setEditingInvoice(null); setView(v); };
             const [appSettings, setAppSettings] = useState(loadSettings());
-            const [inventoryViewMode, setInventoryViewMode] = useState('card'); // 'card' | 'table'
+            const [inventoryViewMode, setInventoryViewMode] = useState('table'); // 'card' | 'table'
+            const [showAddForm, setShowAddForm] = useState(false); // فرم افزودن کالا فقط با دکمه‌ی «+ افزودن کالا» باز می‌شود
             const [showSecurityCenter, setShowSecurityCenter] = useState(false);
             useEffect(()=>{
                 const fn=()=>setShowSecurityCenter(true);
@@ -1159,53 +1160,70 @@
             };
 
             return (
-                <div className="app-shell flex flex-col md:flex-row min-h-screen font-[Vazirmatn]">
-                    <Sidebar view={view} setView={navigateTo} items={items} invoices={invoices} reservedCounts={reservedCounts} lowStockThreshold={appSettings.lowStockThreshold ?? 100} />
-                    <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen">
-                        <Header lastSaved={lastSaved} title={getTitle()} />
+                <div className="app-shell flex flex-col h-screen font-[Vazirmatn]">
+                    <TopNav view={view} setView={navigateTo} items={items} invoices={invoices} reservedCounts={reservedCounts} lowStockThreshold={appSettings.lowStockThreshold ?? 100} lastSaved={lastSaved} />
+                    <main className="flex-1 min-h-0 overflow-y-auto px-4 md:px-8 pb-8">
+                      <div className="max-w-[1400px] mx-auto">
+                        {/* عنوان صفحه: بزرگ و ساده مثل رابط مرجع؛ در داشبورد زیرعنوان و دکمه‌ی اصلی هم دارد */}
+                        <div className="no-print flex items-end justify-between gap-4 pt-6 pb-6">
+                            <div className="min-w-0">
+                                <h1 className={`${view === 'dashboard' ? 'text-3xl md:text-4xl' : 'text-2xl md:text-3xl'} font-black text-indigo-900 tracking-tight truncate`}>{getTitle()}</h1>
+                                {view === 'dashboard' && <p className="text-slate-500 mt-1.5">موجودی، رزروها و خریدهای در راه را یک‌جا ببینید و مدیریت کنید</p>}
+                            </div>
+                            {view === 'dashboard' && <button onClick={() => setShowAddForm(v => !v)} aria-expanded={showAddForm} className="shrink-0 h-11 px-6 rounded-full bg-indigo-600 text-white text-sm font-bold shadow-md shadow-indigo-900/20 hover:bg-indigo-700 transition cursor-pointer">{showAddForm ? '× بستن فرم' : '+ افزودن کالا'}</button>}
+                        </div>
                         <GroupTabs view={view} setView={navigateTo} />
-                        <div className="h-5"></div>
                         {view === 'dashboard' && (
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                                <div className="lg:col-span-9 flex flex-col gap-6">
+                                <div className="lg:col-span-9 flex flex-col gap-5 min-w-0">
                                     <InventoryStats items={items} invoices={invoices} processingOrders={processingOrders} purchases={purchases} />
 
-                                    {/* Excel/Backup Actions */}
-                                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-3 flex flex-col sm:flex-row gap-3">
-                                        <div className="relative flex-1">
-                                            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
-                                            <input className="w-full bg-slate-50 border border-slate-100 rounded-full py-2.5 pr-11 pl-4 text-sm outline-none focus:border-indigo-300 focus:bg-white transition" placeholder="جستجو در کالاها..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
+                                    {/* جستجو + فیلتر انبار + نمای فهرست (چیپ‌های گرد مثل رابط مرجع) */}
+                                    <div className="flex flex-col xl:flex-row xl:items-center gap-3">
+                                        <div className="relative w-full xl:w-72 shrink-0">
+                                            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
+                                            <input aria-label="جستجو در کالاها" className="w-full bg-white rounded-full shadow-sm py-3 pr-11 pl-4 text-sm outline-none focus:ring-2 focus:ring-indigo-600/30 transition" placeholder="جستجو در کالاها..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
                                         </div>
-                                        {(appSettings.warehouses || []).length > 0 && (
-                                            <div className="relative">
-                                                <select className="h-full bg-slate-50 border border-slate-100 rounded-full py-2.5 pr-8 pl-3 text-sm font-bold text-slate-600 outline-none focus:border-indigo-300 appearance-none" value={warehouseFilter} onChange={e => setWarehouseFilter(e.target.value)}>
-                                                    <option value="">همه انبارها</option>
-                                                    <option value="__none__">بدون انبار</option>
-                                                    {appSettings.warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                                                </select>
-                                                <Warehouse className="absolute right-3 top-3 text-slate-400 pointer-events-none" size={16}/>
+                                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 xl:mr-auto">
+                                            {(appSettings.warehouses || []).length > 0 && (
+                                                <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="فیلتر انبار">
+                                                    <span className="text-[11px] text-slate-500 tracking-wide">انبار</span>
+                                                    {[{ v: '', l: 'همه' }, { v: '__none__', l: 'بدون انبار' }, ...appSettings.warehouses.map(w => ({ v: w.id, l: w.name }))].map(o => (
+                                                        <button key={o.v} onClick={() => setWarehouseFilter(o.v)} aria-pressed={warehouseFilter === o.v} className={`h-9 px-4 rounded-full text-xs font-bold transition cursor-pointer ${warehouseFilter === o.v ? 'bg-indigo-900 text-white' : 'bg-white text-slate-600 shadow-sm hover:bg-indigo-50'}`}>{o.l}</button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <div className="flex items-center gap-2" role="group" aria-label="نمای فهرست">
+                                                <span className="text-[11px] text-slate-500 tracking-wide">نمایش</span>
+                                                <button onClick={() => setInventoryViewMode('table')} aria-pressed={inventoryViewMode === 'table'} className={`h-9 px-4 rounded-full text-xs font-bold transition cursor-pointer ${inventoryViewMode === 'table' ? 'bg-indigo-900 text-white' : 'bg-white text-slate-600 shadow-sm hover:bg-indigo-50'}`}>جدول</button>
+                                                <button onClick={() => setInventoryViewMode('card')} aria-pressed={inventoryViewMode === 'card'} className={`h-9 px-4 rounded-full text-xs font-bold transition cursor-pointer ${inventoryViewMode === 'card' ? 'bg-indigo-900 text-white' : 'bg-white text-slate-600 shadow-sm hover:bg-indigo-50'}`}>کارت</button>
                                             </div>
-                                        )}
-                                        <div className="flex gap-2 flex-wrap">
-                                            {/* View Mode Toggle */}
-                                            <div className="flex bg-slate-50 border border-slate-100 rounded-full overflow-hidden shadow-sm">
-                                                <button onClick={() => setInventoryViewMode('card')} className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold transition rounded-full ${inventoryViewMode === 'card' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-white'}`}><LayoutList size={15}/> کارت</button>
-                                                <button onClick={() => setInventoryViewMode('table')} className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold transition rounded-full ${inventoryViewMode === 'table' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-white'}`}><Table2 size={15}/> جدول</button>
-                                            </div>
-                                            <button onClick={handleSystemBackup} className="flex items-center gap-1 bg-slate-800 text-white px-3.5 py-2 rounded-full text-xs font-bold hover:bg-slate-900 transition"><Save size={16}/> بکاپ</button>
-                                            <label className="flex items-center gap-1 bg-slate-50 border border-slate-100 px-3.5 py-2 rounded-full cursor-pointer text-xs font-bold hover:bg-white transition"><Upload size={16}/> بازگردانی <input type="file" className="hidden" onChange={handleSystemRestore}/></label>
-                                            <button onClick={()=>exportToExcel(items, appSettings.warehouses)} className="flex items-center gap-1 bg-emerald-600 text-white px-3.5 py-2 rounded-full text-xs font-bold hover:bg-emerald-700 transition"><Download size={16}/> خروجی</button>
-                                            <label className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3.5 py-2 rounded-full cursor-pointer text-xs font-bold hover:bg-emerald-100 transition"><FileSpreadsheet size={16}/> ورود اکسل <input type="file" className="hidden" onChange={handleFileUpload}/></label>
-                                            <button onClick={()=>navigateTo('mahak-import')} className="flex items-center gap-1 bg-brass-500 text-white px-3.5 py-2 rounded-full text-xs font-black hover:bg-brass-600 transition"><FileSpreadsheet size={16}/> همگام‌سازی محک</button>
                                         </div>
                                     </div>
 
-                                    <AddItemForm onAdd={handleAdd} items={items} warehouses={appSettings.warehouses} />
-                                    
-                                    <div className="space-y-4">
+                                    {showAddForm && (
+                                        <AddItemForm onAdd={handleAdd} items={items} warehouses={appSettings.warehouses} />
+                                    )}
+
+                                    <div className="bg-white rounded-3xl shadow-sm overflow-hidden">
+                                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 px-6 pt-5 pb-4">
+                                            <div>
+                                                <h2 className="text-lg font-black text-indigo-900">همه کالاها</h2>
+                                                <p className="text-xs text-slate-500 mt-0.5">{filteredItems.length} کالا در {Object.keys(grouped).length} گروه</p>
+                                            </div>
+                                            <div className="flex gap-2 flex-wrap sm:justify-end">
+                                                <button onClick={handleSystemBackup} className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"><Save size={15}/> بکاپ</button>
+                                                <label className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"><Upload size={15}/> بازگردانی <input type="file" className="hidden" onChange={handleSystemRestore}/></label>
+                                                <button onClick={()=>exportToExcel(items, appSettings.warehouses)} className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"><Download size={15}/> خروجی</button>
+                                                <label className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"><FileSpreadsheet size={15}/> ورود اکسل <input type="file" className="hidden" onChange={handleFileUpload}/></label>
+                                                <button onClick={()=>navigateTo('mahak-import')} className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition cursor-pointer"><FileSpreadsheet size={15}/> همگام‌سازی محک</button>
+                                            </div>
+                                        </div>
+                                        <div>
                                         {Object.keys(grouped).sort().map(name => (
                                             <InventoryGroup key={name} name={name} items={grouped[name]} reservedCounts={reservedCounts} onUpdateQuantity={handleUpdateQuantity} onDelete={handleDelete} onEdit={setEditingItem} onShowHistory={setHistoryItem} onMerge={setMergeItem} onCount={setCountingItem} viewMode={inventoryViewMode} lowStockThreshold={appSettings.lowStockThreshold ?? 100} warehouses={appSettings.warehouses} />
                                         ))}
+                                    </div>
                                     </div>
                                 </div>
                                 <div className="lg:col-span-3 h-full">
@@ -1262,6 +1280,7 @@
                         {view === 'item-flow' && <AYErrorBoundary><ItemFlowView items={items} transactions={transactions} onOpenHistory={setHistoryItem} /></AYErrorBoundary>}
                         {view === 'settings' && <AYErrorBoundary><SettingsView settings={appSettings} onSave={handleSaveSettings} /></AYErrorBoundary>}
                         {view === 'critical' && <AYErrorBoundary><CriticalItemsView items={items} reservedCounts={reservedCounts} lowStockThreshold={appSettings.lowStockThreshold ?? 100} criticalMutes={appSettings.criticalMutes || {}} criticalGroups={appSettings.criticalGroups || []} onSaveCriticalGroups={(groups)=>{ setAppSettings(prev=>{ const next={...prev, criticalGroups: groups}; saveSettings(next); return next; }); }} onToggleMute={(id,mode)=>{ setAppSettings(prev=>{ const m={...(prev.criticalMutes||{})}; if(mode==='unmute') delete m[id]; else if(mode==='snooze') m[id]=Date.now()+3600000; else m[id]=-1; const next={...prev,criticalMutes:m}; saveSettings(next); return next; }); }} onSelectItem={(item) => { setSearchTerm(`${item.name}${item.brand ? ' ' + item.brand : ''}`); navigateTo('dashboard'); }} /></AYErrorBoundary>}
+                      </div>
                     </main>
                     {editingItem && <EditItemModal item={editingItem} invoices={invoices} processingOrders={processingOrders} purchases={purchases} warehouses={appSettings.warehouses} onClose={()=>setEditingItem(null)} onSave={handleSaveItem} />}
                     {historyItem && <HistoryModal item={historyItem} transactions={transactions} invoices={invoices} purchases={purchases} processingOrders={processingOrders} consignments={consignments} onViewDocument={(row)=>{ if(!row) return; if(row.kind==='invoice') setViewInvoice(row.data); else setViewDocument(row); }} onClose={()=>setHistoryItem(null)} />}

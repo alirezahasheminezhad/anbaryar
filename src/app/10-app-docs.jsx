@@ -4,7 +4,7 @@
         // ===== مستندات برنامه =====
         // نگهداری: هر تغییری که در برنامه داده می‌شود، باید این متن هم به‌روز شود (و شماره‌ی نسخه/تاریخ بالای آن).
         // هدف: هر هوش مصنوعی یا هر فردی که این فایل را می‌بیند، در کمترین زمان بفهمد برنامه چیست و کجا را باید بخواند.
-        const APP_DOCS_VERSION = 'v7.5 — ۱۴۰۵/۰۸/۱۷';
+        const APP_DOCS_VERSION = 'v7.6 — ۱۴۰۵/۰۸/۲۲';
         const APP_DOCS_MD = `# مستندات کامل برنامه‌ی «انبار یار» (Pro Mahak Sync)
 
 نسخه‌ی مستندات: ${APP_DOCS_VERSION}
@@ -156,7 +156,7 @@
 - پشتیبان کامل شامل همه‌ی کلیدهای localStorage (به‌جز کلید ورود موقت) و داده‌ی ابزار استعلام است.
 
 ## ۷. مسیرهای مهم رابط کاربری
-- منوی کناری: کامپوننت Sidebar با آرایه‌ی menu و شناسه‌های view.
+- نوار بالا (جایگزین منوی کناری): کامپوننت TopNav در 07-header.jsx؛ آیتم‌های اصلی در نوار گرد و بقیه زیر «بیشتر»؛ شناسه‌های view همان قبلی است.
 - نمایش صفحه: بلوک main در کامپوننت اصلی App با سوییچ روی view (مثلاً view === 'check-rass' → CheckRassView).
 - پنجره‌ها: InvoiceDetailsModal، DocumentDetailsModal، HistoryModal، EditItemModal، MergeInventoryModal، ExcelImportPreviewModal، InventoryCountModal، SecurityCenter.
 - پیام‌ها: ToastProvider (toast.show) و ConfirmProvider (useConfirm).
@@ -172,7 +172,7 @@
 - RemindersView: سررسیدها و پیگیری.
 - EmptyBagPanel: کیسه‌های خالی آنالیز.
 - MotherBagStockView و MotherBagRow: موجودی کیسه مادر.
-- Sidebar: منوی کناری.
+- TopNav: نوار ناوبری بالا.
 - App: کامپوننت ریشه‌ی برنامه و مدیریت state اصلی (items، invoices، purchases، processingOrders، consignments، notes، appSettings).
 
 ## ۹. ابزارهای کمکی و توابع مشترک

@@ -103,8 +103,8 @@
             const hasZeroStock = items.some(item => item.quantity <= 0);
 
             return (
-                <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden mb-4 animate-in fade-in duration-500 ${hasZeroStock ? 'border-red-200' : hasLowStock ? 'border-orange-200' : 'border-slate-200'}`}>
-                    <div className={`px-4 py-3 border-b flex items-center justify-between cursor-pointer select-none transition-colors ${hasZeroStock ? 'bg-red-50/50 border-red-100' : hasLowStock ? 'bg-orange-50/50 border-orange-100' : 'bg-slate-50/50 border-slate-100'}`} onClick={() => setCollapsed(c => !c)}>
+                <div className="border-t border-slate-100 animate-in fade-in duration-500">
+                    <div className={`px-6 py-3.5 flex items-center justify-between cursor-pointer select-none transition-colors ${hasZeroStock ? 'bg-red-50/60' : hasLowStock ? 'bg-orange-50/60' : 'bg-slate-50/70'}`} onClick={() => setCollapsed(c => !c)}>
                         <div className="flex items-center gap-2">
                             <div className="bg-white p-1.5 rounded-lg border border-slate-200 text-indigo-600 shadow-sm"><Package size={18} /></div>
                             <h3 className="font-black text-slate-700 text-lg">{name}</h3>
@@ -121,16 +121,17 @@
                         viewMode === 'table' ? (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-right">
-                                    <thead className="bg-slate-50 text-slate-500 text-xs border-b border-slate-100">
+                                    <thead className="text-slate-400 text-[11px] tracking-wide border-b border-slate-100">
                                         <tr>
-                                            <th className="px-4 py-2 font-medium">برند / مدل</th>
-                                            <th className="px-4 py-2 font-medium">تگ</th>
-                                            <th className="px-4 py-2 font-medium">انبار</th>
-                                            <th className="px-4 py-2 text-center font-medium">موجودی</th>
-                                            <th className="px-4 py-2 text-center font-medium">رزرو</th>
-                                            <th className="px-4 py-2 text-center font-medium">قابل فروش</th>
-                                            <th className="px-4 py-2 text-center font-medium">واحد</th>
-                                            <th className="px-4 py-2 text-center font-medium">عملیات</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 font-medium">برند / مدل</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 font-medium">تگ</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 font-medium">انبار</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">موجودی</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">رزرو</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">قابل فروش</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">واحد</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">وضعیت</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">عملیات</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
@@ -140,18 +141,24 @@
                                             const itemLowState = getLowStockState(item, reserved, lowStockThreshold);
                                             return (
                                                 <tr key={item.id} className={`hover:bg-slate-50 transition ${item.quantity <= 0 ? 'bg-red-50/30' : itemLowState.isLowStock ? 'bg-orange-50/30' : ''}`}>
-                                                    <td className="px-4 py-2 font-bold text-slate-700">{item.brand || '—'}</td>
-                                                    <td className="px-4 py-2"><span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">{item.tag}</span></td>
-                                                    <td className="px-4 py-2"><WarehouseBadge warehouse={getWarehouseById(warehouses, item.warehouseId)} /></td>
-                                                    <td className="px-4 py-2 text-center font-black tabular-nums text-slate-700">{item.quantity}</td>
-                                                    <td className="px-4 py-2 text-center">
+                                                    <td className="px-6 py-3.5 font-bold text-slate-700">{item.brand || '—'}</td>
+                                                    <td className="px-6 py-3.5"><span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">{item.tag}</span></td>
+                                                    <td className="px-6 py-3.5 whitespace-nowrap"><WarehouseBadge warehouse={getWarehouseById(warehouses, item.warehouseId)} /></td>
+                                                    <td className="px-6 py-3.5 text-center font-black tabular-nums text-slate-700">{item.quantity}</td>
+                                                    <td className="px-6 py-3.5 text-center">
                                                         {reserved > 0 ? <span className="text-xs text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full font-bold border border-amber-200"><Lock size={8} className="inline ml-0.5"/>{reserved}</span> : <span className="text-slate-300">—</span>}
                                                     </td>
-                                                    <td className="px-4 py-2 text-center">
-                                                        <span className={`font-black text-base tabular-nums ${avail <= 0 ? 'text-red-500' : itemLowState.isLowStock ? 'text-orange-500' : 'text-emerald-600'}`}>{avail}</span>
+                                                    <td className="px-6 py-3.5 text-center">
+                                                        <div className="flex flex-col items-center gap-1.5">
+                                                            <span className={`font-black text-base tabular-nums ${avail <= 0 ? 'text-red-500' : itemLowState.isLowStock ? 'text-orange-500' : 'text-indigo-900'}`}>{avail}</span>
+                                                            <div className="w-16 h-1 rounded-full bg-slate-100 overflow-hidden" aria-hidden="true"><div className={`h-full rounded-full ${avail <= 0 ? 'bg-red-400' : itemLowState.isLowStock ? 'bg-orange-400' : 'bg-indigo-600'}`} style={{ width: `${item.quantity > 0 ? Math.max(0, Math.min(100, avail / item.quantity * 100)) : 0}%` }}/></div>
+                                                        </div>
                                                     </td>
-                                                    <td className="px-4 py-2 text-center text-xs text-slate-400">{item.unit||'عدد'}</td>
-                                                    <td className="px-4 py-2">
+                                                    <td className="px-6 py-3.5 text-center text-xs text-slate-400">{item.unit||'عدد'}</td>
+                                                    <td className="px-6 py-3.5 text-center">
+                                                        <span className={`inline-block text-[11px] font-bold px-3 py-1 rounded-full ${item.quantity <= 0 || avail <= 0 ? 'bg-red-50 text-red-600' : itemLowState.isLowStock ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-700'}`}>{item.quantity <= 0 || avail <= 0 ? 'اتمام' : itemLowState.isLowStock ? 'کم‌موجودی' : 'موجود'}</span>
+                                                    </td>
+                                                    <td className="px-6 py-3.5">
                                                         <div className="flex items-center gap-1 justify-center">
                                                             <button onClick={() => onUpdateQuantity(item.id, -1)} className="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 hover:bg-red-50 hover:text-red-500 rounded-lg text-slate-400 transition active:scale-95"><Minus size={12}/></button>
                                                             <button onClick={() => onUpdateQuantity(item.id, 1)} className="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg text-slate-400 transition active:scale-95"><Plus size={12}/></button>
@@ -171,7 +178,7 @@
                                 </table>
                             </div>
                         ) : (
-                            <div className="p-3 bg-slate-50/30 flex flex-col gap-3">
+                            <div className="px-4 py-4 bg-slate-50/40 flex flex-col gap-3">
                                 {items.map(item => (
                                     <InventoryItemCard key={item.id} item={item} reserved={reservedCounts[item.id] || 0} onUpdateQuantity={onUpdateQuantity} onDelete={onDelete} onEdit={onEdit} onShowHistory={onShowHistory} onMerge={onMerge} onCount={onCount} grouped={true} lowStockThreshold={lowStockThreshold} warehouses={warehouses} />
                                 ))}

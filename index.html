@@ -27,8 +27,8 @@
             },
             colors: {
               indigo: {
-                50:'#f3f2fd', 100:'#e6e5fa', 200:'#cdccf5', 300:'#a7a7ec', 400:'#7b7be0',
-                500:'#5b54de', 600:'#4335de', 700:'#3c2ac0', 800:'#3a2c96', 900:'#2f256a', 950:'#1d163b'
+                50:'#eef3ff', 100:'#e0e9ff', 200:'#c4d4fd', 300:'#9bb6fa', 400:'#6b91f5',
+                500:'#3a6df0', 600:'#1d5eea', 700:'#1749c2', 800:'#1a2a6c', 900:'#14214f', 950:'#0d1536'
               },
               brass: {
                 50:'#fef4ec', 100:'#fde9d9', 200:'#fad1b2', 300:'#f8b381', 400:'#f88f49',
@@ -37,18 +37,18 @@
               // فقط سه پله‌ی روشن slate (که تقریباً همیشه پس‌زمینه/خط‌دور هستند، نه متن) کمی
               // نرم‌تر و هم‌رنگ‌تر با هویت سرمه‌ای می‌شوند؛ پله‌های ۳۰۰ به بعد (که برای متن هم
               // استفاده می‌شوند) دست‌نخورده باقی می‌مانند تا هیچ خوانایی متنی آسیب نبیند.
-              slate: { 50:'#f9f9fc', 100:'#f3f3f8', 200:'#e8e7f0' }
+              slate: { 50:'#f5f8fc', 100:'#eef2f8', 200:'#e1e8f2' }
             },
             borderRadius: {
               lg: '0.625rem', xl: '0.875rem', '2xl': '1.125rem', '3xl': '1.75rem'
             },
             boxShadow: {
-              sm: '0 1px 2px 0 rgba(47,37,106,0.06)',
-              DEFAULT: '0 1px 3px 0 rgba(47,37,106,0.08), 0 1px 2px -1px rgba(47,37,106,0.06)',
-              md: '0 4px 8px -2px rgba(47,37,106,0.08), 0 2px 4px -2px rgba(47,37,106,0.05)',
-              lg: '0 12px 20px -6px rgba(47,37,106,0.10), 0 4px 8px -4px rgba(47,37,106,0.06)',
-              xl: '0 22px 32px -8px rgba(47,37,106,0.12), 0 8px 12px -6px rgba(47,37,106,0.06)',
-              '2xl': '0 30px 60px -15px rgba(47,37,106,0.20)'
+              sm: '0 1px 2px 0 rgba(20,33,79,0.06)',
+              DEFAULT: '0 1px 3px 0 rgba(20,33,79,0.08), 0 1px 2px -1px rgba(20,33,79,0.06)',
+              md: '0 4px 8px -2px rgba(20,33,79,0.08), 0 2px 4px -2px rgba(20,33,79,0.05)',
+              lg: '0 12px 20px -6px rgba(20,33,79,0.10), 0 4px 8px -4px rgba(20,33,79,0.06)',
+              xl: '0 22px 32px -8px rgba(20,33,79,0.12), 0 8px 12px -6px rgba(20,33,79,0.06)',
+              '2xl': '0 30px 60px -15px rgba(20,33,79,0.20)'
             }
           }
         }
@@ -72,8 +72,8 @@
     <style>
       body { 
           font-family: 'Vazirmatn', sans-serif; 
-          background-color: #f8f8fc;
-          background-image: radial-gradient(1200px 600px at 100% -10%, rgba(67,53,222,0.05), transparent 60%);
+          background-color: #e9eff6;
+          background-image: radial-gradient(1200px 600px at 100% -10%, rgba(29,94,234,0.07), transparent 60%);
           background-attachment: fixed;
           overflow-x: hidden;
           color: #334155;
@@ -103,7 +103,7 @@
       body, input, select, textarea, button { font-variant-numeric: tabular-nums; }
       button:not(:disabled) { transition: transform .12s ease, filter .12s ease, box-shadow .15s ease, background-color .15s ease; }
       button:not(:disabled):active { transform: scale(0.97); }
-      :focus-visible { outline: 2px solid #4335de; outline-offset: 2px; border-radius: 4px; }
+      :focus-visible { outline: 2px solid #1d5eea; outline-offset: 2px; border-radius: 4px; }
 
         /* چاپ استاندارد: A4 افقی و بدون اسکرول افقی */
         .print-invoice { width:100%; max-width:1120px; margin:0 auto; box-sizing:border-box; overflow:visible!important; }
@@ -1367,7 +1367,7 @@
         const IDB_DATA_KEY = 'secure-data';
         const IDB_FALLBACK_KEY = 'plain-data-fallback';
         const APP_SCHEMA_VERSION = 11;
-        const APP_BUILD = '10.6-offline-local';
+        const APP_BUILD = '10.7-offline-local';
 
         // ------------------------------------------------------------------
         // امنیت و ذخیره‌سازی محلی، IndexedDB
@@ -1731,44 +1731,112 @@
         };
         // --- Components ---
 
-        const Header = ({ lastSaved, title }) => {
+        const TopNav = ({ view, setView, items, invoices, reservedCounts, lowStockThreshold = 100, lastSaved }) => {
+            const [moreOpen, setMoreOpen] = useState(false);
+            const moreRef = useRef(null);
+            useEffect(() => {
+                const h = (e) => { if (moreRef.current && !moreRef.current.contains(e.target)) setMoreOpen(false); };
+                document.addEventListener('mousedown', h);
+                return () => document.removeEventListener('mousedown', h);
+            }, []);
             const isOnline = navigator.onLine;
+
+            // آیتم‌های اصلی در خودِ نوار؛ بقیه زیر «بیشتر». id/برچسب‌ها همان منوی قبلی ساید‌بار است.
+            const primary = [
+                { id: 'dashboard', label: 'داشبورد' },
+                { id: 'pos', label: 'فاکتور فروش' },
+                { id: 'history', label: 'فاکتورها' },
+                { id: 'purchases', label: 'خرید کالا' },
+                { id: 'reminders', label: 'سررسیدها' },
+                { id: 'inventory-master', label: 'گزارش‌ها' },
+            ];
+            const more = [
+                { id: 'mahak-import', label: 'همگام‌سازی موجودی محک', icon: FileSpreadsheet },
+                { id: 'check-rass', label: 'راس‌گیری چک', icon: Landmark },
+                { id: 'estelam', label: 'استعلام', icon: FileText },
+                { id: 'notes', label: 'یادداشت‌ها', icon: ClipboardList },
+                { id: 'settings', group: 'settings', label: 'تنظیمات', icon: Settings },
+            ];
+            const isActive = (item) => item.group ? getViewGroup(view)?.id === item.group : view === item.id;
+            const go = (id) => { setMoreOpen(false); setView(id); };
+
+            // اعلان فعال سررسید: تعداد فاکتورهای نسیه‌ی تسویه‌نشده که سررسیدشان امروز یا گذشته است
+            const dueAlertCount = (invoices || []).filter(inv => {
+                if (!inv.dueDate || inv.status === 'cancelled' || inv.paymentStatus === 'settled') return false;
+                const u = getDueUrgency(inv.dueDate);
+                return u === 'overdue' || u === 'today';
+            }).length;
+            // بارهای بحرانی: صفر/منفی یا رسیدن موجودی آزاد به آستانه هشدار عمومی/اختصاصی کالا
+            const settings = loadSettings();
+            const muteMap = settings.criticalMutes || {};
+            const now = Date.now();
+            const criticalItems = (items || []).filter(i => {
+                const reserved = (reservedCounts && reservedCounts[i.id]) || 0;
+                const low = getLowStockState(i, reserved, lowStockThreshold);
+                const isCritical = Number(i.quantity) <= 0 || low.isLowStock;
+                const muteUntil = Number(muteMap[i.id] || 0);
+                const isMuted = muteUntil === -1 || muteUntil > now;
+                return isCritical && !isMuted;
+            });
+            const moreActive = more.some(isActive) || view === 'critical';
+            const iconBtn = 'relative w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-600 hover:text-indigo-700 transition cursor-pointer';
+
             return (
-                <header className="bg-white/90 backdrop-blur-md rounded-2xl md:rounded-3xl border border-slate-200/70 shadow-md shadow-indigo-900/5 sticky top-2 md:top-4 z-30 no-print mb-1">
-                    <div className="w-full px-4 md:px-6 py-3 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 p-2 rounded-2xl text-white shadow-md shadow-indigo-900/20 ring-1 ring-brass-300/40 shrink-0">
-                                <PackageOpen size={18} />
+                <header className="no-print shrink-0 px-4 md:px-8 pt-4 pb-1 relative z-40">
+                    <div className="max-w-[1400px] mx-auto flex flex-wrap md:flex-nowrap items-center justify-between gap-3">
+                        <button onClick={() => go('dashboard')} aria-label="انبار یار، رفتن به داشبورد" className="flex items-center gap-2.5 shrink-0 cursor-pointer">
+                            <span className="w-10 h-10 rounded-xl bg-indigo-900 text-white flex items-center justify-center"><Warehouse size={20}/></span>
+                            <span className="hidden sm:block text-right leading-tight">
+                                <span className="block text-base font-black text-indigo-900">انبار یار</span>
+                                <span className="block text-[11px] text-slate-500">مدیریت هوشمند موجودی</span>
+                            </span>
+                        </button>
+
+                        <nav aria-label="ناوبری اصلی" className="order-last basis-full md:order-none md:basis-auto md:flex-1 min-w-0 flex justify-center">
+                            <div ref={moreRef} className="relative max-w-full bg-white/95 backdrop-blur rounded-full shadow-md px-2 py-1.5 flex items-center gap-1">
+                                <div className="flex items-center gap-1 overflow-x-auto min-w-0">
+                                    {primary.map(item => (
+                                        <button key={item.id} onClick={() => go(item.id)} aria-current={isActive(item) ? 'page' : undefined}
+                                            className={`h-10 px-4 rounded-full text-sm whitespace-nowrap transition cursor-pointer ${isActive(item) ? 'font-black text-indigo-900 bg-indigo-50' : item.id === 'reminders' && dueAlertCount > 0 ? 'font-bold text-amber-700 bg-amber-50 hover:bg-amber-100' : 'font-medium text-slate-500 hover:text-indigo-900 hover:bg-slate-100'}`}>
+                                            {item.label}
+                                            {item.id === 'reminders' && dueAlertCount > 0 && <span className="mr-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-800">{dueAlertCount}</span>}
+                                        </button>
+                                    ))}
+                                </div>
+                                <button onClick={() => setMoreOpen(o => !o)} aria-haspopup="menu" aria-expanded={moreOpen}
+                                    className={`h-10 px-3.5 rounded-full text-sm whitespace-nowrap shrink-0 flex items-center gap-1 transition cursor-pointer ${moreActive ? 'font-black text-indigo-900 bg-indigo-50' : 'font-medium text-slate-500 hover:text-indigo-900 hover:bg-slate-100'}`}>
+                                    بیشتر <ChevronDown size={14} className={moreOpen ? 'rotate-180 transition' : 'transition'}/>
+                                </button>
+                                {moreOpen && (
+                                    <div role="menu" className="absolute top-full left-0 mt-2 w-60 bg-white rounded-2xl shadow-xl border border-slate-100 p-1.5 z-50">
+                                        {more.map(item => (
+                                            <button key={item.id} role="menuitem" onClick={() => go(item.id)}
+                                                className={`w-full flex items-center gap-2.5 px-3 h-11 rounded-xl text-sm text-right transition cursor-pointer ${isActive(item) ? 'font-black text-indigo-900 bg-indigo-50' : 'font-medium text-slate-600 hover:bg-slate-100'}`}>
+                                                <item.icon size={16}/> {item.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                            <div className="shrink-0 leading-tight">
-                                <h1 className="text-sm font-bold text-slate-800 leading-tight tracking-tight">انبار یار</h1>
-                                <p className="text-[10px] text-slate-400 font-medium leading-tight">مدیریت هوشمند موجودی</p>
-                            </div>
-                            {title && (
-                                <>
-                                    <div className="h-8 w-px bg-gradient-to-b from-transparent via-slate-300 to-transparent mx-1 shrink-0 hidden sm:block"></div>
-                                    <h2 className="text-base font-bold text-slate-700 truncate hidden sm:block">{title}</h2>
-                                </>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
+                        </nav>
+
+                        <div className="flex items-center gap-2 shrink-0">
                             {lastSaved && (
-                                <div className="flex items-center gap-1.5 text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2.5 py-1.5 rounded-full border border-emerald-100">
-                                    <CloudCheck size={12} />
-                                    <span>ذخیره شد {lastSaved.toLocaleTimeString('fa-IR')}</span>
+                                <div className="hidden xl:flex items-center gap-1.5 h-9 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-3 rounded-full">
+                                    <CloudCheck size={13} /> ذخیره شد {lastSaved.toLocaleTimeString('fa-IR')}
                                 </div>
                             )}
-                            <button onClick={()=>window.dispatchEvent(new Event('anbaryar:open-security'))} title="امنیت و قفل برنامه" className="p-2.5 rounded-2xl border transition bg-slate-50 border-slate-200 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer"><ShieldCheck size={15}/></button>
-                            {!isOnline && (
-                                <div className="flex items-center gap-1 text-slate-400 text-xs" title="حالت آفلاین"><WifiOff size={14} /></div>
-                            )}
+                            {!isOnline && <div className="text-slate-400" title="حالت آفلاین"><WifiOff size={16} /></div>}
+                            <button onClick={() => setView('critical')} className={iconBtn} aria-label={criticalItems.length > 0 ? `بارهای بحرانی (${criticalItems.length})` : 'بارهای بحرانی'} title="بارهای بحرانی">
+                                <Bell size={18}/>
+                                {criticalItems.length > 0 && <span className="absolute top-2 left-2.5 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white"/>}
+                            </button>
+                            <button onClick={() => window.dispatchEvent(new Event('anbaryar:open-security'))} className={iconBtn} aria-label="امنیت و قفل برنامه" title="امنیت و قفل برنامه"><ShieldCheck size={18}/></button>
                         </div>
                     </div>
-                    {title && <h2 className="sm:hidden px-4 pb-3 text-base font-bold text-slate-700 truncate">{title}</h2>}
                 </header>
             );
         };
-
         // ------------------------------------------------------------------
         // همگام‌سازی هوشمند موجودی محک
         // فقط دو ستون «نام کامل کالا» و «موجودي» استفاده می‌شوند.
@@ -2625,7 +2693,7 @@ const conversionErrors = rows.filter(r => {
         // ===== مستندات برنامه =====
         // نگهداری: هر تغییری که در برنامه داده می‌شود، باید این متن هم به‌روز شود (و شماره‌ی نسخه/تاریخ بالای آن).
         // هدف: هر هوش مصنوعی یا هر فردی که این فایل را می‌بیند، در کمترین زمان بفهمد برنامه چیست و کجا را باید بخواند.
-        const APP_DOCS_VERSION = 'v7.5 — ۱۴۰۵/۰۸/۱۷';
+        const APP_DOCS_VERSION = 'v7.6 — ۱۴۰۵/۰۸/۲۲';
         const APP_DOCS_MD = `# مستندات کامل برنامه‌ی «انبار یار» (Pro Mahak Sync)
 
 نسخه‌ی مستندات: ${APP_DOCS_VERSION}
@@ -2777,7 +2845,7 @@ const conversionErrors = rows.filter(r => {
 - پشتیبان کامل شامل همه‌ی کلیدهای localStorage (به‌جز کلید ورود موقت) و داده‌ی ابزار استعلام است.
 
 ## ۷. مسیرهای مهم رابط کاربری
-- منوی کناری: کامپوننت Sidebar با آرایه‌ی menu و شناسه‌های view.
+- نوار بالا (جایگزین منوی کناری): کامپوننت TopNav در 07-header.jsx؛ آیتم‌های اصلی در نوار گرد و بقیه زیر «بیشتر»؛ شناسه‌های view همان قبلی است.
 - نمایش صفحه: بلوک main در کامپوننت اصلی App با سوییچ روی view (مثلاً view === 'check-rass' → CheckRassView).
 - پنجره‌ها: InvoiceDetailsModal، DocumentDetailsModal، HistoryModal، EditItemModal، MergeInventoryModal، ExcelImportPreviewModal، InventoryCountModal، SecurityCenter.
 - پیام‌ها: ToastProvider (toast.show) و ConfirmProvider (useConfirm).
@@ -2793,7 +2861,7 @@ const conversionErrors = rows.filter(r => {
 - RemindersView: سررسیدها و پیگیری.
 - EmptyBagPanel: کیسه‌های خالی آنالیز.
 - MotherBagStockView و MotherBagRow: موجودی کیسه مادر.
-- Sidebar: منوی کناری.
+- TopNav: نوار ناوبری بالا.
 - App: کامپوننت ریشه‌ی برنامه و مدیریت state اصلی (items، invoices، purchases، processingOrders، consignments، notes، appSettings).
 
 ## ۹. ابزارهای کمکی و توابع مشترک
@@ -3000,74 +3068,6 @@ const conversionErrors = rows.filter(r => {
             );
         };
 
-        const Sidebar = ({ view, setView, items, invoices, reservedCounts, lowStockThreshold = 100 }) => {
-            const menu = [
-                { id: 'dashboard', label: 'داشبورد و موجودی', icon: LayoutDashboard },
-                { id: 'mahak-import', label: 'همگام‌سازی موجودی محک', icon: FileSpreadsheet },
-                { id: 'pos', label: 'فاکتور فروش (وزنی)', icon: Scale },
-                { id: 'history', label: 'گزارش فاکتورها', icon: History },
-                { id: 'purchases', label: 'خرید کالا (در راه)', icon: ArrowDownLeft },
-                { id: 'reminders', label: 'سررسیدها و پیگیری', icon: Bell },
-                { id: 'check-rass', label: 'راس‌گیری چک', icon: Landmark },
-                { id: 'inventory-master', label: 'گزارش مرکزی موجودی', icon: Table2 },
-                { id: 'estelam', label: 'استعلام', icon: FileText },
-                { id: 'notes', label: 'یادداشت‌ها', icon: ClipboardList },
-                { id: 'settings', group: 'settings', label: 'تنظیمات', icon: Settings },
-            ];
-            // اعلان فعال سررسید: تعداد فاکتورهای نسیه‌ی تسویه‌نشده که سررسیدشان امروز یا گذشته است
-            const dueAlertCount = (invoices || []).filter(inv => {
-                if (!inv.dueDate || inv.status === 'cancelled' || inv.paymentStatus === 'settled') return false;
-                const u = getDueUrgency(inv.dueDate);
-                return u === 'overdue' || u === 'today';
-            }).length;
-            // بارهای بحرانی: صفر/منفی یا رسیدن موجودی آزاد به آستانه هشدار عمومی/اختصاصی کالا
-            const settings = loadSettings();
-            const muteMap = settings.criticalMutes || {};
-            const now = Date.now();
-            const criticalItems = (items || []).filter(i => {
-                const reserved = (reservedCounts && reservedCounts[i.id]) || 0;
-                const low = getLowStockState(i, reserved, lowStockThreshold);
-                const isCritical = Number(i.quantity) <= 0 || low.isLowStock;
-                const muteUntil = Number(muteMap[i.id] || 0);
-                const isMuted = muteUntil === -1 || muteUntil > now;
-                return isCritical && !isMuted;
-            });
-            return (
-                <div className="w-full md:w-64 bg-white text-slate-600 flex flex-col md:h-screen md:sticky md:top-0 z-40 no-print shrink-0 md:m-2 md:rounded-3xl md:border md:border-slate-200/70 shadow-md shadow-indigo-900/5 overflow-hidden">
-                    <div className="hidden md:block h-[3px] w-full bg-gradient-to-l from-indigo-700 via-brass-400 to-indigo-700 shrink-0" />
-                    <div className="p-5 flex items-center gap-3 text-slate-800 border-b border-slate-100">
-                        <div className="bg-gradient-to-br from-brass-400 to-brass-600 p-2 rounded-xl shadow-lg shadow-brass-900/20 ring-1 ring-brass-300/40"><Store size={22} className="text-white"/></div>
-                        <div><h1 className="font-bold text-lg tracking-tight">انبار یار</h1><p className="text-[10px] text-brass-500/90 tracking-wide">نسخه جامع</p></div>
-                    </div>
-                    {/* رفع باگ ساید‌بار: با اضافه‌شدن آیتم‌های جدید، تعداد کل آیتم‌ها از ارتفاع صفحه بیشتر شده بود؛
-                        قبلاً overflow-visible بود (یعنی هیچ اسکرولی نداشت) و آیتم‌های پایینی از صفحه بیرون/روی هم می‌افتادند.
-                        حالا خودِ منو در دسکتاپ به‌صورت مستقل اسکرول می‌شود، هدر بالا ثابت می‌ماند. */}
-                    <nav className="flex-1 min-h-0 p-3 space-y-2 overflow-x-auto flex md:flex-col md:overflow-y-auto md:overflow-x-visible">
-                        {menu.map(item => (
-                            <React.Fragment key={item.id}>
-                                {item.id === 'settings' && criticalItems.length > 0 && (
-                                    /* فقط یک دکمه با تعداد نشان داده می‌شود؛ لیست کامل با کلیک، در یک
-                                       بخش/صفحه‌ی جداگانه (view === 'critical') باز می‌شود، نه از قبل داخل ساید‌بار. */
-                                    <button
-                                        type="button"
-                                        onClick={() => setView('critical')}
-                                        className={`w-full flex items-center justify-between gap-2 text-xs font-bold rounded-xl p-3 md:my-1 shrink-0 border transition-colors cursor-pointer ${view === 'critical' ? 'bg-red-100 border-red-300 text-red-800' : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'}`}
-                                    >
-                                        <span className="flex items-center gap-1.5"><AlertTriangle size={14}/> بارهای بحرانی ({criticalItems.length})</span>
-                                        <ChevronLeft size={14} className="opacity-70"/>
-                                    </button>
-                                )}
-                                <button onClick={() => setView(item.id)} className={`flex items-center gap-3 pr-3 pl-4 py-3 rounded-xl transition-all w-full text-sm font-medium whitespace-nowrap border-r-4 cursor-pointer ${(item.group ? getViewGroup(view)?.id === item.group : view === item.id) ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30 border-brass-400' : item.id === 'reminders' && dueAlertCount > 0 ? 'border-transparent text-amber-700 bg-amber-50 hover:bg-amber-100' : 'border-transparent text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'}`}>
-                                    <item.icon size={18} /> {item.label}
-                                    {item.id === 'reminders' && dueAlertCount > 0 && <span className={`mr-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${view === 'reminders' ? 'bg-white/20 text-white' : 'bg-amber-200 text-amber-800'}`}>{dueAlertCount}</span>}
-                                </button>
-                            </React.Fragment>
-                        ))}
-                    </nav>
-                </div>
-            );
-        };
-
         const CriticalItemsView = ({ items, reservedCounts, onSelectItem, criticalMutes = {}, onToggleMute, lowStockThreshold = 100, criticalGroups = [], onSaveCriticalGroups }) => {
             const [sort, setSort] = React.useState('severity');
             const [selectedGroupId, setSelectedGroupId] = React.useState(null);
@@ -3196,38 +3196,30 @@ const conversionErrors = rows.filter(r => {
             const sellableIncomingMap = getPurchaseSellableIncomingMap(purchases);
             const totalSellableIncoming = Object.values(sellableIncomingMap).reduce((a, b) => a + b, 0);
 
+            const freePct = totalPhysical > 0 ? Math.max(0, Math.round(availableQuantity / totalPhysical * 100)) : 0;
+            // کارت آمار هم‌شکل رابط مرجع: نوار کوچک کنار برچسب، آیکن در قاب گرد‌گوشه، عدد درشت و توضیح ریز.
+            const StatCard = ({ label, value, hint, icon: Icon, dark, pill, wide }) => (
+                <div className={`rounded-3xl p-4 md:p-5 shadow-sm flex flex-col justify-between min-h-[128px] ${wide ? 'col-span-2 xl:col-span-1' : ''} ${dark ? 'bg-indigo-900 text-white' : 'bg-white'}`}>
+                    <div className="flex items-start justify-between gap-3">
+                        <p className={`text-xs font-medium border-r-2 pr-2 leading-5 ${dark ? 'text-white/80 border-white/40' : 'text-slate-500 border-indigo-600'}`}>{label}</p>
+                        <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${dark ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-600'}`}><Icon size={17}/></span>
+                    </div>
+                    <p className={`text-2xl md:text-3xl font-black tabular-nums mt-2 ${dark ? 'text-white' : 'text-indigo-900'}`}>{value}</p>
+                    <div className="flex items-end justify-between gap-2 mt-2">
+                        <p className={`text-[11px] ${dark ? 'text-white/60' : 'text-slate-400'}`}>{hint}</p>
+                        {pill && <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg ${dark ? 'bg-white/15 text-white' : 'bg-emerald-50 text-emerald-700'}`}>{pill}</span>}
+                    </div>
+                </div>
+            );
+
             return (
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
-                    <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col justify-between">
-                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2"><Layers size={14}/></div>
-                        <p className="text-slate-400 text-xs mb-1">تنوع کالا</p>
-                        <p className="text-xl font-black text-slate-700">{totalItems}</p>
-                    </div>
-                    <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col justify-between">
-                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2"><PackageOpen size={14}/></div>
-                        <p className="text-slate-400 text-xs mb-1">موجودی فیزیکی کل</p>
-                        <p className="text-xl font-black text-slate-700">{formatNumber(totalPhysical)}</p>
-                    </div>
-                    <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100 shadow-sm flex flex-col justify-between">
-                        <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-2"><Truck size={14} /></div>
-                        <p className="text-amber-600 text-xs mb-1">در صف خروج</p>
-                        <p className="text-xl font-black text-amber-700">{formatNumber(totalReserved)}</p>
-                    </div>
-                    <div className="bg-sky-50 rounded-2xl p-4 border border-sky-100 shadow-sm flex flex-col justify-between">
-                        <div className="w-8 h-8 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center mb-2"><ArrowDownLeft size={14} /></div>
-                        <p className="text-sky-600 text-xs mb-1">خرید در راه (نرسیده)</p>
-                        <p className="text-xl font-black text-sky-700">{formatNumber(totalIncoming)}</p>
-                    </div>
-                    <div className="bg-teal-50 rounded-2xl p-4 border border-teal-100 shadow-sm flex flex-col justify-between">
-                        <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center mb-2"><Package size={14} /></div>
-                        <p className="text-teal-600 text-xs mb-1">قابل پیش‌فروش (در راه)</p>
-                        <p className="text-xl font-black text-teal-700">{formatNumber(totalSellableIncoming)}</p>
-                    </div>
-                    <div className="bg-gradient-to-br from-brass-500 to-brass-600 rounded-2xl p-4 text-white shadow-lg shadow-brass-900/20 flex flex-col justify-between">
-                        <div className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center mb-2"><CheckCircle size={14}/></div>
-                        <p className="text-white/80 text-xs mb-1">موجودی قابل فروش</p>
-                        <p className="text-2xl font-black">{formatNumber(availableQuantity)}</p>
-                    </div>
+                <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+                    <StatCard dark wide label="موجودی قابل فروش" value={formatNumber(availableQuantity)} hint={`از ${formatNumber(totalPhysical)} موجودی فیزیکی`} icon={CheckCircle} pill={`${formatNumber(freePct)}٪ آزاد`} />
+                    <StatCard label="موجودی فیزیکی کل" value={formatNumber(totalPhysical)} hint="مجموع همه‌ی اقلام" icon={PackageOpen} />
+                    <StatCard label="تنوع کالا" value={totalItems} hint="کالای ثبت‌شده" icon={Layers} />
+                    <StatCard label="در صف خروج" value={formatNumber(totalReserved)} hint="رزرو فاکتور و پردازش" icon={Truck} />
+                    <StatCard label="خرید در راه (نرسیده)" value={formatNumber(totalIncoming)} hint="هنوز وارد انبار نشده" icon={ArrowDownLeft} />
+                    <StatCard wide label="قابل پیش‌فروش (در راه)" value={formatNumber(totalSellableIncoming)} hint="از محموله‌های در راه" icon={Package} />
                 </div>
             );
         };
@@ -3649,8 +3641,8 @@ const conversionErrors = rows.filter(r => {
             const hasZeroStock = items.some(item => item.quantity <= 0);
 
             return (
-                <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden mb-4 animate-in fade-in duration-500 ${hasZeroStock ? 'border-red-200' : hasLowStock ? 'border-orange-200' : 'border-slate-200'}`}>
-                    <div className={`px-4 py-3 border-b flex items-center justify-between cursor-pointer select-none transition-colors ${hasZeroStock ? 'bg-red-50/50 border-red-100' : hasLowStock ? 'bg-orange-50/50 border-orange-100' : 'bg-slate-50/50 border-slate-100'}`} onClick={() => setCollapsed(c => !c)}>
+                <div className="border-t border-slate-100 animate-in fade-in duration-500">
+                    <div className={`px-6 py-3.5 flex items-center justify-between cursor-pointer select-none transition-colors ${hasZeroStock ? 'bg-red-50/60' : hasLowStock ? 'bg-orange-50/60' : 'bg-slate-50/70'}`} onClick={() => setCollapsed(c => !c)}>
                         <div className="flex items-center gap-2">
                             <div className="bg-white p-1.5 rounded-lg border border-slate-200 text-indigo-600 shadow-sm"><Package size={18} /></div>
                             <h3 className="font-black text-slate-700 text-lg">{name}</h3>
@@ -3667,16 +3659,17 @@ const conversionErrors = rows.filter(r => {
                         viewMode === 'table' ? (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-right">
-                                    <thead className="bg-slate-50 text-slate-500 text-xs border-b border-slate-100">
+                                    <thead className="text-slate-400 text-[11px] tracking-wide border-b border-slate-100">
                                         <tr>
-                                            <th className="px-4 py-2 font-medium">برند / مدل</th>
-                                            <th className="px-4 py-2 font-medium">تگ</th>
-                                            <th className="px-4 py-2 font-medium">انبار</th>
-                                            <th className="px-4 py-2 text-center font-medium">موجودی</th>
-                                            <th className="px-4 py-2 text-center font-medium">رزرو</th>
-                                            <th className="px-4 py-2 text-center font-medium">قابل فروش</th>
-                                            <th className="px-4 py-2 text-center font-medium">واحد</th>
-                                            <th className="px-4 py-2 text-center font-medium">عملیات</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 font-medium">برند / مدل</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 font-medium">تگ</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 font-medium">انبار</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">موجودی</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">رزرو</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">قابل فروش</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">واحد</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">وضعیت</th>
+                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">عملیات</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
@@ -3686,18 +3679,24 @@ const conversionErrors = rows.filter(r => {
                                             const itemLowState = getLowStockState(item, reserved, lowStockThreshold);
                                             return (
                                                 <tr key={item.id} className={`hover:bg-slate-50 transition ${item.quantity <= 0 ? 'bg-red-50/30' : itemLowState.isLowStock ? 'bg-orange-50/30' : ''}`}>
-                                                    <td className="px-4 py-2 font-bold text-slate-700">{item.brand || '—'}</td>
-                                                    <td className="px-4 py-2"><span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">{item.tag}</span></td>
-                                                    <td className="px-4 py-2"><WarehouseBadge warehouse={getWarehouseById(warehouses, item.warehouseId)} /></td>
-                                                    <td className="px-4 py-2 text-center font-black tabular-nums text-slate-700">{item.quantity}</td>
-                                                    <td className="px-4 py-2 text-center">
+                                                    <td className="px-6 py-3.5 font-bold text-slate-700">{item.brand || '—'}</td>
+                                                    <td className="px-6 py-3.5"><span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">{item.tag}</span></td>
+                                                    <td className="px-6 py-3.5 whitespace-nowrap"><WarehouseBadge warehouse={getWarehouseById(warehouses, item.warehouseId)} /></td>
+                                                    <td className="px-6 py-3.5 text-center font-black tabular-nums text-slate-700">{item.quantity}</td>
+                                                    <td className="px-6 py-3.5 text-center">
                                                         {reserved > 0 ? <span className="text-xs text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full font-bold border border-amber-200"><Lock size={8} className="inline ml-0.5"/>{reserved}</span> : <span className="text-slate-300">—</span>}
                                                     </td>
-                                                    <td className="px-4 py-2 text-center">
-                                                        <span className={`font-black text-base tabular-nums ${avail <= 0 ? 'text-red-500' : itemLowState.isLowStock ? 'text-orange-500' : 'text-emerald-600'}`}>{avail}</span>
+                                                    <td className="px-6 py-3.5 text-center">
+                                                        <div className="flex flex-col items-center gap-1.5">
+                                                            <span className={`font-black text-base tabular-nums ${avail <= 0 ? 'text-red-500' : itemLowState.isLowStock ? 'text-orange-500' : 'text-indigo-900'}`}>{avail}</span>
+                                                            <div className="w-16 h-1 rounded-full bg-slate-100 overflow-hidden" aria-hidden="true"><div className={`h-full rounded-full ${avail <= 0 ? 'bg-red-400' : itemLowState.isLowStock ? 'bg-orange-400' : 'bg-indigo-600'}`} style={{ width: `${item.quantity > 0 ? Math.max(0, Math.min(100, avail / item.quantity * 100)) : 0}%` }}/></div>
+                                                        </div>
                                                     </td>
-                                                    <td className="px-4 py-2 text-center text-xs text-slate-400">{item.unit||'عدد'}</td>
-                                                    <td className="px-4 py-2">
+                                                    <td className="px-6 py-3.5 text-center text-xs text-slate-400">{item.unit||'عدد'}</td>
+                                                    <td className="px-6 py-3.5 text-center">
+                                                        <span className={`inline-block text-[11px] font-bold px-3 py-1 rounded-full ${item.quantity <= 0 || avail <= 0 ? 'bg-red-50 text-red-600' : itemLowState.isLowStock ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-700'}`}>{item.quantity <= 0 || avail <= 0 ? 'اتمام' : itemLowState.isLowStock ? 'کم‌موجودی' : 'موجود'}</span>
+                                                    </td>
+                                                    <td className="px-6 py-3.5">
                                                         <div className="flex items-center gap-1 justify-center">
                                                             <button onClick={() => onUpdateQuantity(item.id, -1)} className="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 hover:bg-red-50 hover:text-red-500 rounded-lg text-slate-400 transition active:scale-95"><Minus size={12}/></button>
                                                             <button onClick={() => onUpdateQuantity(item.id, 1)} className="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg text-slate-400 transition active:scale-95"><Plus size={12}/></button>
@@ -3717,7 +3716,7 @@ const conversionErrors = rows.filter(r => {
                                 </table>
                             </div>
                         ) : (
-                            <div className="p-3 bg-slate-50/30 flex flex-col gap-3">
+                            <div className="px-4 py-4 bg-slate-50/40 flex flex-col gap-3">
                                 {items.map(item => (
                                     <InventoryItemCard key={item.id} item={item} reserved={reservedCounts[item.id] || 0} onUpdateQuantity={onUpdateQuantity} onDelete={onDelete} onEdit={onEdit} onShowHistory={onShowHistory} onMerge={onMerge} onCount={onCount} grouped={true} lowStockThreshold={lowStockThreshold} warehouses={warehouses} />
                                 ))}
@@ -9530,7 +9529,8 @@ const conversionErrors = rows.filter(r => {
             // نادرست موجودی (برگشت/کسر اشتباه) می‌شد. navigateTo تضمین می‌کند هر پیمایش عادی این حالت را ریست کند.
             const navigateTo = (v) => { setEditingInvoice(null); setView(v); };
             const [appSettings, setAppSettings] = useState(loadSettings());
-            const [inventoryViewMode, setInventoryViewMode] = useState('card'); // 'card' | 'table'
+            const [inventoryViewMode, setInventoryViewMode] = useState('table'); // 'card' | 'table'
+            const [showAddForm, setShowAddForm] = useState(false); // فرم افزودن کالا فقط با دکمه‌ی «+ افزودن کالا» باز می‌شود
             const [showSecurityCenter, setShowSecurityCenter] = useState(false);
             useEffect(()=>{
                 const fn=()=>setShowSecurityCenter(true);
@@ -10660,53 +10660,70 @@ const conversionErrors = rows.filter(r => {
             };
 
             return (
-                <div className="app-shell flex flex-col md:flex-row min-h-screen font-[Vazirmatn]">
-                    <Sidebar view={view} setView={navigateTo} items={items} invoices={invoices} reservedCounts={reservedCounts} lowStockThreshold={appSettings.lowStockThreshold ?? 100} />
-                    <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen">
-                        <Header lastSaved={lastSaved} title={getTitle()} />
+                <div className="app-shell flex flex-col h-screen font-[Vazirmatn]">
+                    <TopNav view={view} setView={navigateTo} items={items} invoices={invoices} reservedCounts={reservedCounts} lowStockThreshold={appSettings.lowStockThreshold ?? 100} lastSaved={lastSaved} />
+                    <main className="flex-1 min-h-0 overflow-y-auto px-4 md:px-8 pb-8">
+                      <div className="max-w-[1400px] mx-auto">
+                        {/* عنوان صفحه: بزرگ و ساده مثل رابط مرجع؛ در داشبورد زیرعنوان و دکمه‌ی اصلی هم دارد */}
+                        <div className="no-print flex items-end justify-between gap-4 pt-6 pb-6">
+                            <div className="min-w-0">
+                                <h1 className={`${view === 'dashboard' ? 'text-3xl md:text-4xl' : 'text-2xl md:text-3xl'} font-black text-indigo-900 tracking-tight truncate`}>{getTitle()}</h1>
+                                {view === 'dashboard' && <p className="text-slate-500 mt-1.5">موجودی، رزروها و خریدهای در راه را یک‌جا ببینید و مدیریت کنید</p>}
+                            </div>
+                            {view === 'dashboard' && <button onClick={() => setShowAddForm(v => !v)} aria-expanded={showAddForm} className="shrink-0 h-11 px-6 rounded-full bg-indigo-600 text-white text-sm font-bold shadow-md shadow-indigo-900/20 hover:bg-indigo-700 transition cursor-pointer">{showAddForm ? '× بستن فرم' : '+ افزودن کالا'}</button>}
+                        </div>
                         <GroupTabs view={view} setView={navigateTo} />
-                        <div className="h-5"></div>
                         {view === 'dashboard' && (
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                                <div className="lg:col-span-9 flex flex-col gap-6">
+                                <div className="lg:col-span-9 flex flex-col gap-5 min-w-0">
                                     <InventoryStats items={items} invoices={invoices} processingOrders={processingOrders} purchases={purchases} />
 
-                                    {/* Excel/Backup Actions */}
-                                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-3 flex flex-col sm:flex-row gap-3">
-                                        <div className="relative flex-1">
-                                            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
-                                            <input className="w-full bg-slate-50 border border-slate-100 rounded-full py-2.5 pr-11 pl-4 text-sm outline-none focus:border-indigo-300 focus:bg-white transition" placeholder="جستجو در کالاها..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
+                                    {/* جستجو + فیلتر انبار + نمای فهرست (چیپ‌های گرد مثل رابط مرجع) */}
+                                    <div className="flex flex-col xl:flex-row xl:items-center gap-3">
+                                        <div className="relative w-full xl:w-72 shrink-0">
+                                            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
+                                            <input aria-label="جستجو در کالاها" className="w-full bg-white rounded-full shadow-sm py-3 pr-11 pl-4 text-sm outline-none focus:ring-2 focus:ring-indigo-600/30 transition" placeholder="جستجو در کالاها..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
                                         </div>
-                                        {(appSettings.warehouses || []).length > 0 && (
-                                            <div className="relative">
-                                                <select className="h-full bg-slate-50 border border-slate-100 rounded-full py-2.5 pr-8 pl-3 text-sm font-bold text-slate-600 outline-none focus:border-indigo-300 appearance-none" value={warehouseFilter} onChange={e => setWarehouseFilter(e.target.value)}>
-                                                    <option value="">همه انبارها</option>
-                                                    <option value="__none__">بدون انبار</option>
-                                                    {appSettings.warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                                                </select>
-                                                <Warehouse className="absolute right-3 top-3 text-slate-400 pointer-events-none" size={16}/>
+                                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 xl:mr-auto">
+                                            {(appSettings.warehouses || []).length > 0 && (
+                                                <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="فیلتر انبار">
+                                                    <span className="text-[11px] text-slate-500 tracking-wide">انبار</span>
+                                                    {[{ v: '', l: 'همه' }, { v: '__none__', l: 'بدون انبار' }, ...appSettings.warehouses.map(w => ({ v: w.id, l: w.name }))].map(o => (
+                                                        <button key={o.v} onClick={() => setWarehouseFilter(o.v)} aria-pressed={warehouseFilter === o.v} className={`h-9 px-4 rounded-full text-xs font-bold transition cursor-pointer ${warehouseFilter === o.v ? 'bg-indigo-900 text-white' : 'bg-white text-slate-600 shadow-sm hover:bg-indigo-50'}`}>{o.l}</button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <div className="flex items-center gap-2" role="group" aria-label="نمای فهرست">
+                                                <span className="text-[11px] text-slate-500 tracking-wide">نمایش</span>
+                                                <button onClick={() => setInventoryViewMode('table')} aria-pressed={inventoryViewMode === 'table'} className={`h-9 px-4 rounded-full text-xs font-bold transition cursor-pointer ${inventoryViewMode === 'table' ? 'bg-indigo-900 text-white' : 'bg-white text-slate-600 shadow-sm hover:bg-indigo-50'}`}>جدول</button>
+                                                <button onClick={() => setInventoryViewMode('card')} aria-pressed={inventoryViewMode === 'card'} className={`h-9 px-4 rounded-full text-xs font-bold transition cursor-pointer ${inventoryViewMode === 'card' ? 'bg-indigo-900 text-white' : 'bg-white text-slate-600 shadow-sm hover:bg-indigo-50'}`}>کارت</button>
                                             </div>
-                                        )}
-                                        <div className="flex gap-2 flex-wrap">
-                                            {/* View Mode Toggle */}
-                                            <div className="flex bg-slate-50 border border-slate-100 rounded-full overflow-hidden shadow-sm">
-                                                <button onClick={() => setInventoryViewMode('card')} className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold transition rounded-full ${inventoryViewMode === 'card' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-white'}`}><LayoutList size={15}/> کارت</button>
-                                                <button onClick={() => setInventoryViewMode('table')} className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold transition rounded-full ${inventoryViewMode === 'table' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-white'}`}><Table2 size={15}/> جدول</button>
-                                            </div>
-                                            <button onClick={handleSystemBackup} className="flex items-center gap-1 bg-slate-800 text-white px-3.5 py-2 rounded-full text-xs font-bold hover:bg-slate-900 transition"><Save size={16}/> بکاپ</button>
-                                            <label className="flex items-center gap-1 bg-slate-50 border border-slate-100 px-3.5 py-2 rounded-full cursor-pointer text-xs font-bold hover:bg-white transition"><Upload size={16}/> بازگردانی <input type="file" className="hidden" onChange={handleSystemRestore}/></label>
-                                            <button onClick={()=>exportToExcel(items, appSettings.warehouses)} className="flex items-center gap-1 bg-emerald-600 text-white px-3.5 py-2 rounded-full text-xs font-bold hover:bg-emerald-700 transition"><Download size={16}/> خروجی</button>
-                                            <label className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3.5 py-2 rounded-full cursor-pointer text-xs font-bold hover:bg-emerald-100 transition"><FileSpreadsheet size={16}/> ورود اکسل <input type="file" className="hidden" onChange={handleFileUpload}/></label>
-                                            <button onClick={()=>navigateTo('mahak-import')} className="flex items-center gap-1 bg-brass-500 text-white px-3.5 py-2 rounded-full text-xs font-black hover:bg-brass-600 transition"><FileSpreadsheet size={16}/> همگام‌سازی محک</button>
                                         </div>
                                     </div>
 
-                                    <AddItemForm onAdd={handleAdd} items={items} warehouses={appSettings.warehouses} />
-                                    
-                                    <div className="space-y-4">
+                                    {showAddForm && (
+                                        <AddItemForm onAdd={handleAdd} items={items} warehouses={appSettings.warehouses} />
+                                    )}
+
+                                    <div className="bg-white rounded-3xl shadow-sm overflow-hidden">
+                                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 px-6 pt-5 pb-4">
+                                            <div>
+                                                <h2 className="text-lg font-black text-indigo-900">همه کالاها</h2>
+                                                <p className="text-xs text-slate-500 mt-0.5">{filteredItems.length} کالا در {Object.keys(grouped).length} گروه</p>
+                                            </div>
+                                            <div className="flex gap-2 flex-wrap sm:justify-end">
+                                                <button onClick={handleSystemBackup} className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"><Save size={15}/> بکاپ</button>
+                                                <label className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"><Upload size={15}/> بازگردانی <input type="file" className="hidden" onChange={handleSystemRestore}/></label>
+                                                <button onClick={()=>exportToExcel(items, appSettings.warehouses)} className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"><Download size={15}/> خروجی</button>
+                                                <label className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"><FileSpreadsheet size={15}/> ورود اکسل <input type="file" className="hidden" onChange={handleFileUpload}/></label>
+                                                <button onClick={()=>navigateTo('mahak-import')} className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition cursor-pointer"><FileSpreadsheet size={15}/> همگام‌سازی محک</button>
+                                            </div>
+                                        </div>
+                                        <div>
                                         {Object.keys(grouped).sort().map(name => (
                                             <InventoryGroup key={name} name={name} items={grouped[name]} reservedCounts={reservedCounts} onUpdateQuantity={handleUpdateQuantity} onDelete={handleDelete} onEdit={setEditingItem} onShowHistory={setHistoryItem} onMerge={setMergeItem} onCount={setCountingItem} viewMode={inventoryViewMode} lowStockThreshold={appSettings.lowStockThreshold ?? 100} warehouses={appSettings.warehouses} />
                                         ))}
+                                    </div>
                                     </div>
                                 </div>
                                 <div className="lg:col-span-3 h-full">
@@ -10763,6 +10780,7 @@ const conversionErrors = rows.filter(r => {
                         {view === 'item-flow' && <AYErrorBoundary><ItemFlowView items={items} transactions={transactions} onOpenHistory={setHistoryItem} /></AYErrorBoundary>}
                         {view === 'settings' && <AYErrorBoundary><SettingsView settings={appSettings} onSave={handleSaveSettings} /></AYErrorBoundary>}
                         {view === 'critical' && <AYErrorBoundary><CriticalItemsView items={items} reservedCounts={reservedCounts} lowStockThreshold={appSettings.lowStockThreshold ?? 100} criticalMutes={appSettings.criticalMutes || {}} criticalGroups={appSettings.criticalGroups || []} onSaveCriticalGroups={(groups)=>{ setAppSettings(prev=>{ const next={...prev, criticalGroups: groups}; saveSettings(next); return next; }); }} onToggleMute={(id,mode)=>{ setAppSettings(prev=>{ const m={...(prev.criticalMutes||{})}; if(mode==='unmute') delete m[id]; else if(mode==='snooze') m[id]=Date.now()+3600000; else m[id]=-1; const next={...prev,criticalMutes:m}; saveSettings(next); return next; }); }} onSelectItem={(item) => { setSearchTerm(`${item.name}${item.brand ? ' ' + item.brand : ''}`); navigateTo('dashboard'); }} /></AYErrorBoundary>}
+                      </div>
                     </main>
                     {editingItem && <EditItemModal item={editingItem} invoices={invoices} processingOrders={processingOrders} purchases={purchases} warehouses={appSettings.warehouses} onClose={()=>setEditingItem(null)} onSave={handleSaveItem} />}
                     {historyItem && <HistoryModal item={historyItem} transactions={transactions} invoices={invoices} purchases={purchases} processingOrders={processingOrders} consignments={consignments} onViewDocument={(row)=>{ if(!row) return; if(row.kind==='invoice') setViewInvoice(row.data); else setViewDocument(row); }} onClose={()=>setHistoryItem(null)} />}
