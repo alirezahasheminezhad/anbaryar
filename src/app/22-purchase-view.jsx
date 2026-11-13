@@ -53,7 +53,7 @@
                     countAsStock: !asReceived ? countAsStock : false,
                 });
                 setCart([]); setSupplier(''); setDescription(''); setCountAsStock(false); setPriority('normal');
-                toast.show(asReceived ? '✅ خرید ثبت و مستقیم به انبار اضافه شد' : '🚚 خرید به عنوان «در راه» ثبت شد. وقتی رسید، از لیست کنارش «دریافت شد» را بزنید.');
+                toast.show(asReceived ? '✓ خرید ثبت و مستقیم به انبار اضافه شد' : 'خرید به عنوان «در راه» ثبت شد. وقتی رسید، از لیست کنارش «دریافت شد» را بزنید.');
             };
 
             const filteredPurchases = useMemo(() => {
@@ -162,7 +162,7 @@
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 <div className="flex bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm text-xs font-bold">
-                                <select value={priorityFilter} onChange={e=>setPriorityFilter(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"><option value="all">همه اولویت‌ها</option><option value="urgent">🔴 فوری</option><option value="high">🟠 مهم</option><option value="normal">🟡 عادی</option><option value="low">⚪ کم</option></select><select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"><option value="newest">جدیدترین بالا</option><option value="oldest">قدیمی‌ترین</option><option value="priority">اولویت</option><option value="due">نزدیک‌ترین موعد</option></select></div>
+                                <select value={priorityFilter} onChange={e=>setPriorityFilter(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"><option value="all">همه اولویت‌ها</option><option value="urgent">فوری</option><option value="high">مهم</option><option value="normal">عادی</option><option value="low">⚪ کم</option></select><select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"><option value="newest">جدیدترین بالا</option><option value="oldest">قدیمی‌ترین</option><option value="priority">اولویت</option><option value="due">نزدیک‌ترین موعد</option></select></div>
                             </div>
                         </div>
                         <div className="overflow-y-auto flex-1 p-3 space-y-2">
@@ -180,14 +180,14 @@
                                             </div>
                                         </div>
                                         <div className="flex flex-col items-end gap-1">
-                                            {p.status === 'in_transit' ? <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-amber-200 flex items-center gap-1"><Truck size={11}/> در راه</span> : <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-emerald-200">دریافت‌شده</span>}<span className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${(p.priority||'normal')==='urgent'?'bg-red-50 text-red-600 border-red-200':(p.priority||'normal')==='high'?'bg-orange-50 text-orange-600 border-orange-200':'bg-slate-50 text-slate-500 border-slate-200'}`}>{(p.priority||'normal')==='urgent'?'🔴 فوری':(p.priority||'normal')==='high'?'🟠 مهم':(p.priority||'normal')==='low'?'⚪ کم':'🟡 عادی'}</span>
+                                            {p.status === 'in_transit' ? <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-amber-200 flex items-center gap-1"><Truck size={11}/> در راه</span> : <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-emerald-200">دریافت‌شده</span>}<span className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${(p.priority||'normal')==='urgent'?'bg-red-50 text-red-600 border-red-200':(p.priority||'normal')==='high'?'bg-orange-50 text-orange-600 border-orange-200':'bg-slate-50 text-slate-500 border-slate-200'}`}>{(p.priority||'normal')==='urgent'?'فوری':(p.priority||'normal')==='high'?'مهم':(p.priority||'normal')==='low'?'⚪ کم':'عادی'}</span>
                                         </div>
                                     </div>
                                     <div className="text-xs text-slate-500 mb-2">
                                         {p.items.map((it, idx) => (<span key={idx} className="inline-block ml-2 mb-0.5"><ItemNameLabel it={it} inventoryItems={items} isPending={p.status === 'in_transit'} /> <b className="text-slate-700">×{formatNumber(it.qty)}</b>{it.weight > 0 && <span className="text-slate-400"> ({formatNumber(it.weight)} کیلو)</span>}</span>))}
                                     </div>
                                     {pTotal > 0 && <div className="text-xs font-bold text-indigo-600 mb-2">جمع مبلغ: {formatNumber(pTotal)} تومان</div>}
-                                    {p.description && <div className="text-[11px] text-slate-400 mb-2">📝 {p.description}</div>}
+                                    {p.description && <div className="text-[11px] text-slate-400 mb-2">{p.description}</div>}
                                     <div className="flex gap-2 mb-1.5">
                                         <button onClick={() => setPrintPurchase(p)} className="flex-1 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-xs font-bold border border-indigo-100 flex items-center justify-center gap-1"><Printer size={13}/> چاپ</button>
                                         <button onClick={() => setEditingPurchase(p)} className="flex-1 py-1.5 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-bold border border-slate-200 flex items-center justify-center gap-1"><Edit3 size={13}/> ویرایش</button>
@@ -208,7 +208,7 @@
                     {editingPurchase && <EditPurchaseModal purchase={editingPurchase} items={items} onClose={() => setEditingPurchase(null)} onSave={(p) => { onEdit(p); setEditingPurchase(null); }}/>}
                     {printPurchase && <PrintOrderModal
                         title="سند خرید کالا"
-                        badge={printPurchase.status === 'in_transit' ? '🚚 در راه' : '✅ دریافت‌شده'}
+                        badge={printPurchase.status === 'in_transit' ? 'در راه' : '✓ دریافت‌شده'}
                         badgeColor={printPurchase.status === 'in_transit' ? {bg:'#fef3c7',text:'#92400e',border:'#fde68a'} : {bg:'#d1fae5',text:'#065f46',border:'#a7f3d0'}}
                         rows={[{label:'فروشنده / تامین‌کننده', value: printPurchase.supplier}, {label:'وضعیت', value: printPurchase.status === 'in_transit' ? 'در راه' : 'دریافت‌شده'}]}
                         itemsList={printPurchase.items}

@@ -110,7 +110,7 @@
                             <h3 className="font-black text-slate-700 text-lg">{name}</h3>
                             <span className="text-xs text-slate-400 font-medium mr-2 bg-slate-100 px-2 py-0.5 rounded-full">{items.length} مدل</span>
                             {hasZeroStock && <span className="text-[10px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full border border-red-200">⚠ اتمام موجودی</span>}
-                            {!hasZeroStock && hasLowStock && <span className="text-[10px] font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full border border-orange-200">⚡ موجودی کم</span>}
+                            {!hasZeroStock && hasLowStock && <span className="text-[10px] font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full border border-orange-200">موجودی کم</span>}
                         </div>
                         <div className="flex items-center gap-2">
                             <div className={`px-3 py-1 rounded-lg text-sm font-bold border ${hasZeroStock?'bg-red-50 text-red-600 border-red-200':hasLowStock?'bg-orange-50 text-orange-600 border-orange-200':'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>مجموع: {totalQuantity.toLocaleString()}</div>

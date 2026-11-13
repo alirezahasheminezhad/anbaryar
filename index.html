@@ -37,7 +37,7 @@
               // فقط سه پله‌ی روشن slate (که تقریباً همیشه پس‌زمینه/خط‌دور هستند، نه متن) کمی
               // نرم‌تر و هم‌رنگ‌تر با هویت سرمه‌ای می‌شوند؛ پله‌های ۳۰۰ به بعد (که برای متن هم
               // استفاده می‌شوند) دست‌نخورده باقی می‌مانند تا هیچ خوانایی متنی آسیب نبیند.
-              slate: { 50:'#f5f8fc', 100:'#eef2f8', 200:'#e1e8f2' }
+              slate: { 50:'#f5f8fc', 100:'#eef2f8', 200:'#e1e8f2', 400:'#6b7a94' } /* 400 تیره‌تر شد: کنتراست ۴:۱ برای برچسب‌های ریز */
             },
             borderRadius: {
               lg: '0.625rem', xl: '0.875rem', '2xl': '1.125rem', '3xl': '1.75rem'
@@ -104,6 +104,31 @@
       button:not(:disabled) { transition: transform .12s ease, filter .12s ease, box-shadow .15s ease, background-color .15s ease; }
       button:not(:disabled):active { transform: scale(0.97); }
       :focus-visible { outline: 2px solid #1d5eea; outline-offset: 2px; border-radius: 4px; }
+
+      /* ------- سیستم طراحی v2 (مرجع: داشبورد Medicore) — لایه‌ی سراسری برای همه‌ی صفحه‌ها -------
+         فقط بصری. با #root اولویت بالاتر از کلاس‌های tailwind می‌گیرد و فاکتور چاپی (.invoice-paper) را لمس نمی‌کند.
+         ۱) کارت‌ها: بدون کادر، سایه‌ی نرم نیلی، گوشه‌ی گرد  ۲) فیلدها: حلقه‌ی فوکوس آبی
+         ۳) جدول‌ها: سرستون ریز و کم‌رنگ، هاور ردیف  ۴) مودال‌ها: پرده‌ی سرمه‌ای، پنل گرد
+         ۵) دکمه‌های اصلی (indigo + متن سفید): کپسولی */
+      #root :is(div,section,article,aside):is(.rounded-xl,.rounded-2xl,.rounded-3xl).bg-white.border.border-slate-200:not(.invoice-paper) {
+        border-color: transparent;
+        box-shadow: 0 1px 2px rgba(20,33,79,.04), 0 8px 24px -10px rgba(20,33,79,.14);
+      }
+      #root :is(div,section,article,aside).rounded-2xl.bg-white.border:not(.invoice-paper) { border-radius: 1.5rem; }
+      #root :is(input,select,textarea):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):focus {
+        outline: none; border-color: #1d5eea; box-shadow: 0 0 0 3px rgba(29,94,234,.16);
+      }
+      #root main table thead th { color: #6b7a94; font-size: 11px; font-weight: 600; letter-spacing: .02em; white-space: nowrap; }
+      #root main table thead { background: transparent; }
+      #root main table tbody tr { transition: background-color .12s ease; }
+      #root main table tbody tr:hover { background-color: rgba(238,243,255,.55); }
+      #root .fixed.inset-0.backdrop-blur-sm { background: rgba(13,21,54,.48); }
+      #root .fixed.inset-0 > .bg-white:is(.rounded-2xl,.rounded-3xl,.rounded-xl),
+      #root .fixed.inset-0 > div > .bg-white:is(.rounded-2xl,.rounded-3xl) {
+        border-radius: 1.75rem; box-shadow: 0 30px 80px -24px rgba(13,21,54,.5);
+      }
+      #root button[class*="bg-indigo-"][class*="text-white"]:not([class*="rounded-full"]) { border-radius: 9999px; }
+      #root main :is(h1,h2) { letter-spacing: -.01em; }
 
         /* چاپ استاندارد: A4 افقی و بدون اسکرول افقی */
         .print-invoice { width:100%; max-width:1120px; margin:0 auto; box-sizing:border-box; overflow:visible!important; }
@@ -1367,7 +1392,7 @@
         const IDB_DATA_KEY = 'secure-data';
         const IDB_FALLBACK_KEY = 'plain-data-fallback';
         const APP_SCHEMA_VERSION = 11;
-        const APP_BUILD = '10.7-offline-local';
+        const APP_BUILD = '10.8-offline-local';
 
         // ------------------------------------------------------------------
         // امنیت و ذخیره‌سازی محلی، IndexedDB
@@ -2337,7 +2362,7 @@ const conversionErrors = rows.filter(r => {
                                     if (!bagRows.length) return null;
                                     return (
                                     <details className="mb-3 rounded-2xl border border-sky-200 bg-sky-50/50 p-3" open={bagRows.some(r => Number(r.mahakQty2) > 0 && Math.abs(Number(r.mahakQty2) - Number(r.mahakKg)/Number(r.weightKg)) > 0.5)}>
-                                        <summary className="text-xs font-black text-sky-700 cursor-pointer">🧮 بررسی وزن کیسه‌ها ({bagRows.length} کالا) — درست است؟ یا دستی اصلاح کن</summary>
+                                        <summary className="text-xs font-black text-sky-700 cursor-pointer">بررسی وزن کیسه‌ها ({bagRows.length} کالا) — درست است؟ یا دستی اصلاح کن</summary>
                                         <div className="space-y-2 mt-3 max-h-72 overflow-y-auto">
                                             {bagRows.map(r => {
                                                 const w = Number(r.weightKg), kg = Number(r.mahakKg), calc = kg / w, q2 = Number(r.mahakQty2) || 0;
@@ -2348,7 +2373,7 @@ const conversionErrors = rows.filter(r => {
                                                     <div className="md:col-span-2"><label className="text-[9px] text-slate-400 block">وزن هر کیسه (kg)</label><input type="number" min="0" step="any" value={r.weightKg} onChange={e => updateRow(r.id, { weightKg: e.target.value, saveBagWeight: true })} className="w-full p-1.5 rounded-lg border border-slate-200 text-xs text-center font-black" /></div>
                                                     <div className="md:col-span-2"><label className="text-[9px] text-slate-400 block">تعداد = کیلو ÷ وزن</label><div className="font-black text-sm text-indigo-700">{formatNumber(Math.round(calc * 100) / 100)}</div></div>
                                                     <div className="md:col-span-2"><label className="text-[9px] text-slate-400 block">یا تعداد واقعی را بزن</label><input type="number" min="0" step="any" placeholder="تعداد" onChange={e => { const c = Number(e.target.value); if (c > 0) updateRow(r.id, { weightKg: Number((kg / c).toFixed(4)), saveBagWeight: true }); }} className="w-full p-1.5 rounded-lg border border-slate-200 text-xs text-center" /></div>
-                                                    <div className="col-span-2 md:col-span-2 text-[9px] leading-4">{mismatch && <span className="text-amber-700 font-bold">⚠️ محک {formatNumber(q2)} کیسه گفته (کیسه‌ها هم‌وزن نیستند)</span>}{r.saveBagWeight && <span className="text-emerald-700 font-bold block">✓ با Sync روی کالا ذخیره می‌شود</span>}</div>
+                                                    <div className="col-span-2 md:col-span-2 text-[9px] leading-4">{mismatch && <span className="text-amber-700 font-bold">⚠ محک {formatNumber(q2)} کیسه گفته (کیسه‌ها هم‌وزن نیستند)</span>}{r.saveBagWeight && <span className="text-emerald-700 font-bold block">✓ با Sync روی کالا ذخیره می‌شود</span>}</div>
                                                 </div>);
                                             })}
                                         </div>
@@ -2402,7 +2427,7 @@ const conversionErrors = rows.filter(r => {
                                                 <div className="xl:col-span-2"><label className="text-[9px] text-slate-400 block mb-1">واحد داخلی</label><select value={r.targetUnit} onChange={e=>updateRow(r.id,{targetUnit:e.target.value})} className="w-full p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold"><option value="کیسه">کیسه</option><option value="کارتن">کارتن</option><option value="بسته">بسته</option><option value="عدد">عدد</option><option value="کیلوگرم">کیلوگرم</option><option value="کیلو">کیلو</option></select></div>
                                                 <div className="xl:col-span-2"><label className="text-[9px] text-slate-400 block mb-1">وزن هر بسته/کارتن (kg)</label><input type="number" min="0" step="any" disabled={conv.mode==='package-direct'} value={r.weightKg} onChange={e=>updateRow(r.id,{weightKg:e.target.value})} className="w-full p-2 rounded-lg bg-white border border-slate-200 text-xs font-black text-center disabled:bg-slate-100 disabled:text-slate-400" placeholder="مثلاً 5"/>
                                                     {conv.mode==='package-direct' && <div className="text-[9px] text-indigo-600 font-bold mt-1">عدد مستقیم محک استفاده می‌شود؛ نیازی به وزن حدسی نیست</div>}
-                                                    {conv.mode!=='package-direct' && item && Number(item.bagWeight) > 0 && Math.abs(Number(r.weightKg||0) - Number(item.bagWeight)/1000) > 1e-6 && <div className="text-[9px] text-amber-700 font-bold mt-1">⚠️ با وزن ثبت‌شده‌ی خود کالا ({formatNumber(Number(item.bagWeight)/1000)} kg) فرق دارد</div>}
+                                                    {conv.mode!=='package-direct' && item && Number(item.bagWeight) > 0 && Math.abs(Number(r.weightKg||0) - Number(item.bagWeight)/1000) > 1e-6 && <div className="text-[9px] text-amber-700 font-bold mt-1">⚠ با وزن ثبت‌شده‌ی خود کالا ({formatNumber(Number(item.bagWeight)/1000)} kg) فرق دارد</div>}
                                                 </div>
                                                 <div className="xl:col-span-2"><div className={`rounded-xl p-2 border ${conv.ok?'bg-slate-50 border-slate-200':'bg-red-50 border-red-200'}`}><div className="text-[9px] text-slate-400">نتیجه تبدیل{conv.mode==='package-direct' && <span className="text-indigo-500"> (مستقیم از محک)</span>}</div>{conv.ok?<><div className="font-black text-indigo-700 text-base">{formatNumber(conv.value)} {r.targetUnit}</div>{conv.remainder>0&&<div className="text-[9px] text-amber-700 mt-1">مانده: {formatNumber(conv.remainder)} kg</div>}</>:<div className="text-[9px] font-bold text-red-600 leading-5">{conv.reason}</div>}</div></div>
                                                 <div className="xl:col-span-2 text-left">
@@ -2412,14 +2437,14 @@ const conversionErrors = rows.filter(r => {
                                                         <div className="mt-1"><ItemDistinguishBadges item={sg.item}/></div>
                                                     </button>)}
                                                     {r.mode==='existing' && r.itemId && <div className="text-[9px] text-emerald-600 font-bold">✓ متصل به کالای فعلی</div>}
-                                                    {r.conflictNote && <div className="text-[9px] text-amber-700 font-bold mt-1">⚠️ {r.conflictNote}</div>}
+                                                    {r.conflictNote && <div className="text-[9px] text-amber-700 font-bold mt-1">⚠ {r.conflictNote}</div>}
                                                     {r.mode==='new' && <div className="text-[9px] text-blue-600 font-bold">✓ کالای جدید ساخته می‌شود</div>}
                                                 </div>
                                             </div>
                                         </div>;
                                     })}
                                 </div>
-                                <div className="flex justify-between items-center gap-3 mt-5"><button onClick={()=>{setRows([]);setStep(1);}} className="px-4 py-2 rounded-xl border text-xs font-bold">انتخاب فایل دیگر</button><div className="text-[10px] text-slate-400">{conversionErrors.length>0 ? `${conversionErrors.length} مورد تبدیل نیاز به بررسی دارد؛ اما بازبینی قفل نمی‌شود.` : unresolvedAmbiguous.length>0 ? `⚠️ ${unresolvedAmbiguous.length} مورد چون هم‌نام با چند کالای انبار است، باید دستی انتخاب شود.` : unresolvedNew.length>0 ? `${unresolvedNew.length} مورد هنوز تعیین تکلیف نشده؛ در مرحله نهایی می‌توانید یکجا کالای جدید بسازید.` : 'همه موارد آماده‌اند.'}</div><button disabled={busy} onClick={()=>{setPinnedReviewIds([...conversionErrors.map(r=>r.id), ...unresolvedAmbiguous.map(r=>r.id)]);setStep(3);}} className="px-5 py-3 rounded-xl bg-indigo-600 text-white text-xs font-black disabled:opacity-40">ادامه به بازبینی</button></div>
+                                <div className="flex justify-between items-center gap-3 mt-5"><button onClick={()=>{setRows([]);setStep(1);}} className="px-4 py-2 rounded-xl border text-xs font-bold">انتخاب فایل دیگر</button><div className="text-[10px] text-slate-400">{conversionErrors.length>0 ? `${conversionErrors.length} مورد تبدیل نیاز به بررسی دارد؛ اما بازبینی قفل نمی‌شود.` : unresolvedAmbiguous.length>0 ? `⚠ ${unresolvedAmbiguous.length} مورد چون هم‌نام با چند کالای انبار است، باید دستی انتخاب شود.` : unresolvedNew.length>0 ? `${unresolvedNew.length} مورد هنوز تعیین تکلیف نشده؛ در مرحله نهایی می‌توانید یکجا کالای جدید بسازید.` : 'همه موارد آماده‌اند.'}</div><button disabled={busy} onClick={()=>{setPinnedReviewIds([...conversionErrors.map(r=>r.id), ...unresolvedAmbiguous.map(r=>r.id)]);setStep(3);}} className="px-5 py-3 rounded-xl bg-indigo-600 text-white text-xs font-black disabled:opacity-40">ادامه به بازبینی</button></div>
                             </div>
                         )}
 
@@ -2428,14 +2453,14 @@ const conversionErrors = rows.filter(r => {
                             const normalRows = rows.filter(r=>!pinnedReviewIds.includes(r.id));
                             return (
                             <div className="p-6">
-                                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4 text-xs text-amber-800 leading-6"><b>قبل از اعمال:</b> موجودی فعلی کالاهای انتخاب‌شده با مقدار تبدیل‌شده‌ی محک <b>جایگزین</b> می‌شود، نه اینکه به موجودی قبلی اضافه شود. قبل از این کار یک بکاپ کامل خودکار ساخته می‌شود.</div>{conversionErrors.length>0 && <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4 mb-4 text-xs text-red-800 leading-6 shadow-sm"><div className="font-black text-sm mb-2">🚨 نیاز به اصلاح {conversionErrors.length} مورد — این موردها جداگانه در ابتدای صفحه آمده‌اند</div><div>کالای مشکل‌دار: <b className="text-red-900">{conversionErrors.map(r=>r.mahakName).join('، ')}</b></div><div className="mt-1 text-red-700">همین‌جا واحد و وزن را تعیین کنید؛ بعد از اصلاح، دکمه نهایی خودکار فعال می‌شود.</div></div>}
+                                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4 text-xs text-amber-800 leading-6"><b>قبل از اعمال:</b> موجودی فعلی کالاهای انتخاب‌شده با مقدار تبدیل‌شده‌ی محک <b>جایگزین</b> می‌شود، نه اینکه به موجودی قبلی اضافه شود. قبل از این کار یک بکاپ کامل خودکار ساخته می‌شود.</div>{conversionErrors.length>0 && <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4 mb-4 text-xs text-red-800 leading-6 shadow-sm"><div className="font-black text-sm mb-2">⚠ نیاز به اصلاح {conversionErrors.length} مورد — این موردها جداگانه در ابتدای صفحه آمده‌اند</div><div>کالای مشکل‌دار: <b className="text-red-900">{conversionErrors.map(r=>r.mahakName).join('، ')}</b></div><div className="mt-1 text-red-700">همین‌جا واحد و وزن را تعیین کنید؛ بعد از اصلاح، دکمه نهایی خودکار فعال می‌شود.</div></div>}
                                 {unresolvedBanner}<div className="grid grid-cols-1 lg:grid-cols-4 gap-3 mb-5">
                                     <div className="bg-slate-50 rounded-2xl border p-4"><div className="text-[10px] text-slate-400">ردیف‌های مثبت محک</div><div className="text-2xl font-black text-slate-800">{rows.length}</div></div>
                                     <div className="bg-indigo-50 rounded-2xl border border-indigo-100 p-4"><div className="text-[10px] text-indigo-500">آماده بروزرسانی</div><div className="text-2xl font-black text-indigo-700">{readyRows.length}</div></div>
                                     <div className="bg-amber-50 rounded-2xl border border-amber-100 p-4"><div className="text-[10px] text-amber-500">تعیین‌تکلیف‌نشده</div><div className="text-sm font-black text-amber-700 mt-1">{unresolved.length}</div></div>
                                      <div className="bg-emerald-50 rounded-2xl border border-emerald-100 p-4"><div className="text-[10px] text-emerald-500">منبع موجودی</div><div className="text-sm font-black text-emerald-700 mt-1">محک</div></div>
                                 </div>
-                                <div className="space-y-2">{[...pinnedRows, ...normalRows].map((r,reviewIndex)=>{const item=r.mode==='existing'?items.find(i=>i.id===r.itemId):null;const target=r.mode==='new'?{unit:r.targetUnit,bagWeight:Number(r.weightKg||0)*1000}:item;const conv=convertMahakKgToTarget(r.mahakKg,target,r.weightKg,r.forcePackage===true,r.mahakQty2);const isConversionError=!conv.ok;return <React.Fragment key={r.id}>{reviewIndex===0 && pinnedRows.length>0 && <div className="sticky top-0 z-10 bg-red-600 text-white rounded-xl px-4 py-3 text-xs font-black shadow-lg">🚨 مواردی که هنگام ورود به بازبینی نیاز به اصلاح داشتند — همین‌جا بمانید و بعد تأیید نهایی بزنید ({pinnedRows.length} مورد)</div>}{reviewIndex===pinnedRows.length && pinnedRows.length>0 && <div className="mt-5 pt-4 border-t-2 border-slate-200 bg-slate-50 rounded-xl px-4 py-3 text-xs font-black text-slate-700">✓ سایر {normalRows.length} ردیف بازبینی نهایی</div>}<div key={r.id} id={`mahak-row-${r.id}`} className={`rounded-2xl border p-3 ${conv.ok?(unresolved.some(u=>u.id===r.id)?'border-amber-400 bg-amber-50/40 ring-2 ring-amber-200':'border-slate-200 bg-white'):'border-red-300 bg-red-50'}`}><div className="grid grid-cols-1 lg:grid-cols-7 gap-2 items-center"><div className="lg:col-span-2"><div className="font-black text-sm">{r.mahakName}</div><div className="text-[10px] text-slate-500">محک: {formatNumber(r.mahakKg)} kg</div>{r.isAmbiguous && <div className="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-300 rounded px-1.5 py-0.5 mt-1 inline-block">⚠️ چند کالای هم‌نام در انبار پیدا شد — باید دستی انتخاب کنی، وگرنه دوباره تکراری ساخته می‌شود</div>}</div><div><label className="text-[9px] text-slate-400 block mb-1">روش</label><div className="flex gap-1"><button onClick={()=>updateRow(r.id,{mode:'existing'})} className={`flex-1 px-2 py-2 rounded-lg text-[10px] font-bold border ${r.mode==='existing'?'bg-indigo-600 text-white':'bg-white'}`}>کالای فعلی</button><button onClick={()=>updateRow(r.id,{mode:'new',targetName:r.targetName||r.mahakName,targetWarehouseId:r.targetWarehouseId||defaultMahakWarehouseId})} className={`flex-1 px-2 py-2 rounded-lg text-[10px] font-bold border ${r.mode==='new'?'bg-emerald-600 text-white':'bg-white'}`}>جدید</button></div></div><div>{r.mode==='existing'?(() => { const selected=items.find(i=>i.id===r.itemId); const q=openLinkRow===r.id?normalizeMahakName(linkSearch):''; const linkCandidates=items.filter(i=>!q||normalizeMahakName([i.name,i.brand,i.tag,i.unit,i.bagWeight?String(i.bagWeight):''].filter(Boolean).join(' ')).includes(q)).sort((a,b)=>{if(a.id===r.itemId)return -1;if(b.id===r.itemId)return 1;return String(a.name||'').localeCompare(String(b.name||''),'fa');}); const shownCandidates=linkCandidates.slice(0,40); const allNames=shownCandidates.map(x=>x.name); return <div className="relative"><button type="button" onClick={()=>{setOpenLinkRow(openLinkRow===r.id?null:r.id);setLinkSearch('');}} className="w-full p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold outline-none text-right flex items-center justify-between gap-2"><span className="truncate">{selected?selected.name:'— انتخاب کالا —'}</span><ChevronDown size={13} className="shrink-0 text-slate-400"/></button>{openLinkRow===r.id && <div className="absolute z-[80] top-full mt-1 right-0 w-[min(420px,90vw)] bg-white border border-slate-200 rounded-xl shadow-2xl p-2"><div className="flex items-center gap-2 mb-2"><Search size={14} className="text-slate-400 shrink-0"/><input autoFocus value={linkSearch} onChange={e=>setLinkSearch(e.target.value)} placeholder="جستجو در نام، برند، تگ..." className="flex-1 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs outline-none"/></div><div className="max-h-56 overflow-y-auto space-y-1">{shownCandidates.length===0?<div className="p-4 text-center text-xs text-slate-400">کالایی پیدا نشد.</div>:shownCandidates.map(it=>{const {prefix,diff}=splitNameDiff(allNames,it.name);return <button key={it.id} type="button" onClick={()=>{updateRow(r.id,{itemId:it.id,targetName:it.name,targetUnit:it.unit||'کیسه',weightKg:it.bagWeight?Number(it.bagWeight)/1000:r.weightKg});setOpenLinkRow(null);setLinkSearch('');}} className={`w-full text-right p-2 rounded-lg border ${it.id===r.itemId?'border-indigo-300 bg-indigo-50':'border-transparent hover:border-slate-200 hover:bg-slate-50'}`}><div className="font-black text-xs text-slate-800">{prefix}{diff && <span className={`mr-1 px-1 rounded border ${stringToBadgeColor(diff)}`}>{diff}</span>}</div><div className="mt-1"><ItemDistinguishBadges item={it}/></div></button>;})}</div></div>}</div>; })():<input value={r.targetName} onChange={e=>updateRow(r.id,{targetName:e.target.value})} className="w-full p-2 rounded-lg border text-xs" placeholder="نام کالای جدید"/>}</div>{r.mode==='new' && <div><select value={r.targetWarehouseId || defaultMahakWarehouseId || ''} onChange={e=>updateRow(r.id,{targetWarehouseId:e.target.value})} className="w-full p-2 rounded-lg border text-xs"><option value="">— بدون انبار —</option>{(settings?.warehouses || []).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select><div className="text-[8px] text-slate-400 mt-1">انبار کالای جدید</div></div>}<div><select value={r.targetUnit} onChange={e=>updateRow(r.id,{targetUnit:e.target.value,weightKg:(e.target.value==='کیلوگرم'||e.target.value==='کیلو')?'':r.weightKg})} className="w-full p-2 rounded-lg border text-xs"><option value="کیسه">کیسه</option><option value="کارتن">کارتن</option><option value="بسته">بسته</option><option value="عدد">عدد</option><option value="کیلوگرم">کیلوگرم</option><option value="کیلو">کیلو</option></select></div><div><input type="number" min="0" step="any" disabled={r.targetUnit==='کیلوگرم'||r.targetUnit==='کیلو'} value={r.weightKg} onChange={e=>updateRow(r.id,{weightKg:e.target.value})} className="w-full p-2 rounded-lg border text-xs text-center disabled:bg-slate-100" placeholder={r.targetUnit==='کیلوگرم'||r.targetUnit==='کیلو'?'نیاز نیست':'وزن هر بسته (kg)'}/></div><div className={`p-2 rounded-lg text-center text-xs font-black ${conv.ok?'bg-emerald-50 text-emerald-700':'bg-red-100 text-red-700'}`}>{conv.ok?`${formatNumber(conv.value)} ${r.targetUnit}`:conv.reason}</div></div></div></React.Fragment>})}</div>
+                                <div className="space-y-2">{[...pinnedRows, ...normalRows].map((r,reviewIndex)=>{const item=r.mode==='existing'?items.find(i=>i.id===r.itemId):null;const target=r.mode==='new'?{unit:r.targetUnit,bagWeight:Number(r.weightKg||0)*1000}:item;const conv=convertMahakKgToTarget(r.mahakKg,target,r.weightKg,r.forcePackage===true,r.mahakQty2);const isConversionError=!conv.ok;return <React.Fragment key={r.id}>{reviewIndex===0 && pinnedRows.length>0 && <div className="sticky top-0 z-10 bg-red-600 text-white rounded-xl px-4 py-3 text-xs font-black shadow-lg">⚠ مواردی که هنگام ورود به بازبینی نیاز به اصلاح داشتند — همین‌جا بمانید و بعد تأیید نهایی بزنید ({pinnedRows.length} مورد)</div>}{reviewIndex===pinnedRows.length && pinnedRows.length>0 && <div className="mt-5 pt-4 border-t-2 border-slate-200 bg-slate-50 rounded-xl px-4 py-3 text-xs font-black text-slate-700">✓ سایر {normalRows.length} ردیف بازبینی نهایی</div>}<div key={r.id} id={`mahak-row-${r.id}`} className={`rounded-2xl border p-3 ${conv.ok?(unresolved.some(u=>u.id===r.id)?'border-amber-400 bg-amber-50/40 ring-2 ring-amber-200':'border-slate-200 bg-white'):'border-red-300 bg-red-50'}`}><div className="grid grid-cols-1 lg:grid-cols-7 gap-2 items-center"><div className="lg:col-span-2"><div className="font-black text-sm">{r.mahakName}</div><div className="text-[10px] text-slate-500">محک: {formatNumber(r.mahakKg)} kg</div>{r.isAmbiguous && <div className="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-300 rounded px-1.5 py-0.5 mt-1 inline-block">⚠ چند کالای هم‌نام در انبار پیدا شد — باید دستی انتخاب کنی، وگرنه دوباره تکراری ساخته می‌شود</div>}</div><div><label className="text-[9px] text-slate-400 block mb-1">روش</label><div className="flex gap-1"><button onClick={()=>updateRow(r.id,{mode:'existing'})} className={`flex-1 px-2 py-2 rounded-lg text-[10px] font-bold border ${r.mode==='existing'?'bg-indigo-600 text-white':'bg-white'}`}>کالای فعلی</button><button onClick={()=>updateRow(r.id,{mode:'new',targetName:r.targetName||r.mahakName,targetWarehouseId:r.targetWarehouseId||defaultMahakWarehouseId})} className={`flex-1 px-2 py-2 rounded-lg text-[10px] font-bold border ${r.mode==='new'?'bg-emerald-600 text-white':'bg-white'}`}>جدید</button></div></div><div>{r.mode==='existing'?(() => { const selected=items.find(i=>i.id===r.itemId); const q=openLinkRow===r.id?normalizeMahakName(linkSearch):''; const linkCandidates=items.filter(i=>!q||normalizeMahakName([i.name,i.brand,i.tag,i.unit,i.bagWeight?String(i.bagWeight):''].filter(Boolean).join(' ')).includes(q)).sort((a,b)=>{if(a.id===r.itemId)return -1;if(b.id===r.itemId)return 1;return String(a.name||'').localeCompare(String(b.name||''),'fa');}); const shownCandidates=linkCandidates.slice(0,40); const allNames=shownCandidates.map(x=>x.name); return <div className="relative"><button type="button" onClick={()=>{setOpenLinkRow(openLinkRow===r.id?null:r.id);setLinkSearch('');}} className="w-full p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold outline-none text-right flex items-center justify-between gap-2"><span className="truncate">{selected?selected.name:'— انتخاب کالا —'}</span><ChevronDown size={13} className="shrink-0 text-slate-400"/></button>{openLinkRow===r.id && <div className="absolute z-[80] top-full mt-1 right-0 w-[min(420px,90vw)] bg-white border border-slate-200 rounded-xl shadow-2xl p-2"><div className="flex items-center gap-2 mb-2"><Search size={14} className="text-slate-400 shrink-0"/><input autoFocus value={linkSearch} onChange={e=>setLinkSearch(e.target.value)} placeholder="جستجو در نام، برند، تگ..." className="flex-1 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs outline-none"/></div><div className="max-h-56 overflow-y-auto space-y-1">{shownCandidates.length===0?<div className="p-4 text-center text-xs text-slate-400">کالایی پیدا نشد.</div>:shownCandidates.map(it=>{const {prefix,diff}=splitNameDiff(allNames,it.name);return <button key={it.id} type="button" onClick={()=>{updateRow(r.id,{itemId:it.id,targetName:it.name,targetUnit:it.unit||'کیسه',weightKg:it.bagWeight?Number(it.bagWeight)/1000:r.weightKg});setOpenLinkRow(null);setLinkSearch('');}} className={`w-full text-right p-2 rounded-lg border ${it.id===r.itemId?'border-indigo-300 bg-indigo-50':'border-transparent hover:border-slate-200 hover:bg-slate-50'}`}><div className="font-black text-xs text-slate-800">{prefix}{diff && <span className={`mr-1 px-1 rounded border ${stringToBadgeColor(diff)}`}>{diff}</span>}</div><div className="mt-1"><ItemDistinguishBadges item={it}/></div></button>;})}</div></div>}</div>; })():<input value={r.targetName} onChange={e=>updateRow(r.id,{targetName:e.target.value})} className="w-full p-2 rounded-lg border text-xs" placeholder="نام کالای جدید"/>}</div>{r.mode==='new' && <div><select value={r.targetWarehouseId || defaultMahakWarehouseId || ''} onChange={e=>updateRow(r.id,{targetWarehouseId:e.target.value})} className="w-full p-2 rounded-lg border text-xs"><option value="">— بدون انبار —</option>{(settings?.warehouses || []).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select><div className="text-[8px] text-slate-400 mt-1">انبار کالای جدید</div></div>}<div><select value={r.targetUnit} onChange={e=>updateRow(r.id,{targetUnit:e.target.value,weightKg:(e.target.value==='کیلوگرم'||e.target.value==='کیلو')?'':r.weightKg})} className="w-full p-2 rounded-lg border text-xs"><option value="کیسه">کیسه</option><option value="کارتن">کارتن</option><option value="بسته">بسته</option><option value="عدد">عدد</option><option value="کیلوگرم">کیلوگرم</option><option value="کیلو">کیلو</option></select></div><div><input type="number" min="0" step="any" disabled={r.targetUnit==='کیلوگرم'||r.targetUnit==='کیلو'} value={r.weightKg} onChange={e=>updateRow(r.id,{weightKg:e.target.value})} className="w-full p-2 rounded-lg border text-xs text-center disabled:bg-slate-100" placeholder={r.targetUnit==='کیلوگرم'||r.targetUnit==='کیلو'?'نیاز نیست':'وزن هر بسته (kg)'}/></div><div className={`p-2 rounded-lg text-center text-xs font-black ${conv.ok?'bg-emerald-50 text-emerald-700':'bg-red-100 text-red-700'}`}>{conv.ok?`${formatNumber(conv.value)} ${r.targetUnit}`:conv.reason}</div></div></div></React.Fragment>})}</div>
                                 <div className="flex justify-between items-center mt-5"><button onClick={()=>setStep(2)} className="px-4 py-2 rounded-xl border text-xs font-bold">بازگشت به تطبیق</button><button disabled={busy || conversionErrors.length>0} onClick={applySync} title={conversionErrors.length>0?'موارد مشکل‌دار در ابتدای همین صفحه جداگانه نمایش داده شده‌اند. همان‌جا اصلاحشان کنید.':''} className="px-5 py-3 rounded-xl bg-emerald-600 text-white text-xs font-black disabled:opacity-50">{busy?'در حال اعمال...':conversionErrors.length>0 ? `نیاز به اصلاح ${conversionErrors.length} مورد` : unresolved.length ? `اعمال Sync + تعیین تکلیف ${unresolved.length} مورد` : 'ساخت بکاپ و اعمال همگام‌سازی'}</button></div>
                             </div>
                             );
@@ -3059,10 +3084,11 @@ const conversionErrors = rows.filter(r => {
         const GroupTabs = ({ view, setView }) => {
             const g = getViewGroup(view);
             if (!g) return null;
+            // چیپ‌های گرد هم‌شکل فیلترهای داشبورد: فعال = سرمه‌ای، غیرفعال = سفید با سایه‌ی نرم
             return (
-                <div className="no-print mb-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-1.5 flex gap-1 overflow-x-auto" role="tablist" aria-label={g.label}>
+                <div className="no-print mb-5 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label={g.label}>
                     {g.tabs.map(t => (
-                        <button key={t.id} role="tab" aria-selected={view === t.id} onClick={() => setView(t.id)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap border-r-4 transition-all cursor-pointer ${view === t.id ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/20 border-brass-400' : 'border-transparent text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'}`}><t.icon size={16}/>{t.label}</button>
+                        <button key={t.id} role="tab" aria-selected={view === t.id} onClick={() => setView(t.id)} className={`flex items-center gap-2 h-10 px-4 rounded-full text-sm font-bold whitespace-nowrap transition cursor-pointer ${view === t.id ? 'bg-indigo-900 text-white shadow-md shadow-indigo-900/20' : 'bg-white text-slate-600 shadow-sm hover:text-indigo-700 hover:bg-indigo-50'}`}><t.icon size={16}/>{t.label}</button>
                     ))}
                 </div>
             );
@@ -3161,8 +3187,8 @@ const conversionErrors = rows.filter(r => {
                                 <div className="mt-3 flex items-center justify-between gap-2">
                                     <div className="text-[10px] text-slate-500">رزرو: <b>{formatNumber((reservedCounts&&reservedCounts[i.id])||0)}</b> • فیزیکی: <b>{formatNumber(i.quantity)}</b></div>
                                     <div className="flex gap-1.5">
-                                        <button onClick={()=>toggle(i.id, i.muted ? 'unmute' : 'mute')} className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition ${i.muted?'bg-emerald-50 text-emerald-700 border-emerald-200':'bg-slate-50 text-slate-600 border-slate-200'}`}>{i.muted?'🔔 Unmute':'🔕 Mute'}</button>
-                                        {!i.muted && <button onClick={()=>toggle(i.id,'snooze')} className="px-3 py-1.5 rounded-full text-[10px] font-bold border bg-amber-50 text-amber-700 border-amber-200">⏰ تا ۱ ساعت</button>}
+                                        <button onClick={()=>toggle(i.id, i.muted ? 'unmute' : 'mute')} className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition ${i.muted?'bg-emerald-50 text-emerald-700 border-emerald-200':'bg-slate-50 text-slate-600 border-slate-200'}`}>{i.muted?'فعال‌کردن هشدار':'بی‌صدا'}</button>
+                                        {!i.muted && <button onClick={()=>toggle(i.id,'snooze')} className="px-3 py-1.5 rounded-full text-[10px] font-bold border bg-amber-50 text-amber-700 border-amber-200">تا ۱ ساعت</button>}
                                     </div>
                                 </div>
                             </div>
@@ -3648,7 +3674,7 @@ const conversionErrors = rows.filter(r => {
                             <h3 className="font-black text-slate-700 text-lg">{name}</h3>
                             <span className="text-xs text-slate-400 font-medium mr-2 bg-slate-100 px-2 py-0.5 rounded-full">{items.length} مدل</span>
                             {hasZeroStock && <span className="text-[10px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full border border-red-200">⚠ اتمام موجودی</span>}
-                            {!hasZeroStock && hasLowStock && <span className="text-[10px] font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full border border-orange-200">⚡ موجودی کم</span>}
+                            {!hasZeroStock && hasLowStock && <span className="text-[10px] font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full border border-orange-200">موجودی کم</span>}
                         </div>
                         <div className="flex items-center gap-2">
                             <div className={`px-3 py-1 rounded-lg text-sm font-bold border ${hasZeroStock?'bg-red-50 text-red-600 border-red-200':hasLowStock?'bg-orange-50 text-orange-600 border-orange-200':'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>مجموع: {totalQuantity.toLocaleString()}</div>
@@ -4564,7 +4590,7 @@ const conversionErrors = rows.filter(r => {
                                                         <span className="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100 font-bold">{rItem.brand}</span>
                                                     )}
                                                     <span className="text-[9px] text-slate-400">{rItem.tag}</span>
-                                                    {item.sourced && <span className="text-[9px] text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded font-bold">🛒 از: {item.sourceParty || '—'}{item.sourcePrice > 0 && ` (${formatNumber(item.sourcePrice)} ت)`} · {item.sourceSettlement === 'settled' ? 'تسویه‌شده' : 'تسویه‌نشده'}</span>}
+                                                    {item.sourced && <span className="text-[9px] text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded font-bold">از: {item.sourceParty || '—'}{item.sourcePrice > 0 && ` (${formatNumber(item.sourcePrice)} ت)`} · {item.sourceSettlement === 'settled' ? 'تسویه‌شده' : 'تسویه‌نشده'}</span>}
                                                 </div>
                                             </td>
                                             <td className="p-2.5 text-center">{item.qty}</td>
@@ -4589,21 +4615,21 @@ const conversionErrors = rows.filter(r => {
                                                     {!shippable && !(item.shipments && item.shipments.length > 0) && <span className="text-slate-300 text-[10px]">—</span>}
                                                     {shippable && (
                                                         <div className="flex flex-wrap items-center justify-center gap-1">
-                                                            {fullyGone && <span className="text-[9px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full font-bold border border-slate-300">✅ ارسال شده</span>}
+                                                            {fullyGone && <span className="text-[9px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full font-bold border border-slate-300">✓ ارسال شده</span>}
                                                             {!fullyGone && shipped > 0 && (
                                                                 <>
-                                                                    <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold border border-emerald-200">✅ رفته: {formatNumber(shipped)}</span>
-                                                                    <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold border border-amber-200">⏳ باقی‌مانده: {formatNumber(remaining)}</span>
+                                                                    <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold border border-emerald-200">✓ رفته: {formatNumber(shipped)}</span>
+                                                                    <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold border border-amber-200">باقی‌مانده: {formatNumber(remaining)}</span>
                                                                 </>
                                                             )}
-                                                            {shipped === 0 && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold border border-amber-200">⏳ رزرو</span>}
+                                                            {shipped === 0 && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold border border-amber-200">رزرو</span>}
                                                         </div>
                                                     )}
                                                     {item.shipments && item.shipments.length > 0 && (
                                                         <div className="mt-1 text-right space-y-0.5">
                                                             {item.shipments.map((sh, sIdx) => (
                                                                 <div key={sh.id || sIdx} className="text-[9px] text-slate-400 bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5">
-                                                                    محموله {sIdx + 1} — {sh.date}: {formatNumber(sh.qty)} عدد، {formatNumber(sh.weight)} کیلو {sh.weightManual ? <span className="text-amber-600 font-bold">(🖊 وزن دستی{sh.calculatedWeight != null ? `، به‌نسبت می‌شد ${formatNumber(sh.calculatedWeight)}` : ''})</span> : <span className="text-slate-300">(🔢 به‌نسبت)</span>}، فی {formatNumber(sh.price)} {sh.priceManual && <span className="text-amber-600 font-bold">(🖊 قیمت دستی)</span>}
+                                                                    محموله {sIdx + 1} — {sh.date}: {formatNumber(sh.qty)} عدد، {formatNumber(sh.weight)} کیلو {sh.weightManual ? <span className="text-amber-600 font-bold">(✎ وزن دستی{sh.calculatedWeight != null ? `، به‌نسبت می‌شد ${formatNumber(sh.calculatedWeight)}` : ''})</span> : <span className="text-slate-300">(به‌نسبت)</span>}، فی {formatNumber(sh.price)} {sh.priceManual && <span className="text-amber-600 font-bold">(✎ قیمت دستی)</span>}
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -4653,7 +4679,7 @@ const conversionErrors = rows.filter(r => {
                             )}
                         {invoice.dateManuallySet && (
                             <div className="mt-4 bg-amber-50 rounded-xl p-3 border border-amber-200 text-amber-800 text-xs font-bold space-y-0.5">
-                                <div className="flex items-center gap-2"><span>📌</span><span>این فاکتور با یک تاریخِ دستی (متفاوت از تاریخِ واقعیِ ثبت) صادر شده — محاسبات و گزارش‌ها بر همین تاریخِ دستی هستند.</span></div>
+                                <div className="flex items-center gap-2"><span></span><span>این فاکتور با یک تاریخِ دستی (متفاوت از تاریخِ واقعیِ ثبت) صادر شده — محاسبات و گزارش‌ها بر همین تاریخِ دستی هستند.</span></div>
                                 {invoice.realEntryTimestamp && (
                                     <div className="pr-5 text-amber-600 font-medium">تاریخِ نوشته‌شده روی سند: {invoice.date} — روزِ واقعیِ ثبت در سیستم: {formatJalali(new Date(invoice.realEntryTimestamp).toISOString(), true)}</div>
                                 )}
@@ -4670,7 +4696,7 @@ const conversionErrors = rows.filter(r => {
                                     <div className="space-y-2">
                                         {invoice.dateChangeLogs.map((log, idx) => (
                                             <div key={idx} className="text-xs text-orange-800 bg-white rounded-lg px-3 py-2 border border-orange-100 flex items-center gap-2">
-                                                <span className="text-orange-400">🗓</span>
+                                                <span className="text-orange-400"></span>
                                                 <span>در تاریخ <strong>{log.changedAt}</strong>، تاریخ فاکتور از <strong className="text-red-600">{log.from}</strong> به <strong className="text-emerald-600">{log.to}</strong> تغییر کرد</span>
                                                 {log.changedBy && <span className="text-orange-400 text-[10px]">— {log.changedBy}</span>}
                                             </div>
@@ -4709,7 +4735,7 @@ const conversionErrors = rows.filter(r => {
                                             <span>اطلاعات کسری و بسته‌بندی</span>
                                             <span className="text-[9px] text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full font-medium border border-blue-200">پاورقی – فقط جنبه اطلاعاتی</span>
                                             {enrichedItems.some(it => it._enrichedFromInventory) && (
-                                                <span className="text-[9px] text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full font-medium border border-violet-200">📦 داده از انبار جاری</span>
+                                                <span className="text-[9px] text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full font-medium border border-violet-200">داده از انبار جاری</span>
                                             )}
                                         </div>
                                         <div className="space-y-3">
@@ -4721,10 +4747,10 @@ const conversionErrors = rows.filter(r => {
                                                     <span className="font-bold text-blue-900 text-sm">{it.name} {it.brand && `(${it.brand})`}</span>
                                                     {it.deductionPerBag && (
                                                         <div className="space-y-1">
-                                                            <span className="flex items-center gap-1">🔸 کسری هر کیسه: <strong>{formatNumber(it.deductionPerBag)} گرم</strong> {it.deductionDate && `— ثبت شده در تاریخ ${it.deductionDate}`}</span>
+                                                            <span className="flex items-center gap-1">کسری هر کیسه: <strong>{formatNumber(it.deductionPerBag)} گرم</strong> {it.deductionDate && `— ثبت شده در تاریخ ${it.deductionDate}`}</span>
                                                             {it.qty > 0 && (
                                                                 <div className="bg-blue-100 rounded-lg px-3 py-2 border border-blue-200 text-blue-900">
-                                                                    <div className="font-bold text-xs mb-1">📐 محاسبه کسری کل:</div>
+                                                                    <div className="font-bold text-xs mb-1">محاسبه کسری کل:</div>
                                                                     <div className="font-mono text-sm">
                                                                         {it.qty} کیسه × {formatNumber(it.deductionPerBag)} گرم = {formatNumber(deducGrams)} گرم
                                                                     </div>
@@ -4735,8 +4761,8 @@ const conversionErrors = rows.filter(r => {
                                                             )}
                                                         </div>
                                                     )}
-                                                    {it.bagWeight && <span>📦 وزن کیسه/کارتن: <strong>{it.bagWeight >= 1000 ? `${it.bagWeight/1000} کیلوگرم` : `${formatNumber(it.bagWeight)} گرم`}</strong></span>}
-                                                    {it.deductionPerBag && <span className="text-blue-500 text-[10px]">⚠️ این اطلاعات صرفاً برای مطلع ماندن شما ثبت شده و در محاسبات تأثیری ندارد.</span>}
+                                                    {it.bagWeight && <span>وزن کیسه/کارتن: <strong>{it.bagWeight >= 1000 ? `${it.bagWeight/1000} کیلوگرم` : `${formatNumber(it.bagWeight)} گرم`}</strong></span>}
+                                                    {it.deductionPerBag && <span className="text-blue-500 text-[10px]">⚠ این اطلاعات صرفاً برای مطلع ماندن شما ثبت شده و در محاسبات تأثیری ندارد.</span>}
                                                 </div>
                                                 );
                                             })}
@@ -4981,7 +5007,7 @@ const conversionErrors = rows.filter(r => {
                             </table>
                             {doneIdx.length > 0 && (
                                 <div className="text-[9px] text-slate-500 bg-emerald-50 border border-emerald-200 rounded-lg p-1.5 mt-2">
-                                    <span className="font-bold text-emerald-700">✅ {doneIdx.length} ردیف قبلاً به‌طور کامل ارسال شده</span> و نیازی به تصمیم جدید ندارد: {doneIdx.map(({ it }) => it.name).join('، ')}
+                                    <span className="font-bold text-emerald-700">✓ {doneIdx.length} ردیف قبلاً به‌طور کامل ارسال شده</span> و نیازی به تصمیم جدید ندارد: {doneIdx.map(({ it }) => it.name).join('، ')}
                                 </div>
                             )}
                             {showDueStep && (
@@ -5372,7 +5398,7 @@ const conversionErrors = rows.filter(r => {
                 setShowDescModal(false);
                 try {
                     await navigator.clipboard.writeText(text);
-                    toast.show('📋 توضیحات تولید و در کلیپ‌بورد کپی شد');
+                    toast.show('توضیحات تولید و در کلیپ‌بورد کپی شد');
                 } catch (err) {
                     toast.show('توضیحات تولید شد (کپی خودکار ممکن نشد، از روی متن کپی کنید)');
                 }
@@ -5555,8 +5581,8 @@ const conversionErrors = rows.filter(r => {
                                 <div className="flex flex-col items-stretch">
                                     <label className="block text-[11px] font-bold text-slate-500 mb-1">تاریخ فاکتور</label>
                                     <input className={`w-full h-9 px-4 rounded-2xl border text-sm font-bold text-center tabular-nums outline-none transition focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 ${dateIsManualNonToday ? 'border-amber-400 bg-amber-50' : 'border-slate-200 bg-slate-50/70'}`} placeholder="تاریخ" value={date} onChange={e => setDate(e.target.value)} onBlur={e => setDate(normalizeInvoiceDateStr(e.target.value))} title="فرمت: سال/ماه/روز — نیازی به صفر ابتدایی یا ارقام فارسی نیست، خودکار یکدست می‌شود" />
-                                    {dateIsManualNonToday && <div className="text-[10px] text-amber-600 font-bold mt-1.5 flex items-center gap-1.5">📌 تاریخ دستی (غیر از امروز) <button type="button" onClick={() => setDate(new Date().toLocaleDateString('fa-IR'))} className="text-indigo-600 underline hover:text-indigo-800">بازگشت به امروز</button></div>}
-                                    {!dateChangedThisSession && isJalaliDateStrDifferentFromToday(date) && initialData?.dateManuallySet && <div className="text-[10px] text-amber-500 font-bold mt-1.5">📌 قبلاً به‌صورت دستی ثبت شده</div>}
+                                    {dateIsManualNonToday && <div className="text-[10px] text-amber-600 font-bold mt-1.5 flex items-center gap-1.5">تاریخ دستی (غیر از امروز) <button type="button" onClick={() => setDate(new Date().toLocaleDateString('fa-IR'))} className="text-indigo-600 underline hover:text-indigo-800">بازگشت به امروز</button></div>}
+                                    {!dateChangedThisSession && isJalaliDateStrDifferentFromToday(date) && initialData?.dateManuallySet && <div className="text-[10px] text-amber-500 font-bold mt-1.5">قبلاً به‌صورت دستی ثبت شده</div>}
                                 </div>
                             </div>
                             <div className="flex gap-2.5">
@@ -5664,14 +5690,14 @@ const conversionErrors = rows.filter(r => {
                                                         </span>
                                                     ); })()}
                                                     {item.isManual && <span className="text-[10px] text-slate-400">(دستی)</span>}
-                                                    {!item.isManual && item.qty > item.stock && <span className="text-[10px] text-red-500 font-bold">⚠️ آزاد: {item.stock}</span>}
+                                                    {!item.isManual && item.qty > item.stock && <span className="text-[10px] text-red-500 font-bold">⚠ آزاد: {item.stock}</span>}
                                                     {incomingSellable > 0 && <span className="text-[9px] text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5"><Truck size={9}/> شامل {incomingSellable} از بارِ در راه</span>}
-                                                    {item.sourced && <span className="text-[9px] text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded font-bold">🛒 خریداری از: {item.sourceParty || '—'}{item.sourcePrice > 0 && ` (${formatNumber(item.sourcePrice)} ت)`}{item.sourceSettlement && <span className={item.sourceSettlement === 'settled' ? 'text-emerald-700' : 'text-red-500'}> · {item.sourceSettlement === 'settled' ? 'تسویه‌شده' : 'تسویه‌نشده'}</span>}</span>}
+                                                    {item.sourced && <span className="text-[9px] text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded font-bold">خریداری از: {item.sourceParty || '—'}{item.sourcePrice > 0 && ` (${formatNumber(item.sourcePrice)} ت)`}{item.sourceSettlement && <span className={item.sourceSettlement === 'settled' ? 'text-emerald-700' : 'text-red-500'}> · {item.sourceSettlement === 'settled' ? 'تسویه‌شده' : 'تسویه‌نشده'}</span>}</span>}
                                                 </div>
                                                 {(deducGrams > 0 || item.bagWeight > 0) && (
                                                     <div className="text-[9px] text-blue-600 mt-0.5 leading-snug">
-                                                        {deducGrams > 0 && <>📋 {item.qty}×{formatNumber(item.deductionPerBag)}گ = {deducKg % 1 === 0 ? deducKg : deducKg.toFixed(2)} کیلو کسری{item.bagWeight > 0 && <span className="text-slate-300"> • </span>}</>}
-                                                        {item.bagWeight > 0 && <span className="text-slate-400">📦 کیسه {item.bagWeight >= 1000 ? `${item.bagWeight/1000}کیلو` : `${formatNumber(item.bagWeight)}گرم`}</span>}
+                                                        {deducGrams > 0 && <>{item.qty}×{formatNumber(item.deductionPerBag)}گ = {deducKg % 1 === 0 ? deducKg : deducKg.toFixed(2)} کیلو کسری{item.bagWeight > 0 && <span className="text-slate-300"> • </span>}</>}
+                                                        {item.bagWeight > 0 && <span className="text-slate-400">کیسه {item.bagWeight >= 1000 ? `${item.bagWeight/1000}کیلو` : `${formatNumber(item.bagWeight)}گرم`}</span>}
                                                     </div>
                                                 )}
                                             </td>
@@ -5752,12 +5778,12 @@ const conversionErrors = rows.filter(r => {
                                     <div className="flex justify-between items-center gap-4 pb-2.5 border-b border-dashed border-slate-200 text-amber-700">
                                         <label className="flex items-center gap-2 cursor-pointer select-none" title="لغو/فعال‌سازی سریع هزینه بارگیری برای همین فاکتور">
                                             <input type="checkbox" className="accent-amber-600 w-4 h-4" checked={includeLoadingCostChoice} onChange={e => setIncludeLoadingCostChoice(e.target.checked)} />
-                                            <span className={includeLoadingCostChoice ? 'font-bold' : 'line-through text-slate-400'}>🚛 هزینه بارگیری</span>
+                                            <span className={includeLoadingCostChoice ? 'font-bold' : 'line-through text-slate-400'}>هزینه بارگیری</span>
                                         </label>
                                         <strong className={`text-sm tabular-nums ${includeLoadingCostChoice ? '' : 'text-slate-400 line-through'}`}>{formatNumber(getAppliedLoadingCostAmount())} تومان</strong>
                                     </div>
-                                    <div className="flex justify-between items-center gap-4 pb-2.5 border-b border-dashed border-slate-200 text-indigo-700"><span>💳 مهلت تسویه</span><strong className="text-sm">{settlementTerm.trim() || 'تعیین نشده'}</strong></div>
-                                    {dueDate && <div className="flex justify-between items-center gap-4 text-indigo-700 sm:col-span-2"><span>📅 سررسید دقیق</span><strong className="text-sm">{formatJalali(dueDate)}</strong></div>}
+                                    <div className="flex justify-between items-center gap-4 pb-2.5 border-b border-dashed border-slate-200 text-indigo-700"><span>مهلت تسویه</span><strong className="text-sm">{settlementTerm.trim() || 'تعیین نشده'}</strong></div>
+                                    {dueDate && <div className="flex justify-between items-center gap-4 text-indigo-700 sm:col-span-2"><span>سررسید دقیق</span><strong className="text-sm">{formatJalali(dueDate)}</strong></div>}
                                 </div>
                                 <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white p-4 md:min-w-[300px] flex flex-col justify-center">
                                     <div className="text-[11px] text-indigo-200 font-bold">جمع کل فاکتور</div>
@@ -5853,10 +5879,10 @@ const conversionErrors = rows.filter(r => {
                                         </div>
                                         <div className="text-[10px] text-slate-500 bg-slate-50 border rounded-xl p-3">وزن طبق واحد گرد کردن تنظیم‌شده (اکنون {formatNumber(settings.loadingWeightIncrementKg ?? 1000)} کیلوگرم) گرد شده و هزینه بر اساس نرخ فعلی تنظیمات محاسبه شده است.</div>
                                         {loadingMinWeightKg > 0 && actualWeight < loadingMinWeightKg && (
-                                            <div className="text-[10px] text-blue-700 bg-blue-50 border border-blue-200 rounded-xl p-3">ℹ️ چون وزن این بار ({formatNumber(actualWeight)} کیلو) از آستانه‌ی حداقل وزن برای بارگیری ({formatNumber(loadingMinWeightKg)} کیلو) کمتر است، هزینه‌ی بارگیری صفر محاسبه شد.</div>
+                                            <div className="text-[10px] text-blue-700 bg-blue-50 border border-blue-200 rounded-xl p-3">ℹ چون وزن این بار ({formatNumber(actualWeight)} کیلو) از آستانه‌ی حداقل وزن برای بارگیری ({formatNumber(loadingMinWeightKg)} کیلو) کمتر است، هزینه‌ی بارگیری صفر محاسبه شد.</div>
                                         )}
                                         <div className={`text-xs font-bold rounded-xl p-3 border ${includeLoadingCostChoice ? 'text-amber-800 bg-amber-50 border-amber-200' : 'text-slate-600 bg-slate-50 border-slate-200'}`}>
-                                            {includeLoadingCostChoice ? '🚛 هزینه بارگیری برای این فاکتور در مبلغ نهایی محاسبه می‌شود.' : '🚛 هزینه بارگیری برای این فاکتور محاسبه نمی‌شود و مبلغ فاکتور فقط شامل جمع اقلام است.'}
+                                            {includeLoadingCostChoice ? 'هزینه بارگیری برای این فاکتور در مبلغ نهایی محاسبه می‌شود.' : 'هزینه بارگیری برای این فاکتور محاسبه نمی‌شود و مبلغ فاکتور فقط شامل جمع اقلام است.'}
                                         </div>
                                         <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3">
                                             <div className="flex items-center gap-2 mb-2">
@@ -5864,8 +5890,8 @@ const conversionErrors = rows.filter(r => {
                                                 <div className="font-black text-indigo-900">تسویه فاکتور</div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2 mb-2.5">
-                                                <button type="button" onClick={() => applyQuickPay('cash')} className={`py-2 rounded-lg font-black text-xs transition ${quickPayKind === 'cash' ? 'bg-emerald-600 text-white' : 'bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}>💵 نقدی</button>
-                                                <button type="button" onClick={() => applyQuickPay('cheque')} className={`py-2 rounded-lg font-black text-xs transition ${quickPayKind === 'cheque' ? 'bg-indigo-600 text-white' : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50'}`}>🧾 چک ثبتی</button>
+                                                <button type="button" onClick={() => applyQuickPay('cash')} className={`py-2 rounded-lg font-black text-xs transition ${quickPayKind === 'cash' ? 'bg-emerald-600 text-white' : 'bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}>نقدی</button>
+                                                <button type="button" onClick={() => applyQuickPay('cheque')} className={`py-2 rounded-lg font-black text-xs transition ${quickPayKind === 'cheque' ? 'bg-indigo-600 text-white' : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50'}`}>چک ثبتی</button>
                                             </div>
                                             <label className="text-[10px] text-indigo-700 font-bold block mb-1">مهلت / شرایط تسویه</label>
                                             <input className="w-full p-2.5 rounded-lg border border-indigo-200 bg-white text-sm outline-none focus:border-indigo-500" placeholder="مثلاً: نقدی، ۱۵ روز، ۱ ماه، پایان ماه..." value={settlementTerm} onChange={e => setSettlementTerm(e.target.value)} />
@@ -6083,13 +6109,13 @@ const conversionErrors = rows.filter(r => {
                                         )}
                                         {editingCartItem.deductionPerBag > 0 && editingCartItem.qty > 0 && (
                                             <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100 text-[10px] text-blue-700">
-                                                📋 <strong>پاورقی کسری:</strong> {editingCartItem.qty} کیسه × {formatNumber(editingCartItem.deductionPerBag)}گ = <strong>{((editingCartItem.qty * editingCartItem.deductionPerBag) / 1000).toFixed(3)} کیلوگرم</strong>
+                                                <strong>پاورقی کسری:</strong> {editingCartItem.qty} کیسه × {formatNumber(editingCartItem.deductionPerBag)}گ = <strong>{((editingCartItem.qty * editingCartItem.deductionPerBag) / 1000).toFixed(3)} کیلوگرم</strong>
                                             </div>
                                         )}
                                         <div className="border-t border-dashed border-slate-200 pt-3">
                                             <label className="flex items-center gap-2 text-xs font-bold text-purple-700 cursor-pointer select-none mb-2">
                                                 <input type="checkbox" className="accent-purple-600 w-4 h-4" checked={!!editingCartItem.sourced} onChange={e => setEditingCartItem({...editingCartItem, sourced: e.target.checked})} />
-                                                🛒 این کالا را خودم از تامین‌کننده/شخص دیگری خریداری کردم
+                                                این کالا را خودم از تامین‌کننده/شخص دیگری خریداری کردم
                                             </label>
                                             {editingCartItem.sourced && (
                                                 <div className="space-y-2 bg-purple-50 border border-purple-100 rounded-lg p-2.5">
@@ -6275,7 +6301,7 @@ const conversionErrors = rows.filter(r => {
                             </select>
                             <button onClick={() => setShowFilters(v => !v)} className={`flex items-center gap-1 px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap border transition ${activeFilterCount > 0 ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}><Filter size={14}/> فیلتر {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}</button>
                             <button onClick={() => exportInvoicesToExcel(selectedIds.length > 0 ? selectedInvoices : sortedInvoices, selectedIds.length > 0 ? 'فاکتورهای_منتخب' : 'گزارش_فاکتورها')} className="flex items-center gap-1 bg-emerald-600 text-white px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap hover:bg-emerald-700 transition" title="خروجی ساده — یک ردیف به‌ازای هر فاکتور"><Download size={14}/> Excel ساده</button>
-                            <button onClick={() => exportInvoicesFullReport(selectedIds.length > 0 ? selectedInvoices : sortedInvoices, selectedIds.length > 0 ? 'گزارش_کامل_منتخب' : 'گزارش_کامل')} className="flex items-center gap-1 bg-brass-500 text-white px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap hover:bg-brass-600 transition" title="۵ شیت: ساده، تفکیک مشتری، تفکیک کالا، گزارش مالی، گزارش کسری — بر اساس فیلتر/انتخابِ فعلی"><FileBarChart size={14}/> گزارش کامل (۵ شیت)</button>
+                            <button onClick={() => exportInvoicesFullReport(selectedIds.length > 0 ? selectedInvoices : sortedInvoices, selectedIds.length > 0 ? 'گزارش_کامل_منتخب' : 'گزارش_کامل')} className="flex items-center gap-1 bg-indigo-900 text-white px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap hover:bg-indigo-800 transition" title="۵ شیت: ساده، تفکیک مشتری، تفکیک کالا، گزارش مالی، گزارش کسری — بر اساس فیلتر/انتخابِ فعلی"><FileBarChart size={14}/> گزارش کامل (۵ شیت)</button>
                         </div>
                     </div>
                     {showFilters && (
@@ -6343,7 +6369,7 @@ const conversionErrors = rows.filter(r => {
                                                         <span className="text-[9px] text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-200 font-bold" title={`${inv.dateChangeLogs.length} بار ویرایش شده`}>✎ {inv.dateChangeLogs.length}</span>
                                                     )}
                                                     {inv.dateManuallySet && (
-                                                        <span className="text-[9px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200 font-bold" title={`این فاکتور با تاریخِ دستیِ «${inv.date}» ثبت شده${inv.realEntryTimestamp ? ` — روزِ واقعیِ ثبت: ${formatJalali(new Date(inv.realEntryTimestamp).toISOString(), true)}` : ''}`}>📌 دستی</span>
+                                                        <span className="text-[9px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200 font-bold" title={`این فاکتور با تاریخِ دستیِ «${inv.date}» ثبت شده${inv.realEntryTimestamp ? ` — روزِ واقعیِ ثبت: ${formatJalali(new Date(inv.realEntryTimestamp).toISOString(), true)}` : ''}`}>دستی</span>
                                                     )}
                                                     <button onClick={() => startEditDate(inv)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded" title="ویرایش تاریخ"><Pencil size={12}/></button>
                                                 </div>
@@ -6373,12 +6399,12 @@ const conversionErrors = rows.filter(r => {
                                             {inv.status === 'pending' ? <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-amber-200">رزرو / در انتظار</span> : <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-emerald-200">تکمیل شده</span>}
                                             {inv.status === 'pending' && (inv.items||[]).some(it => (Number(it.shippedQty)||0) > 0) && (() => {
                                                 const goneCount = (inv.items||[]).filter(it => (Number(it.qty)||0) - (Number(it.shippedQty)||0) <= 0.0001 && (Number(it.shippedQty)||0) > 0).length;
-                                                return <div className="mt-1"><span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg text-[9px] font-bold border border-blue-200">🚚 {goneCount} از {(inv.items||[]).length} قلم رفته</span></div>;
+                                                return <div className="mt-1"><span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg text-[9px] font-bold border border-blue-200">{goneCount} از {(inv.items||[]).length} قلم رفته</span></div>;
                                             })()}
                                             {/* برچسب «چندمرحله‌ای»: هر وقت حداقل یکی از ردیف‌های این فاکتور بیش از یک محموله‌ی جداگانه (با احتمال وزن/فی متفاوت)
                                                 داشته باشد — چه فاکتور هنوز رزرو باشد چه کاملاً تکمیل شده — تا در «مشاهده» بشود ریزِ هر بخش را دید. */}
                                             {(inv.items||[]).some(it => it.shipments && it.shipments.length > 1) && (
-                                                <div className="mt-1"><span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-lg text-[9px] font-bold border border-purple-200" title="حداقل یک قلم این فاکتور در چند مرحله‌ی جدا (احتمالاً با وزن/قیمت متفاوت) ارسال شده — برای ریز آن روی «مشاهده» بزنید">🔀 چندمرحله‌ای</span></div>
+                                                <div className="mt-1"><span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-lg text-[9px] font-bold border border-purple-200" title="حداقل یک قلم این فاکتور در چند مرحله‌ی جدا (احتمالاً با وزن/قیمت متفاوت) ارسال شده — برای ریز آن روی «مشاهده» بزنید">چندمرحله‌ای</span></div>
                                             )}
                                         </td>
                                         <td className="p-4 font-black text-slate-700 text-base">{formatNumber(inv.totalPrice)} <span className="text-[9px] font-normal text-slate-400">تومان</span></td>
@@ -6627,22 +6653,22 @@ const conversionErrors = rows.filter(r => {
             const addSub=()=>{const value=newSubtask.trim();if(!value)return;setSubtasks(prev=>[...prev,{id:generateId(),text:value,isDone:false}]);setNewSubtask('')};
             const save=()=>{if(!text.trim()&&!title.trim())return;onSave({...note,id:note?.id||generateId(),title:title.trim()||'یادداشت بدون عنوان',text:text.trim(),description,subtasks,tags,priority,dueDate,color,pinned,isDone:note?.isDone||false,date:note?.date||Date.now(),updatedAt:Date.now()});onClose()};
             return <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div className="bg-white rounded-[36px] w-full max-w-4xl shadow-2xl max-h-[92vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
-                <div className="p-5 border-b bg-[#f5f5f4] flex justify-between items-center"><div><h3 className="font-black text-slate-800 flex items-center gap-2"><Edit3 size={19} className="text-[#e5654a]"/>{note?'ویرایش یادداشت':'یادداشت حرفه‌ای جدید'}</h3><p className="text-[10px] text-slate-400 mt-1">یادداشت، چک‌لیست، اولویت، موعد و برچسب‌ها</p></div><button onClick={onClose} className="p-2 rounded-full hover:bg-white transition"><X size={19}/></button></div>
+                <div className="p-5 border-b bg-[#f5f8fc] flex justify-between items-center"><div><h3 className="font-black text-slate-800 flex items-center gap-2"><Edit3 size={19} className="text-[#1d5eea]"/>{note?'ویرایش یادداشت':'یادداشت حرفه‌ای جدید'}</h3><p className="text-[10px] text-slate-400 mt-1">یادداشت، چک‌لیست، اولویت، موعد و برچسب‌ها</p></div><button onClick={onClose} className="p-2 rounded-full hover:bg-white transition"><X size={19}/></button></div>
                 <div className="p-5 grid grid-cols-1 lg:grid-cols-3 gap-5">
                     <div className="lg:col-span-2 space-y-4">
-                        <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="عنوان یادداشت" className="w-full text-lg font-black p-3 rounded-2xl border border-slate-200 bg-[#f5f5f4] outline-none focus:border-[#e5654a]" autoFocus/>
-                        <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="متن یادداشت..." className="w-full min-h-40 p-4 rounded-3xl border border-slate-200 bg-white outline-none focus:border-[#e5654a] text-sm leading-7"/>
-                        <div className="flex items-center gap-2 mb-2"><span className="text-xs font-bold">اولویت:</span><select value={priority} onChange={e=>setPriority(e.target.value)} className="border rounded-lg px-2 py-1 text-xs"><option value="urgent">🔴 فوری</option><option value="high">🟠 مهم</option><option value="normal">🟡 عادی</option><option value="low">⚪ کم</option></select></div><textarea value={description} onChange={e=>setDescription(e.target.value)} placeholder="توضیحات تکمیلی..." className="w-full min-h-24 p-3 rounded-2xl border border-slate-200 bg-[#f5f5f4] outline-none focus:border-[#e5654a] text-sm leading-6"/>
-                        <div className="bg-[#f5f5f4] rounded-3xl border border-slate-200 p-4"><div className="font-bold text-xs mb-2">چک‌لیست</div><div className="flex gap-2"><input value={newSubtask} onChange={e=>setNewSubtask(e.target.value)} onKeyDown={e=>e.key==='Enter'&&(e.preventDefault(),addSub())} placeholder="مورد جدید..." className="flex-1 p-2.5 rounded-2xl border border-slate-200 text-sm"/><button type="button" onClick={addSub} className="px-4 bg-black text-white rounded-2xl hover:bg-slate-700 active:scale-95 transition"><Plus size={16}/> افزودن</button></div><div className="space-y-1.5 mt-3">{subtasks.map(s=><div key={s.id} className="flex items-center gap-2 p-2 bg-white rounded-2xl border border-slate-100"><button onClick={()=>setSubtasks(subtasks.map(x=>x.id===s.id?{...x,isDone:!x.isDone}:x))}>{s.isDone?<CheckSquare className="text-emerald-500" size={18}/>:<Square className="text-slate-300" size={18}/>}</button><span className={`flex-1 text-sm ${s.isDone?'line-through text-slate-400':''}`}>{s.text}</span><button onClick={()=>setSubtasks(subtasks.filter(x=>x.id!==s.id))}><X size={14} className="text-slate-300 hover:text-red-500"/></button></div>)}</div></div>
+                        <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="عنوان یادداشت" className="w-full text-lg font-black p-3 rounded-2xl border border-slate-200 bg-[#f5f8fc] outline-none focus:border-[#1d5eea]" autoFocus/>
+                        <textarea value={text} onChange={e=>setText(e.target.value)} placeholder="متن یادداشت..." className="w-full min-h-40 p-4 rounded-3xl border border-slate-200 bg-white outline-none focus:border-[#1d5eea] text-sm leading-7"/>
+                        <div className="flex items-center gap-2 mb-2"><span className="text-xs font-bold">اولویت:</span><select value={priority} onChange={e=>setPriority(e.target.value)} className="border rounded-lg px-2 py-1 text-xs"><option value="urgent">فوری</option><option value="high">مهم</option><option value="normal">عادی</option><option value="low">⚪ کم</option></select></div><textarea value={description} onChange={e=>setDescription(e.target.value)} placeholder="توضیحات تکمیلی..." className="w-full min-h-24 p-3 rounded-2xl border border-slate-200 bg-[#f5f8fc] outline-none focus:border-[#1d5eea] text-sm leading-6"/>
+                        <div className="bg-[#f5f8fc] rounded-3xl border border-slate-200 p-4"><div className="font-bold text-xs mb-2">چک‌لیست</div><div className="flex gap-2"><input value={newSubtask} onChange={e=>setNewSubtask(e.target.value)} onKeyDown={e=>e.key==='Enter'&&(e.preventDefault(),addSub())} placeholder="مورد جدید..." className="flex-1 p-2.5 rounded-2xl border border-slate-200 text-sm"/><button type="button" onClick={addSub} className="px-4 bg-indigo-900 text-white rounded-2xl hover:bg-slate-700 active:scale-95 transition"><Plus size={16}/> افزودن</button></div><div className="space-y-1.5 mt-3">{subtasks.map(s=><div key={s.id} className="flex items-center gap-2 p-2 bg-white rounded-2xl border border-slate-100"><button onClick={()=>setSubtasks(subtasks.map(x=>x.id===s.id?{...x,isDone:!x.isDone}:x))}>{s.isDone?<CheckSquare className="text-emerald-500" size={18}/>:<Square className="text-slate-300" size={18}/>}</button><span className={`flex-1 text-sm ${s.isDone?'line-through text-slate-400':''}`}>{s.text}</span><button onClick={()=>setSubtasks(subtasks.filter(x=>x.id!==s.id))}><X size={14} className="text-slate-300 hover:text-red-500"/></button></div>)}</div></div>
                     </div>
                     <div className="space-y-4">
-                        <div className="p-4 rounded-3xl border border-slate-200 bg-[#f5f5f4]"><label className="text-xs font-bold text-slate-500 block mb-2">اولویت</label><div className="grid grid-cols-2 gap-2">{[['low','کم'],['normal','عادی'],['high','مهم'],['urgent','فوری']].map(([v,l])=><button key={v} onClick={()=>setPriority(v)} className={`p-2 rounded-full text-xs font-bold border transition ${priority===v?'bg-[#e5654a] text-white border-[#e5654a]':'bg-white text-slate-500 border-slate-200 hover:bg-[#f5f5f4]'}`}>{l}</button>)}</div></div>
-                        <div><label className="text-xs font-bold text-slate-500 block mb-1">موعد (تقویم شمسی)</label><div className="grid grid-cols-3 gap-2" dir="rtl"><input inputMode="numeric" value={jYear} onChange={e=>{const ny=e.target.value.replace(/\D/g,'');setJYear(ny);const maxD=daysInJalaliMonth(ny,jMonth);const nd=jDay&&Number(jDay)>maxD?String(maxD):jDay;if(nd!==jDay)setJDay(nd);setDueDate(fromJalaliInput(ny,jMonth,nd,jHour,jMinute))}} placeholder="سال" className="p-2.5 rounded-2xl border border-slate-200 text-sm text-center"/><select value={jMonth} onChange={e=>{const nm=e.target.value;setJMonth(nm);const maxD=daysInJalaliMonth(jYear,nm);const nd=jDay&&Number(jDay)>maxD?String(maxD):jDay;if(nd!==jDay)setJDay(nd);setDueDate(fromJalaliInput(jYear,nm,nd,jHour,jMinute))}} className="p-2.5 rounded-2xl border border-slate-200 text-sm"><option value="">ماه</option>{Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}</select><select value={jDay} onChange={e=>{setJDay(e.target.value);setDueDate(fromJalaliInput(jYear,jMonth,e.target.value,jHour,jMinute))}} className="p-2.5 rounded-2xl border border-slate-200 text-sm"><option value="">روز</option>{Array.from({length:daysInJalaliMonth(jYear,jMonth)},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}</select></div><div className="grid grid-cols-2 gap-2 mt-2"><select value={jHour} onChange={e=>{setJHour(e.target.value);setDueDate(fromJalaliInput(jYear,jMonth,jDay,e.target.value,jMinute))}} className="p-2.5 rounded-2xl border border-slate-200 text-sm"><option value="">ساعت</option>{Array.from({length:24},(_,i)=><option key={i} value={String(i).padStart(2,'0')}>{String(i).padStart(2,'0')}</option>)}</select><select value={jMinute} onChange={e=>{setJMinute(e.target.value);setDueDate(fromJalaliInput(jYear,jMonth,jDay,jHour,e.target.value))}} className="p-2.5 rounded-2xl border border-slate-200 text-sm"><option value="">دقیقه</option>{Array.from({length:12},(_,i)=><option key={i*5} value={String(i*5).padStart(2,'0')}>{String(i*5).padStart(2,'0')}</option>)}</select></div>{dueDate&&<div className="text-[10px] text-[#e5654a] font-bold mt-2">موعد ثبت‌شده: {formatJalali(dueDate,true)}</div>}</div>
-                        <label className="flex items-center gap-2 p-3 rounded-2xl border border-slate-200 bg-white text-sm font-bold"><input type="checkbox" checked={pinned} onChange={e=>setPinned(e.target.checked)}/> 📌 سنجاق کردن</label>
-                        <div><label className="text-xs font-bold text-slate-500 block mb-2">رنگ یادداشت</label><div className="grid grid-cols-4 gap-2">{['indigo','amber','emerald','rose'].map(c=><button key={c} onClick={()=>setColor(c)} className={`h-9 rounded-full border-2 ${color===c?'border-slate-800':'border-transparent'} ${c==='indigo'?'bg-slate-100':c==='amber'?'bg-[#fdeee3]':c==='emerald'?'bg-[#e7f3ec]':'bg-[#fbe6e1]'}`}/>)}</div></div>
-                        <div><label className="text-xs font-bold text-slate-500 block mb-1">تگ‌ها</label><div className="flex gap-2"><input value={newTag} onChange={e=>setNewTag(e.target.value)} onKeyDown={e=>e.key==='Enter'&&(e.preventDefault(),newTag.trim()&&(setTags([...new Set([...tags,newTag.trim()])]),setNewTag('')))} placeholder="#tag" className="flex-1 p-2.5 rounded-2xl border border-slate-200 text-sm"/><button onClick={()=>{if(newTag.trim()){setTags([...new Set([...tags,newTag.trim()])]);setNewTag('')}}} className="px-3 bg-[#e5654a] text-white rounded-2xl"><Plus size={15}/></button></div><div className="flex flex-wrap gap-1 mt-2">{tags.map(t=><span key={t} className="px-2 py-1 rounded-full bg-[#fdeee3] text-[#c94a29] text-[10px] font-bold">#{t}</span>)}</div>{savedCustomTags.filter(t=>!tags.includes(t)).length>0&&<div className="flex flex-wrap gap-1 mt-2">{savedCustomTags.filter(t=>!tags.includes(t)).slice(0,8).map(t=><button key={t} onClick={()=>setTags([...tags,t])} className="px-2 py-1 rounded-full border text-[10px] text-slate-500">+{t}</button>)}</div>}</div>
+                        <div className="p-4 rounded-3xl border border-slate-200 bg-[#f5f8fc]"><label className="text-xs font-bold text-slate-500 block mb-2">اولویت</label><div className="grid grid-cols-2 gap-2">{[['low','کم'],['normal','عادی'],['high','مهم'],['urgent','فوری']].map(([v,l])=><button key={v} onClick={()=>setPriority(v)} className={`p-2 rounded-full text-xs font-bold border transition ${priority===v?'bg-[#1d5eea] text-white border-[#1d5eea]':'bg-white text-slate-500 border-slate-200 hover:bg-[#f5f8fc]'}`}>{l}</button>)}</div></div>
+                        <div><label className="text-xs font-bold text-slate-500 block mb-1">موعد (تقویم شمسی)</label><div className="grid grid-cols-3 gap-2" dir="rtl"><input inputMode="numeric" value={jYear} onChange={e=>{const ny=e.target.value.replace(/\D/g,'');setJYear(ny);const maxD=daysInJalaliMonth(ny,jMonth);const nd=jDay&&Number(jDay)>maxD?String(maxD):jDay;if(nd!==jDay)setJDay(nd);setDueDate(fromJalaliInput(ny,jMonth,nd,jHour,jMinute))}} placeholder="سال" className="p-2.5 rounded-2xl border border-slate-200 text-sm text-center"/><select value={jMonth} onChange={e=>{const nm=e.target.value;setJMonth(nm);const maxD=daysInJalaliMonth(jYear,nm);const nd=jDay&&Number(jDay)>maxD?String(maxD):jDay;if(nd!==jDay)setJDay(nd);setDueDate(fromJalaliInput(jYear,nm,nd,jHour,jMinute))}} className="p-2.5 rounded-2xl border border-slate-200 text-sm"><option value="">ماه</option>{Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}</select><select value={jDay} onChange={e=>{setJDay(e.target.value);setDueDate(fromJalaliInput(jYear,jMonth,e.target.value,jHour,jMinute))}} className="p-2.5 rounded-2xl border border-slate-200 text-sm"><option value="">روز</option>{Array.from({length:daysInJalaliMonth(jYear,jMonth)},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}</select></div><div className="grid grid-cols-2 gap-2 mt-2"><select value={jHour} onChange={e=>{setJHour(e.target.value);setDueDate(fromJalaliInput(jYear,jMonth,jDay,e.target.value,jMinute))}} className="p-2.5 rounded-2xl border border-slate-200 text-sm"><option value="">ساعت</option>{Array.from({length:24},(_,i)=><option key={i} value={String(i).padStart(2,'0')}>{String(i).padStart(2,'0')}</option>)}</select><select value={jMinute} onChange={e=>{setJMinute(e.target.value);setDueDate(fromJalaliInput(jYear,jMonth,jDay,jHour,e.target.value))}} className="p-2.5 rounded-2xl border border-slate-200 text-sm"><option value="">دقیقه</option>{Array.from({length:12},(_,i)=><option key={i*5} value={String(i*5).padStart(2,'0')}>{String(i*5).padStart(2,'0')}</option>)}</select></div>{dueDate&&<div className="text-[10px] text-[#1d5eea] font-bold mt-2">موعد ثبت‌شده: {formatJalali(dueDate,true)}</div>}</div>
+                        <label className="flex items-center gap-2 p-3 rounded-2xl border border-slate-200 bg-white text-sm font-bold"><input type="checkbox" checked={pinned} onChange={e=>setPinned(e.target.checked)}/> سنجاق کردن</label>
+                        <div><label className="text-xs font-bold text-slate-500 block mb-2">رنگ یادداشت</label><div className="grid grid-cols-4 gap-2">{['indigo','amber','emerald','rose'].map(c=><button key={c} onClick={()=>setColor(c)} className={`h-9 rounded-full border-2 ${color===c?'border-slate-800':'border-transparent'} ${c==='indigo'?'bg-slate-100':c==='amber'?'bg-[#e0e9ff]':c==='emerald'?'bg-[#e7f3ec]':'bg-[#fee2e2]'}`}/>)}</div></div>
+                        <div><label className="text-xs font-bold text-slate-500 block mb-1">تگ‌ها</label><div className="flex gap-2"><input value={newTag} onChange={e=>setNewTag(e.target.value)} onKeyDown={e=>e.key==='Enter'&&(e.preventDefault(),newTag.trim()&&(setTags([...new Set([...tags,newTag.trim()])]),setNewTag('')))} placeholder="#tag" className="flex-1 p-2.5 rounded-2xl border border-slate-200 text-sm"/><button onClick={()=>{if(newTag.trim()){setTags([...new Set([...tags,newTag.trim()])]);setNewTag('')}}} className="px-3 bg-[#1d5eea] text-white rounded-2xl"><Plus size={15}/></button></div><div className="flex flex-wrap gap-1 mt-2">{tags.map(t=><span key={t} className="px-2 py-1 rounded-full bg-[#e0e9ff] text-[#1749c2] text-[10px] font-bold">#{t}</span>)}</div>{savedCustomTags.filter(t=>!tags.includes(t)).length>0&&<div className="flex flex-wrap gap-1 mt-2">{savedCustomTags.filter(t=>!tags.includes(t)).slice(0,8).map(t=><button key={t} onClick={()=>setTags([...tags,t])} className="px-2 py-1 rounded-full border text-[10px] text-slate-500">+{t}</button>)}</div>}</div>
                     </div>
-                </div><div className="p-4 border-t bg-[#f5f5f4] flex gap-2"><button onClick={onClose} className="flex-1 py-3.5 rounded-full border bg-white font-bold text-slate-500 hover:bg-slate-100 transition">لغو</button><button onClick={save} className="flex-1 py-3.5 rounded-full bg-[#e5654a] text-white font-black shadow-lg shadow-[#e5654a]/30 hover:bg-[#d4553a] transition">ذخیره یادداشت</button></div>
+                </div><div className="p-4 border-t bg-[#f5f8fc] flex gap-2"><button onClick={onClose} className="flex-1 py-3.5 rounded-full border bg-white font-bold text-slate-500 hover:bg-slate-100 transition">لغو</button><button onClick={save} className="flex-1 py-3.5 rounded-full bg-[#1d5eea] text-white font-black shadow-lg shadow-[#1d5eea]/30 hover:bg-[#1749c2] transition">ذخیره یادداشت</button></div>
             </div></div>
         };
 
@@ -6660,38 +6686,38 @@ const conversionErrors = rows.filter(r => {
             const _now=new Date(); const tj=gregorianToJalali(_now.getFullYear(),_now.getMonth()+1,_now.getDate());
             const stOpen=notes.filter(n=>!n.isDone&&!n.archived).length, stDone=notes.filter(n=>n.isDone).length, stUrgent=notes.filter(n=>n.priority==='urgent'&&!n.isDone).length, stOver=notes.filter(n=>isOverdue(n)).length, stPin=notes.filter(n=>n.pinned).length;
             const pct=notes.length?Math.round(stDone/notes.length*100):0; const RR=34, CC=2*Math.PI*RR;
-            const tint={indigo:'bg-white',amber:'bg-[#fdeee3]',emerald:'bg-[#e7f3ec]',rose:'bg-[#fbe6e1]'};
-            const prioCls=p=>p==='urgent'?'bg-[#e5654a] text-white':p==='high'?'bg-[#fbd9c8] text-[#c94a29]':p==='low'?'bg-white/70 text-slate-400':'bg-white/80 text-slate-500';
+            const tint={indigo:'bg-white',amber:'bg-[#e0e9ff]',emerald:'bg-[#e7f3ec]',rose:'bg-[#fee2e2]'};
+            const prioCls=p=>p==='urgent'?'bg-red-500 text-white':p==='high'?'bg-amber-100 text-amber-700':p==='low'?'bg-white/70 text-slate-400':'bg-white/80 text-slate-500';
             const prioLbl=p=>p==='urgent'?'فوری':p==='high'?'مهم':p==='low'?'کم':'عادی';
             const circ='w-8 h-8 rounded-full bg-white/80 hover:bg-white flex items-center justify-center text-slate-500 transition active:scale-90';
-            return <div className="h-full flex flex-col gap-3 bg-[#ededec] rounded-[36px] p-3 sm:p-4 overflow-y-auto" dir="rtl">
-                <div className="bg-[#f6f6f5] rounded-[30px] p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
+            return <div className="h-full flex flex-col gap-3 bg-[#eef2f8] rounded-[36px] p-3 sm:p-4 overflow-y-auto" dir="rtl">
+                <div className="bg-[#f5f8fc] rounded-[30px] p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                         <div className="w-16 h-16 rounded-full bg-white border border-slate-200 flex flex-col items-center justify-center leading-none shrink-0"><b className="text-2xl font-black text-slate-900">{tj.jd.toLocaleString('fa-IR')}</b><span className="text-[9px] text-slate-400 mt-1">{JM[tj.jm-1]}</span></div>
                         <div><div className="text-2xl font-black text-slate-900">یادداشت‌ها</div><div className="text-xs text-slate-400 mt-1">کارها، پیگیری‌ها و چک‌لیست‌ها</div></div>
                     </div>
-                    <button onClick={()=>setEditModal('new')} className="h-12 pr-5 pl-1.5 rounded-full bg-[#e5654a] text-white font-bold text-sm flex items-center gap-3 shadow-[0_12px_22px_-12px_rgba(229,101,74,.95)] hover:bg-[#d4553a] active:scale-95 transition">یادداشت جدید<span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center"><Plus size={17}/></span></button>
+                    <button onClick={()=>setEditModal('new')} className="h-12 pr-5 pl-1.5 rounded-full bg-[#1d5eea] text-white font-bold text-sm flex items-center gap-3 shadow-[0_12px_22px_-12px_rgba(29,94,234,.55)] hover:bg-[#1749c2] active:scale-95 transition">یادداشت جدید<span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center"><Plus size={17}/></span></button>
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div className="bg-white rounded-[28px] p-4 flex flex-col justify-between min-h-[112px]"><div className="text-xs text-slate-400 font-bold">باز</div><div><div className="text-4xl font-black text-slate-900 leading-none">{stOpen.toLocaleString('fa-IR')}</div><div className="flex gap-1 mt-3">{Array.from({length:Math.min(notes.length,14)},(_,i)=><i key={i} className={`w-1.5 h-1.5 rounded-full ${i<Math.round((notes.length?stDone/notes.length:0)*Math.min(notes.length,14))?'bg-[#e5654a]':'bg-slate-200'}`}/>)}</div></div></div>
-                    <div className="bg-black text-white rounded-[28px] p-4 flex items-center justify-between min-h-[112px]"><div><div className="text-xs text-white/50 font-bold">نرخ انجام</div><div className="text-[10px] text-white/40 mt-1">{stDone.toLocaleString('fa-IR')} از {notes.length.toLocaleString('fa-IR')}</div></div><div className="relative w-[84px] h-[84px]"><svg width="84" height="84" viewBox="0 0 84 84" style={{transform:'rotate(-90deg)'}}><circle cx="42" cy="42" r={RR} fill="none" stroke="rgba(255,255,255,.14)" strokeWidth="7"/><circle cx="42" cy="42" r={RR} fill="none" stroke="#e5654a" strokeWidth="7" strokeLinecap="round" strokeDasharray={CC} strokeDashoffset={CC*(1-pct/100)}/></svg><b className="absolute inset-0 flex items-center justify-center text-sm">{pct.toLocaleString('fa-IR')}٪</b></div></div>
-                    <div className="bg-[#fdeee3] rounded-[28px] p-4 flex flex-col justify-between min-h-[112px]"><div className="text-xs text-[#c94a29] font-bold">فوری</div><div className="text-4xl font-black text-[#e5654a] leading-none">{stUrgent.toLocaleString('fa-IR')}</div></div>
-                    <div className="bg-[#f6f6f5] rounded-[28px] p-4 flex flex-col justify-between min-h-[112px]"><div className="flex justify-between text-xs text-slate-400 font-bold"><span>عقب‌افتاده</span><span>سنجاق‌شده</span></div><div className="flex justify-between items-end"><span className={`text-4xl font-black leading-none ${stOver?'text-[#e5654a]':'text-slate-900'}`}>{stOver.toLocaleString('fa-IR')}</span><span className="text-2xl font-black text-slate-500 leading-none">{stPin.toLocaleString('fa-IR')}</span></div></div>
+                    <div className="bg-white rounded-[28px] p-4 flex flex-col justify-between min-h-[112px]"><div className="text-xs text-slate-400 font-bold">باز</div><div><div className="text-4xl font-black text-slate-900 leading-none">{stOpen.toLocaleString('fa-IR')}</div><div className="flex gap-1 mt-3">{Array.from({length:Math.min(notes.length,14)},(_,i)=><i key={i} className={`w-1.5 h-1.5 rounded-full ${i<Math.round((notes.length?stDone/notes.length:0)*Math.min(notes.length,14))?'bg-[#1d5eea]':'bg-slate-200'}`}/>)}</div></div></div>
+                    <div className="bg-indigo-900 text-white rounded-[28px] p-4 flex items-center justify-between min-h-[112px]"><div><div className="text-xs text-white/50 font-bold">نرخ انجام</div><div className="text-[10px] text-white/40 mt-1">{stDone.toLocaleString('fa-IR')} از {notes.length.toLocaleString('fa-IR')}</div></div><div className="relative w-[84px] h-[84px]"><svg width="84" height="84" viewBox="0 0 84 84" style={{transform:'rotate(-90deg)'}}><circle cx="42" cy="42" r={RR} fill="none" stroke="rgba(255,255,255,.14)" strokeWidth="7"/><circle cx="42" cy="42" r={RR} fill="none" stroke="#1d5eea" strokeWidth="7" strokeLinecap="round" strokeDasharray={CC} strokeDashoffset={CC*(1-pct/100)}/></svg><b className="absolute inset-0 flex items-center justify-center text-sm">{pct.toLocaleString('fa-IR')}٪</b></div></div>
+                    <div className="bg-[#e0e9ff] rounded-[28px] p-4 flex flex-col justify-between min-h-[112px]"><div className="text-xs text-[#1749c2] font-bold">فوری</div><div className="text-4xl font-black text-[#1d5eea] leading-none">{stUrgent.toLocaleString('fa-IR')}</div></div>
+                    <div className="bg-[#f5f8fc] rounded-[28px] p-4 flex flex-col justify-between min-h-[112px]"><div className="flex justify-between text-xs text-slate-400 font-bold"><span>عقب‌افتاده</span><span>سنجاق‌شده</span></div><div className="flex justify-between items-end"><span className={`text-4xl font-black leading-none ${stOver?'text-[#1d5eea]':'text-slate-900'}`}>{stOver.toLocaleString('fa-IR')}</span><span className="text-2xl font-black text-slate-500 leading-none">{stPin.toLocaleString('fa-IR')}</span></div></div>
                 </div>
-                <div className="bg-[#f6f6f5] rounded-[28px] p-3 flex flex-col lg:flex-row gap-2 lg:items-center">
-                    <div className="relative flex-1 min-w-[180px]"><Search size={16} className="absolute right-4 top-3.5 text-slate-400"/><input value={searchText} onChange={e=>setSearchText(e.target.value)} placeholder="جستجوی عنوان، متن، تگ..." className="w-full h-11 pr-11 pl-4 rounded-full bg-white text-sm outline-none border border-transparent focus:border-[#e5654a] transition"/></div>
-                    <div className="flex gap-1.5 flex-wrap">{[['all','همه'],['open','باز'],['urgent','مهم'],['pinned','سنجاق'],['done','انجام‌شده'],['archive','آرشیو']].map(([v,l])=><button key={v} onClick={()=>setFilter(v)} className={`h-10 px-4 rounded-full text-xs font-bold transition ${filter===v?'bg-black text-white':'bg-white text-slate-500 hover:bg-white/60'}`}>{l}</button>)}</div>
+                <div className="bg-[#f5f8fc] rounded-[28px] p-3 flex flex-col lg:flex-row gap-2 lg:items-center">
+                    <div className="relative flex-1 min-w-[180px]"><Search size={16} className="absolute right-4 top-3.5 text-slate-400"/><input value={searchText} onChange={e=>setSearchText(e.target.value)} placeholder="جستجوی عنوان، متن، تگ..." className="w-full h-11 pr-11 pl-4 rounded-full bg-white text-sm outline-none border border-transparent focus:border-[#1d5eea] transition"/></div>
+                    <div className="flex gap-1.5 flex-wrap">{[['all','همه'],['open','باز'],['urgent','مهم'],['pinned','سنجاق'],['done','انجام‌شده'],['archive','آرشیو']].map(([v,l])=><button key={v} onClick={()=>setFilter(v)} className={`h-10 px-4 rounded-full text-xs font-bold transition ${filter===v?'bg-indigo-900 text-white':'bg-white text-slate-500 hover:bg-white/60'}`}>{l}</button>)}</div>
                     <select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="h-10 px-4 rounded-full bg-white text-xs font-bold outline-none"><option value="newest">جدیدترین</option><option value="oldest">قدیمی‌ترین</option><option value="priority">اولویت</option><option value="due">نزدیک‌ترین موعد</option></select>
-                    <div className="flex gap-1 p-1 rounded-full bg-white">{[['card','کارت'],['list','خطی'],['compact','فشرده']].map(([v,l])=><button key={v} type="button" onClick={()=>{setViewMode(v);localStorage.setItem('anbaryar_notes_view',v)}} className={`h-8 px-3 rounded-full text-[11px] font-bold transition ${viewMode===v?'bg-[#e5654a] text-white':'text-slate-500'}`}>{l}</button>)}</div>
+                    <div className="flex gap-1 p-1 rounded-full bg-white">{[['card','کارت'],['list','خطی'],['compact','فشرده']].map(([v,l])=><button key={v} type="button" onClick={()=>{setViewMode(v);localStorage.setItem('anbaryar_notes_view',v)}} className={`h-8 px-3 rounded-full text-[11px] font-bold transition ${viewMode===v?'bg-[#1d5eea] text-white':'text-slate-500'}`}>{l}</button>)}</div>
                 </div>
-                <div className={`${viewMode==='card'?'grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3':viewMode==='list'?'flex flex-col gap-2':'grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-2'} pb-2`}>{filtered.length===0?<div className="col-span-full bg-white rounded-[28px] p-14 text-center text-slate-400">یادداشتی پیدا نشد.</div>:filtered.map(n=>{const done=(n.subtasks||[]).filter(s=>s.isDone).length;const total=(n.subtasks||[]).length;const small=viewMode!=='card';return <div key={n.id} className={`${tint[n.color]||tint.indigo} ${small?'rounded-[22px] p-3':'rounded-[30px] p-5'} ${n.isDone?'opacity-55':''} ${isOverdue(n)?'ring-1 ring-[#e5654a]/50':''} transition hover:-translate-y-0.5 hover:shadow-[0_16px_30px_-18px_rgba(0,0,0,.35)]`}>
-                    <div className="flex items-start gap-3"><button onClick={()=>toggleDone(n.id)} className="mt-0.5 shrink-0">{n.isDone?<CheckSquare className="text-[#e5654a]" size={viewMode==='compact'?17:21}/>:<Square className="text-slate-300" size={viewMode==='compact'?17:21}/>}</button>
-                        <div className="flex-1 min-w-0"><div className="flex items-center gap-2"><h3 className={`font-black text-slate-900 truncate ${viewMode==='compact'?'text-xs':'text-base'} ${n.isDone?'line-through':''}`}>{n.title||n.text}</h3>{n.pinned&&<Pin size={13} className="text-[#e5654a] shrink-0"/>}</div>
+                <div className={`${viewMode==='card'?'grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3':viewMode==='list'?'flex flex-col gap-2':'grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-2'} pb-2`}>{filtered.length===0?<div className="col-span-full bg-white rounded-[28px] p-14 text-center text-slate-400">یادداشتی پیدا نشد.</div>:filtered.map(n=>{const done=(n.subtasks||[]).filter(s=>s.isDone).length;const total=(n.subtasks||[]).length;const small=viewMode!=='card';return <div key={n.id} className={`${tint[n.color]||tint.indigo} ${small?'rounded-[22px] p-3':'rounded-[30px] p-5'} ${n.isDone?'opacity-55':''} ${isOverdue(n)?'ring-1 ring-[#1d5eea]/50':''} transition hover:-translate-y-0.5 hover:shadow-[0_16px_30px_-18px_rgba(0,0,0,.35)]`}>
+                    <div className="flex items-start gap-3"><button onClick={()=>toggleDone(n.id)} className="mt-0.5 shrink-0">{n.isDone?<CheckSquare className="text-[#1d5eea]" size={viewMode==='compact'?17:21}/>:<Square className="text-slate-300" size={viewMode==='compact'?17:21}/>}</button>
+                        <div className="flex-1 min-w-0"><div className="flex items-center gap-2"><h3 className={`font-black text-slate-900 truncate ${viewMode==='compact'?'text-xs':'text-base'} ${n.isDone?'line-through':''}`}>{n.title||n.text}</h3>{n.pinned&&<Pin size={13} className="text-[#1d5eea] shrink-0"/>}</div>
                             {viewMode!=='compact'&&<p className={`text-sm text-slate-500 mt-1.5 whitespace-pre-wrap leading-6 ${viewMode==='list'?'line-clamp-1':'line-clamp-3'}`}>{n.text}</p>}
-                            <div className="flex flex-wrap items-center gap-1.5 mt-3"><span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${prioCls(n.priority)}`}>{prioLbl(n.priority)}</span>{n.dueDate&&<span className={`px-2.5 py-1 rounded-full bg-white/80 text-[10px] font-bold flex items-center gap-1 ${isOverdue(n)?'text-[#e5654a]':'text-slate-500'}`}><Calendar size={11}/>{formatJalali(n.dueDate,true)}{isOverdue(n)?' • عقب‌افتاده':''}</span>}{viewMode!=='compact'&&(n.tags||[]).map(t=><span key={t} className="px-2.5 py-1 rounded-full bg-white/60 text-slate-500 text-[10px] font-bold">#{t}</span>)}</div>
-                            {total>0&&<div className="flex items-center gap-2 mt-3"><div className="flex gap-1">{Array.from({length:Math.min(total,12)},(_,i)=><i key={i} className={`w-2 h-2 rounded-full ${i<Math.round(done/total*Math.min(total,12))?'bg-[#e5654a]':'bg-slate-300/70'}`}/>)}</div><span className="text-[10px] text-slate-400 font-bold">{done.toLocaleString('fa-IR')}/{total.toLocaleString('fa-IR')}</span></div>}
+                            <div className="flex flex-wrap items-center gap-1.5 mt-3"><span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${prioCls(n.priority)}`}>{prioLbl(n.priority)}</span>{n.dueDate&&<span className={`px-2.5 py-1 rounded-full bg-white/80 text-[10px] font-bold flex items-center gap-1 ${isOverdue(n)?'text-[#1d5eea]':'text-slate-500'}`}><Calendar size={11}/>{formatJalali(n.dueDate,true)}{isOverdue(n)?' • عقب‌افتاده':''}</span>}{viewMode!=='compact'&&(n.tags||[]).map(t=><span key={t} className="px-2.5 py-1 rounded-full bg-white/60 text-slate-500 text-[10px] font-bold">#{t}</span>)}</div>
+                            {total>0&&<div className="flex items-center gap-2 mt-3"><div className="flex gap-1">{Array.from({length:Math.min(total,12)},(_,i)=><i key={i} className={`w-2 h-2 rounded-full ${i<Math.round(done/total*Math.min(total,12))?'bg-[#1d5eea]':'bg-slate-300/70'}`}/>)}</div><span className="text-[10px] text-slate-400 font-bold">{done.toLocaleString('fa-IR')}/{total.toLocaleString('fa-IR')}</span></div>}
                         </div>
-                        <div className={`flex ${small?'flex-row':'flex-col'} gap-1.5 shrink-0`}><button onClick={()=>togglePin(n.id)} className={circ} title="سنجاق">{n.pinned?<PinOff size={14}/>:<Pin size={14}/>}</button><button onClick={()=>setEditModal(n)} className={circ} title="ویرایش"><Edit3 size={14}/></button><button onClick={()=>remove(n.id)} className={circ+' !text-[#e5654a]'} title="حذف"><Trash2 size={14}/></button></div>
+                        <div className={`flex ${small?'flex-row':'flex-col'} gap-1.5 shrink-0`}><button onClick={()=>togglePin(n.id)} className={circ} title="سنجاق">{n.pinned?<PinOff size={14}/>:<Pin size={14}/>}</button><button onClick={()=>setEditModal(n)} className={circ} title="ویرایش"><Edit3 size={14}/></button><button onClick={()=>remove(n.id)} className={circ+' !text-[#1d5eea]'} title="حذف"><Trash2 size={14}/></button></div>
                     </div></div>})}</div>
                 {editModal&&<NoteEditModal note={editModal==='new'?null:editModal} onClose={()=>setEditModal(null)} onSave={saveNote} savedCustomTags={savedCustomTags}/>}
             </div>;
@@ -6732,8 +6758,8 @@ const conversionErrors = rows.filter(r => {
                     <label className="text-xs font-bold">فروشنده / تأمین‌کننده<input value={supplier} onChange={e=>setSupplier(e.target.value)} className="mt-1 w-full p-3 rounded-xl border border-slate-200"/></label>
                     <label className="text-xs font-bold">تاریخ<input value={date} onChange={e=>setDate(e.target.value)} className="mt-1 w-full p-3 rounded-xl border border-slate-200" dir="ltr"/></label>
                     <label className="text-xs font-bold">تاریخ مورد انتظار<input type="date" disabled={received} value={expectedDate} onChange={e=>setExpectedDate(e.target.value)} className="mt-1 w-full p-3 rounded-xl border border-slate-200"/></label>
-                    <label className="text-xs font-bold">اولویت<select value={priority} onChange={e=>setPriority(e.target.value)} className="mt-1 w-full p-3 rounded-xl border border-slate-200 bg-white"><option value="urgent">🔴 فوری</option><option value="high">🟠 مهم</option><option value="normal">🟡 عادی</option><option value="low">⚪ کم</option></select></label>
-                    {!received&&<label className="text-xs font-bold">وضعیت<select value={status} onChange={e=>setStatus(e.target.value)} className="mt-1 w-full p-3 rounded-xl border border-slate-200 bg-white"><option value="in_transit">🚚 در راه</option><option value="delayed">⚠️ تأخیر</option><option value="cancelled">❌ لغو</option></select></label>}
+                    <label className="text-xs font-bold">اولویت<select value={priority} onChange={e=>setPriority(e.target.value)} className="mt-1 w-full p-3 rounded-xl border border-slate-200 bg-white"><option value="urgent">فوری</option><option value="high">مهم</option><option value="normal">عادی</option><option value="low">⚪ کم</option></select></label>
+                    {!received&&<label className="text-xs font-bold">وضعیت<select value={status} onChange={e=>setStatus(e.target.value)} className="mt-1 w-full p-3 rounded-xl border border-slate-200 bg-white"><option value="in_transit">در راه</option><option value="delayed">⚠ تأخیر</option><option value="cancelled">✕ لغو</option></select></label>}
                     {!received&&<label className="flex items-center gap-2 p-3 rounded-xl bg-sky-50 border border-sky-100 text-xs font-bold"><input type="checkbox" checked={countAsStock} onChange={e=>setCountAsStock(e.target.checked)}/> در محاسبه قابل‌پیش‌فروش لحاظ شود</label>}
                     <label className="md:col-span-2 text-xs font-bold">توضیحات<textarea value={description} onChange={e=>setDescription(e.target.value)} className="mt-1 w-full min-h-28 p-3 rounded-xl border border-slate-200"/></label>
                 </div>
@@ -7388,7 +7414,7 @@ const conversionErrors = rows.filter(r => {
                                             <tbody className="divide-y divide-slate-100">
                                                 {group.items.map((r, idx) => (
                                                     <tr key={idx} className="hover:bg-slate-50">
-                                                        <td className="p-2">{r.itemName} {r.hasManualWeight && <span className="text-amber-600" title="حداقل یکی از ارسال‌های این ردیف وزن دستی داشته">🖊</span>}</td>
+                                                        <td className="p-2">{r.itemName} {r.hasManualWeight && <span className="text-amber-600" title="حداقل یکی از ارسال‌های این ردیف وزن دستی داشته">✎</span>}</td>
                                                         <td className="p-2 text-center font-bold">{formatNumber(r.total)}</td>
                                                         <td className="p-2 text-center text-emerald-600 font-bold">{formatNumber(r.shipped)}</td>
                                                         <td className="p-2 text-center text-amber-600 font-black">{formatNumber(r.remaining)}</td>
@@ -7448,7 +7474,7 @@ const conversionErrors = rows.filter(r => {
                                         <td className="p-2 text-slate-400 font-mono">#{r.invoiceId.slice(-6)}</td>
                                         <td className="p-2">{r.itemName}</td>
                                         <td className="p-2 text-center">{formatNumber(r.qty)}</td>
-                                        <td className="p-2 text-center">{formatNumber(r.weight)} {r.weightManual && <span className="text-amber-600" title="وزن دستی">🖊</span>}</td>
+                                        <td className="p-2 text-center">{formatNumber(r.weight)} {r.weightManual && <span className="text-amber-600" title="وزن دستی">✎</span>}</td>
                                         <td className="p-2 text-center font-bold text-emerald-700">{formatNumber(r.amount)}</td>
                                         <td className="p-2 text-center"><span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${r.status === 'کامل' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>{r.status}</span></td>
                                     </tr>
@@ -7584,9 +7610,9 @@ const conversionErrors = rows.filter(r => {
                     {tab === 'due' && (
                         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                             <div className="bg-slate-50 border-b border-slate-100 p-4 flex flex-wrap items-center gap-3 text-xs font-bold">
-                                <span className="text-red-600">🔴 گذشته: {overdueCount}</span>
-                                <span className="text-amber-600">🟠 امروز: {todayCount}</span>
-                                <span className="text-yellow-600">🟡 تا ۳ روز آینده: {soonCount}</span>
+                                <span className="text-red-600 inline-flex items-center gap-1.5"><i className="inline-block w-2 h-2 rounded-full bg-red-500" aria-hidden="true"></i>گذشته: {overdueCount}</span>
+                                <span className="text-amber-600 inline-flex items-center gap-1.5"><i className="inline-block w-2 h-2 rounded-full bg-amber-500" aria-hidden="true"></i>امروز: {todayCount}</span>
+                                <span className="text-yellow-600 inline-flex items-center gap-1.5"><i className="inline-block w-2 h-2 rounded-full bg-yellow-400" aria-hidden="true"></i>تا ۳ روز آینده: {soonCount}</span>
                                 <span className="text-slate-400 font-medium mr-auto">سررسید بر اساس تقویم شمسی دقیق (با احتساب کبیسه) محاسبه می‌شود</span>
                             </div>
                             <div className="divide-y divide-slate-100">
@@ -7603,7 +7629,7 @@ const conversionErrors = rows.filter(r => {
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
                                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${urgencyStyle(inv._urgency)}`}>
-                                                📅 {formatJalali(inv.dueDate)} · {urgencyLabel(inv._urgency)}{inv._urgency === 'overdue' ? ` (${Math.abs(inv._diff)} روز)` : ''}
+                                                {formatJalali(inv.dueDate)} · {urgencyLabel(inv._urgency)}{inv._urgency === 'overdue' ? ` (${Math.abs(inv._diff)} روز)` : ''}
                                             </span>
                                             <button onClick={() => setPrintInv(inv)} className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" title="چاپ فاکتور"><Printer size={14}/></button>
                                             <button onClick={() => onEditInvoice(inv)} className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" title="ویرایش فاکتور"><Edit3 size={14}/></button>
@@ -7632,7 +7658,7 @@ const conversionErrors = rows.filter(r => {
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
                                             <span className="px-2.5 py-1 rounded-full text-[10px] font-bold border bg-rose-50 border-rose-200 text-rose-700">
-                                                ⏳ {c.daysSince} روز از آخرین خرید
+                                                {c.daysSince} روز از آخرین خرید
                                             </span>
                                             {c.lastInvoice && <button onClick={() => setPrintInv(c.lastInvoice)} className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" title="چاپ فاکتور آخر"><Printer size={14}/></button>}
                                         </div>
@@ -7670,7 +7696,7 @@ const conversionErrors = rows.filter(r => {
             if (text.length < 1024) throw new Error(`حجم پاسخ مشکوکانه کم بود: ${url}`);
         };
         const buildOfflineHtml = async (log) => {
-            log('📸 برداشتن نسخه‌ی فعلی برنامه...');
+            log('برداشتن نسخه‌ی فعلی برنامه...');
             const clone = document.documentElement.cloneNode(true);
             const rootEl = clone.querySelector('#root');
             if (rootEl) rootEl.innerHTML = '';
@@ -7681,9 +7707,9 @@ const conversionErrors = rows.filter(r => {
             const scripts = [];
             let m;
             while ((m = scriptRe.exec(html))) scripts.push({ fullTag: m[0], url: m[2] });
-            log(`🔗 ${scripts.length} کتابخانه‌ی خارجی پیدا شد.`);
+            log(`${scripts.length} کتابخانه‌ی خارجی پیدا شد.`);
             for (const { fullTag, url } of scripts) {
-                log(`⏳ دانلود: ${url}`);
+                log(`دانلود: ${url}`);
                 const code = await offlineFetchText(url);
                 offlineAssertScript(url, code);
                 const safeCode = code.replace(/<\/script>/gi, '<\\/script>');
@@ -7699,7 +7725,7 @@ const conversionErrors = rows.filter(r => {
             const hasFonts = fontLinkRe.test(html) || fontImportRe.test(html);
             html = html.replace(fontLinkRe, '').replace(fontImportRe, '');
             if (hasFonts) {
-                log('🔤 جاسازی فونت...');
+                log('جاسازی فونت...');
                 let fontCss = await offlineFetchText('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100;300;400;500;700;900&display=swap');
                 const fontUrls = [...new Set([...fontCss.matchAll(/url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/g)].map(x => x[1]))];
                 for (const fu of fontUrls) {
@@ -7720,7 +7746,7 @@ const conversionErrors = rows.filter(r => {
                 .replace(/<script\s+type=["']module["']\s+src=["']\/index\.tsx["']\s*><\/script>\s*/i, '');
 
             // ۴) بررسی نهایی: هیچ وابستگی اینترنتی نباید باقی بماند
-            log('🔍 بررسی نهایی...');
+            log('بررسی نهایی...');
             scriptRe.lastIndex = 0;
             const leftovers = [...html.matchAll(scriptRe)].map(x => x[2]);
             if (leftovers.length) throw new Error('این کتابخانه‌ها هنوز به اینترنت وابسته‌اند: ' + leftovers.join(' ، '));
@@ -7747,10 +7773,10 @@ const conversionErrors = rows.filter(r => {
                     a.click();
                     setTimeout(() => URL.revokeObjectURL(url), 2000);
                     setResult({ size: out.size, count: out.count, at: new Date().toLocaleString('fa-IR') });
-                    log('✅ نسخه‌ی آفلاین ساخته و دانلود شد.');
+                    log('✓ نسخه‌ی آفلاین ساخته و دانلود شد.');
                 } catch (e) {
                     setError(e.message || String(e));
-                    log('❌ ساخت انجام نشد.');
+                    log('✕ ساخت انجام نشد.');
                 } finally {
                     setBusy(false);
                 }
@@ -7775,7 +7801,7 @@ const conversionErrors = rows.filter(r => {
                     )}
                     {result && (
                         <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800 leading-6">
-                            ✅ آخرین ساخت: {result.at} · {result.count} کتابخانه جاسازی شد · حجم: {(result.size / 1024 / 1024).toFixed(2)} MB
+                            ✓ آخرین ساخت: {result.at} · {result.count} کتابخانه جاسازی شد · حجم: {(result.size / 1024 / 1024).toFixed(2)} MB
                         </div>
                     )}
                 </div>
@@ -7850,7 +7876,7 @@ const conversionErrors = rows.filter(r => {
                     <div className="flex flex-col md:flex-row gap-5 items-start">
                         <nav className="w-full md:w-56 shrink-0 bg-white rounded-3xl border border-slate-200 shadow-sm p-2 flex md:flex-col gap-1 overflow-x-auto md:sticky md:top-4">
                             {[['loading','هزینه بارگیری',Truck],['alerts','هشدارها',AlertTriangle],['warehouses','انبارها',Warehouse],['security','قفل و امنیت',Lock],['tools','ابزارهای سیستم',Wrench]].map(([id,label,Ic])=>(
-                                <button key={id} type="button" onClick={()=>setSettingsSec(id)} className={`flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-sm font-bold whitespace-nowrap border-r-4 transition-all ${settingsSec===id?'bg-indigo-600 text-white shadow-md shadow-indigo-900/20 border-brass-400':'border-transparent text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'}`}><Ic size={17}/>{label}</button>
+                                <button key={id} type="button" onClick={()=>setSettingsSec(id)} className={`flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-sm font-bold whitespace-nowrap border-r-4 transition-all ${settingsSec===id?'bg-indigo-600 text-white shadow-md shadow-indigo-900/20 border-indigo-300':'border-transparent text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'}`}><Ic size={17}/>{label}</button>
                             ))}
                         </nav>
                         <div className="flex-1 min-w-0 w-full space-y-5">
@@ -8080,7 +8106,7 @@ const conversionErrors = rows.filter(r => {
                     countAsStock: !asReceived ? countAsStock : false,
                 });
                 setCart([]); setSupplier(''); setDescription(''); setCountAsStock(false); setPriority('normal');
-                toast.show(asReceived ? '✅ خرید ثبت و مستقیم به انبار اضافه شد' : '🚚 خرید به عنوان «در راه» ثبت شد. وقتی رسید، از لیست کنارش «دریافت شد» را بزنید.');
+                toast.show(asReceived ? '✓ خرید ثبت و مستقیم به انبار اضافه شد' : 'خرید به عنوان «در راه» ثبت شد. وقتی رسید، از لیست کنارش «دریافت شد» را بزنید.');
             };
 
             const filteredPurchases = useMemo(() => {
@@ -8189,7 +8215,7 @@ const conversionErrors = rows.filter(r => {
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 <div className="flex bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm text-xs font-bold">
-                                <select value={priorityFilter} onChange={e=>setPriorityFilter(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"><option value="all">همه اولویت‌ها</option><option value="urgent">🔴 فوری</option><option value="high">🟠 مهم</option><option value="normal">🟡 عادی</option><option value="low">⚪ کم</option></select><select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"><option value="newest">جدیدترین بالا</option><option value="oldest">قدیمی‌ترین</option><option value="priority">اولویت</option><option value="due">نزدیک‌ترین موعد</option></select></div>
+                                <select value={priorityFilter} onChange={e=>setPriorityFilter(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"><option value="all">همه اولویت‌ها</option><option value="urgent">فوری</option><option value="high">مهم</option><option value="normal">عادی</option><option value="low">⚪ کم</option></select><select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"><option value="newest">جدیدترین بالا</option><option value="oldest">قدیمی‌ترین</option><option value="priority">اولویت</option><option value="due">نزدیک‌ترین موعد</option></select></div>
                             </div>
                         </div>
                         <div className="overflow-y-auto flex-1 p-3 space-y-2">
@@ -8207,14 +8233,14 @@ const conversionErrors = rows.filter(r => {
                                             </div>
                                         </div>
                                         <div className="flex flex-col items-end gap-1">
-                                            {p.status === 'in_transit' ? <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-amber-200 flex items-center gap-1"><Truck size={11}/> در راه</span> : <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-emerald-200">دریافت‌شده</span>}<span className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${(p.priority||'normal')==='urgent'?'bg-red-50 text-red-600 border-red-200':(p.priority||'normal')==='high'?'bg-orange-50 text-orange-600 border-orange-200':'bg-slate-50 text-slate-500 border-slate-200'}`}>{(p.priority||'normal')==='urgent'?'🔴 فوری':(p.priority||'normal')==='high'?'🟠 مهم':(p.priority||'normal')==='low'?'⚪ کم':'🟡 عادی'}</span>
+                                            {p.status === 'in_transit' ? <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-amber-200 flex items-center gap-1"><Truck size={11}/> در راه</span> : <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-emerald-200">دریافت‌شده</span>}<span className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${(p.priority||'normal')==='urgent'?'bg-red-50 text-red-600 border-red-200':(p.priority||'normal')==='high'?'bg-orange-50 text-orange-600 border-orange-200':'bg-slate-50 text-slate-500 border-slate-200'}`}>{(p.priority||'normal')==='urgent'?'فوری':(p.priority||'normal')==='high'?'مهم':(p.priority||'normal')==='low'?'⚪ کم':'عادی'}</span>
                                         </div>
                                     </div>
                                     <div className="text-xs text-slate-500 mb-2">
                                         {p.items.map((it, idx) => (<span key={idx} className="inline-block ml-2 mb-0.5"><ItemNameLabel it={it} inventoryItems={items} isPending={p.status === 'in_transit'} /> <b className="text-slate-700">×{formatNumber(it.qty)}</b>{it.weight > 0 && <span className="text-slate-400"> ({formatNumber(it.weight)} کیلو)</span>}</span>))}
                                     </div>
                                     {pTotal > 0 && <div className="text-xs font-bold text-indigo-600 mb-2">جمع مبلغ: {formatNumber(pTotal)} تومان</div>}
-                                    {p.description && <div className="text-[11px] text-slate-400 mb-2">📝 {p.description}</div>}
+                                    {p.description && <div className="text-[11px] text-slate-400 mb-2">{p.description}</div>}
                                     <div className="flex gap-2 mb-1.5">
                                         <button onClick={() => setPrintPurchase(p)} className="flex-1 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-xs font-bold border border-indigo-100 flex items-center justify-center gap-1"><Printer size={13}/> چاپ</button>
                                         <button onClick={() => setEditingPurchase(p)} className="flex-1 py-1.5 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-bold border border-slate-200 flex items-center justify-center gap-1"><Edit3 size={13}/> ویرایش</button>
@@ -8235,7 +8261,7 @@ const conversionErrors = rows.filter(r => {
                     {editingPurchase && <EditPurchaseModal purchase={editingPurchase} items={items} onClose={() => setEditingPurchase(null)} onSave={(p) => { onEdit(p); setEditingPurchase(null); }}/>}
                     {printPurchase && <PrintOrderModal
                         title="سند خرید کالا"
-                        badge={printPurchase.status === 'in_transit' ? '🚚 در راه' : '✅ دریافت‌شده'}
+                        badge={printPurchase.status === 'in_transit' ? 'در راه' : '✓ دریافت‌شده'}
                         badgeColor={printPurchase.status === 'in_transit' ? {bg:'#fef3c7',text:'#92400e',border:'#fde68a'} : {bg:'#d1fae5',text:'#065f46',border:'#a7f3d0'}}
                         rows={[{label:'فروشنده / تامین‌کننده', value: printPurchase.supplier}, {label:'وضعیت', value: printPurchase.status === 'in_transit' ? 'در راه' : 'دریافت‌شده'}]}
                         itemsList={printPurchase.items}
@@ -8624,7 +8650,7 @@ const conversionErrors = rows.filter(r => {
                             {o.returnedItems.map((it, idx) => (<span key={idx} className="inline-block ml-2"><ItemNameLabel it={it} inventoryItems={items} isPending={false} /> ×{formatNumber(it.qty)}{it.weight > 0 && <span className="text-emerald-500"> ({formatNumber(it.weight)} کیلو)</span>}</span>))}
                         </div>
                     )}
-                    {o.description && <div className="text-[11px] text-slate-400 mb-2">📝 {o.description}</div>}
+                    {o.description && <div className="text-[11px] text-slate-400 mb-2">{o.description}</div>}
                     <div className="flex gap-2 mb-1.5">
                         <button onClick={() => setPrintOrder(o)} className="flex-1 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-xs font-bold border border-indigo-100 flex items-center justify-center gap-1"><Printer size={13}/> چاپ</button>
                         <button onClick={() => setEditingOrder(o)} className="flex-1 py-1.5 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-bold border border-slate-200 flex items-center justify-center gap-1"><Edit3 size={13}/> ویرایش</button>
@@ -8705,8 +8731,8 @@ const conversionErrors = rows.filter(r => {
                             <button onClick={() => submit(true)} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm flex justify-center items-center gap-2"><Truck size={16}/> ارسال فوری</button>
                         </div>
                     </div>
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="md:col-span-3 flex justify-end">
+                    <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 content-start">
+                        <div className="md:col-span-3 flex justify-end items-start">
                             <button type="button" onClick={()=>setShowProcessingSummary(true)} className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><RefreshCw size={14}/> گزارش کلی</button>
                         </div>
                         <div className="bg-white rounded-3xl border border-slate-200 p-3 shadow-sm">
@@ -8728,7 +8754,7 @@ const conversionErrors = rows.filter(r => {
                     {mergeOrder && <ProcessingMergeModal record={mergeOrder} candidates={mergeCandidatesFor(mergeOrder)} onClose={() => setMergeOrder(null)} onSubmit={(ids) => { onMerge(ids); setMergeOrder(null); }}/>}
                     {printOrder && <PrintOrderModal
                         title="سند آنالیز / پردازش"
-                        badge={printOrder.status === 'reserved' ? '📋 رزرو' : printOrder.status === 'sent' ? '🚚 در حال پردازش' : '✅ برگشته / تکمیل'}
+                        badge={printOrder.status === 'reserved' ? 'رزرو' : printOrder.status === 'sent' ? 'در حال پردازش' : '✓ برگشته / تکمیل'}
                         badgeColor={printOrder.status === 'reserved' ? {bg:'#f1f5f9',text:'#475569',border:'#e2e8f0'} : printOrder.status === 'sent' ? {bg:'#dbeafe',text:'#1e40af',border:'#93c5fd'} : {bg:'#d1fae5',text:'#065f46',border:'#a7f3d0'}}
                         rows={[{label:'مقصد / کارگاه پردازش', value: printOrder.recipient}, {label:'وضعیت', value: printOrder.status === 'reserved' ? 'رزرو' : printOrder.status === 'sent' ? 'در حال پردازش' : 'برگشته/تکمیل'}]}
                         itemsList={printOrder.status === 'returned' && printOrder.returnedItems ? printOrder.returnedItems : printOrder.items}
@@ -9061,7 +9087,7 @@ const conversionErrors = rows.filter(r => {
                 <div className="flex flex-col lg:flex-row gap-6">
                     <div className="lg:w-1/3 bg-white rounded-3xl border border-slate-200 flex flex-col overflow-hidden shadow-sm shrink-0">
                         <div className="p-4 bg-slate-50 border-b border-slate-100 space-y-3">
-                            <select value={priorityFilter} onChange={e=>setPriorityFilter(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-bold"><option value="all">همه اولویت‌ها</option><option value="urgent">🔴 فوری</option><option value="high">🟠 مهم</option><option value="normal">🟡 عادی</option><option value="low">⚪ کم</option></select><select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-bold"><option value="newest">جدیدترین بالا</option><option value="oldest">قدیمی‌ترین</option><option value="priority">اولویت</option><option value="due">نزدیک‌ترین موعد</option></select><div className="flex bg-white border border-slate-200 rounded-full overflow-hidden shadow-sm text-xs font-bold">
+                            <select value={priorityFilter} onChange={e=>setPriorityFilter(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-bold"><option value="all">همه اولویت‌ها</option><option value="urgent">فوری</option><option value="high">مهم</option><option value="normal">عادی</option><option value="low">⚪ کم</option></select><select value={sortBy} onChange={e=>setSortBy(e.target.value)} className="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-bold"><option value="newest">جدیدترین بالا</option><option value="oldest">قدیمی‌ترین</option><option value="priority">اولویت</option><option value="due">نزدیک‌ترین موعد</option></select><div className="flex bg-white border border-slate-200 rounded-full overflow-hidden shadow-sm text-xs font-bold">
                                 <button onClick={() => setDirection('borrowed')} className={`flex-1 py-2 flex items-center justify-center gap-1.5 rounded-full transition ${direction === 'borrowed' ? 'bg-sky-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}><ArrowDownLeft size={14}/> امانی گرفته‌ام</button>
                                 <button onClick={() => setDirection('lent')} className={`flex-1 py-2 flex items-center justify-center gap-1.5 rounded-full transition ${direction === 'lent' ? 'bg-purple-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}><ArrowUpRight size={14}/> امانی داده‌ام</button>
                             </div>
@@ -9161,7 +9187,7 @@ const conversionErrors = rows.filter(r => {
                                         </div>
                                         <div className="flex flex-col items-end gap-1">
                                             <span className={`px-2 py-1 rounded-lg text-[10px] font-bold border flex items-center gap-1 ${c.direction === 'borrowed' ? 'bg-sky-100 text-sky-700 border-sky-200' : 'bg-purple-100 text-purple-700 border-purple-200'}`}><meta.icon size={11}/> {meta.label}</span>
-                                            {c.status === 'pending' ? <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-amber-200">در جریان{(c.returnedItems || []).length > 0 ? ' (بخشی برگشته)' : ''}</span> : <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-emerald-200">برگشته/تکمیل</span>}<span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-50 text-slate-500 border border-slate-200">{(c.priority||'normal')==='urgent'?'🔴 فوری':(c.priority||'normal')==='high'?'🟠 مهم':(c.priority||'normal')==='low'?'⚪ کم':'🟡 عادی'}</span>
+                                            {c.status === 'pending' ? <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-amber-200">در جریان{(c.returnedItems || []).length > 0 ? ' (بخشی برگشته)' : ''}</span> : <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-emerald-200">برگشته/تکمیل</span>}<span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-50 text-slate-500 border border-slate-200">{(c.priority||'normal')==='urgent'?'فوری':(c.priority||'normal')==='high'?'مهم':(c.priority||'normal')==='low'?'⚪ کم':'عادی'}</span>
                                             {remaining > 0 && <span className="bg-orange-50 text-orange-600 px-2 py-1 rounded-lg text-[10px] font-bold border border-orange-200">مانده کالا: {formatNumber(remaining)}</span>}
                                             {surplus > 0 && <span className="bg-fuchsia-50 text-fuchsia-600 px-2 py-1 rounded-lg text-[10px] font-bold border border-fuchsia-200">مازاد/طلب شما: {formatNumber(surplus)}</span>}
                                         </div>
@@ -9185,7 +9211,7 @@ const conversionErrors = rows.filter(r => {
                                             <ArrowUpRight size={12}/> از مازادِ این سند، {childRecords.length} سند جدید (بدهکار/بستانکار متقابل) ساخته شده که در لیست جداگانه قابل مشاهده و دادوستد است.
                                         </div>
                                     )}
-                                    {c.description && <div className="text-[11px] text-slate-400 mb-2">📝 {c.description}</div>}
+                                    {c.description && <div className="text-[11px] text-slate-400 mb-2">{c.description}</div>}
                                     <div className="flex gap-2 mb-1.5">
                                         <button onClick={() => setPrintRecord(c)} className="flex-1 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-xs font-bold border border-indigo-100 flex items-center justify-center gap-1"><Printer size={13}/> چاپ</button>
                                         <button onClick={() => setEditingRecord(c)} className="flex-1 py-1.5 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-bold border border-slate-200 flex items-center justify-center gap-1"><Edit3 size={13}/> ویرایش</button>
@@ -9206,7 +9232,7 @@ const conversionErrors = rows.filter(r => {
                     {mergeRecord && <ConsignmentMergeModal record={mergeRecord} candidates={mergeCandidatesFor(mergeRecord)} onClose={() => setMergeRecord(null)} onSubmit={(ids) => { onMerge(ids); setMergeRecord(null); }}/>}
                     {printRecord && <PrintOrderModal
                         title="سند امانی"
-                        badge={printRecord.status === 'pending' ? `📋 ${dirMeta[printRecord.direction].label} (در جریان)` : '✅ برگشته/تکمیل'}
+                        badge={printRecord.status === 'pending' ? `${dirMeta[printRecord.direction].label} (در جریان)` : '✓ برگشته/تکمیل'}
                         badgeColor={printRecord.status === 'pending' ? {bg:'#f0f9ff',text:'#0369a1',border:'#bae6fd'} : {bg:'#d1fae5',text:'#065f46',border:'#a7f3d0'}}
                         rows={[{label:'طرف حساب', value: printRecord.party}, {label:'نوع', value: dirMeta[printRecord.direction].label}, {label:'وضعیت', value: printRecord.status === 'pending' ? 'در جریان' : 'برگشته/تکمیل'}]}
                         itemsList={printRecord.status === 'returned' && printRecord.returnedItems ? printRecord.returnedItems : printRecord.items}
@@ -9476,7 +9502,16 @@ const conversionErrors = rows.filter(r => {
                 return decodeURIComponent(escape(atob(b64)));
             }
         };
-        const EMBEDDED_ESTELAM_HTML = decodeEmbeddedHTML(EMBEDDED_ESTELAM_B64);
+        // هم‌رنگ‌سازی با سیستم طراحی انبار یار (آبی/سرمه‌ای). فقط رنگ‌ها و متغیرهای CSS در لحظه‌ی بارگذاری عوض می‌شوند؛
+        // منطق و ساختار برنامه‌ی استعلام دست‌نخورده می‌ماند. اگر رنگ‌های اصلی آن عوض شد، این جدول را به‌روز کنید.
+        const ESTELAM_COLOR_MAP = [['#111','#14214f'],['#e5654a','#1d5eea'],['#c94a29','#1749c2'],['#fdece6','#e0e9ff'],['#efefed','#eef2f8'],['#ededec','#e9eff6'],['#f6f6f5','#f5f8fc'],['#a3a3a0','#6b7a94'],['#a9a9a6','#6b7a94']];
+        const themeEstelamHTML = (html) => {
+            let out = html;
+            ESTELAM_COLOR_MAP.forEach(([a, b]) => { out = out.replace(new RegExp(a + '(?![0-9a-fA-F])', 'gi'), b); });
+            const vars = '<style>:root{--bg:#e9eff6;--bg-soft:#f5f8fc;--ink:#14214f;--ink-soft:#4b5b78;--ink-faint:#6b7a94;--line:#e1e8f2;--line-soft:#eef2f8;--primary:#1d5eea;--primary-dark:#1749c2;--primary-light:#e0e9ff;--teal:#1d5eea;--teal-soft:#e0e9ff;--tile:#f5f8fc;--radius:24px;--shadow:0 1px 2px rgba(20,33,79,.04),0 8px 24px -10px rgba(20,33,79,.14)}</style>';
+            return out.includes('</head>') ? out.replace('</head>', vars + '</head>') : vars + out;
+        };
+        const EMBEDDED_ESTELAM_HTML = themeEstelamHTML(decodeEmbeddedHTML(EMBEDDED_ESTELAM_B64));
 
         const EmbeddedToolView = ({ type }) => {
             // «مدیریت خرید کاربران» طبق درخواست کاربر کاملاً حذف شد؛ این کامپوننت فقط برای «استعلام» باقی مانده.
@@ -9484,11 +9519,11 @@ const conversionErrors = rows.filter(r => {
             const label = 'استعلام';
             return (
                 <div className="space-y-3" dir="rtl">
-                    <div className="bg-[#f6f6f5] rounded-[30px] p-4 flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-full bg-white text-[#e5654a] flex items-center justify-center shrink-0"><FileText size={18}/></div>
+                    <div className="bg-white rounded-3xl shadow-sm p-4 flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0"><FileText size={18}/></div>
                         <div><h3 className="font-black text-slate-800">استعلام</h3><p className="text-[11px] text-slate-400 mt-0.5">ابزار مستقل استعلام قیمت/کالا — در یک محیط ایزوله اجرا می‌شود</p></div>
                     </div>
-                    <div className="w-full h-[calc(100vh-200px)] min-h-[640px] bg-[#ededec] rounded-[32px] overflow-hidden">
+                    <div className="w-full h-[calc(100vh-200px)] min-h-[640px] bg-[#e9eff6] rounded-3xl overflow-hidden">
                     <iframe
                         title={label}
                         srcDoc={srcDoc}
@@ -10042,7 +10077,7 @@ const conversionErrors = rows.filter(r => {
                 const deleteTxId = generateId();
                 logTransaction(item, 'DELETE', -item.quantity, 0, undefined, undefined, 'حذف کالا', deleteTxId);
                 setItems(prev => prev.filter(i => i.id !== id));
-                toast && toast.show(`🗑 کالای "${name || item.name}" حذف شد`, {
+                toast && toast.show(`کالای "${name || item.name}" حذف شد`, {
                     label: '↩ بازگردانی',
                     fn: () => {
                         setItems(prev => [deletedItem, ...prev]);
@@ -10072,7 +10107,7 @@ const conversionErrors = rows.filter(r => {
                 if (diff !== 0) {
                     logTransaction(item, 'ADJUSTMENT', diff, countedQty, undefined, undefined, reason);
                     setItems(prev => prev.map(i => i.id === itemId ? { ...i, quantity: countedQty, lastUpdated: Date.now() } : i));
-                    toast.show(`✅ شمارش ثبت شد — اختلاف ${diff > 0 ? '+' : ''}${formatNumber(diff)} اصلاح شد`);
+                    toast.show(`✓ شمارش ثبت شد — اختلاف ${diff > 0 ? '+' : ''}${formatNumber(diff)} اصلاح شد`);
                 } else {
                     toast.show('موجودی سیستم با شمارش مطابقت داشت — تغییری اعمال نشد');
                 }
@@ -10142,7 +10177,7 @@ const conversionErrors = rows.filter(r => {
                 setPurchases(prev => prev.map(p => ({ ...p, items: remapItemId(p.items) })));
                 setProcessingOrders(prev => prev.map(o => ({ ...o, items: remapItemId(o.items), returnedItems: remapItemId(o.returnedItems) })));
 
-                toast.show(`✅ ${group.length} بار با موفقیت در «${mergedItem.name}» ادغام شدند`);
+                toast.show(`✓ ${group.length} بار با موفقیت در «${mergedItem.name}» ادغام شدند`);
                 setMergeItem(null);
             };
 
@@ -10172,7 +10207,7 @@ const conversionErrors = rows.filter(r => {
                 setConsignments(prev => prev.map(c => ({ ...c, items: remap(c.items), returnedItems: remap(c.returnedItems) })));
                 setPurchases(prev => prev.map(p => ({ ...p, items: remap(p.items) })));
                 setProcessingOrders(prev => prev.map(o => ({ ...o, items: remap(o.items), returnedItems: remap(o.returnedItems) })));
-                toast.show(`✅ ${previewCount} مرجع قدیمی اصلاح شد`);
+                toast.show(`✓ ${previewCount} مرجع قدیمی اصلاح شد`);
             };
 
 
@@ -10345,7 +10380,7 @@ const conversionErrors = rows.filter(r => {
                 }
 
                 setLastSaved(new Date());
-                toast.show(allShipped ? '✅ بار نهایی شد؛ اثر موجودی و مبلغ اعمال شد.' : '🚚 بخشی از بار ثبت شد؛ باقی‌مانده همچنان رزرو است.');
+                toast.show(allShipped ? '✓ بار نهایی شد؛ اثر موجودی و مبلغ اعمال شد.' : 'بخشی از بار ثبت شد؛ باقی‌مانده همچنان رزرو است.');
             };
 
 
@@ -10569,15 +10604,15 @@ const conversionErrors = rows.filter(r => {
                             await restoreIDBAll('InvDB_v4','history',raw.embedded.invDb.history || []);
                         }
 
-                        toast.show('✅ بازیابی کامل انجام شد و اطلاعات با امنیت فعلی برنامه ذخیره شد. برای اطمینان یک بار برنامه را بازخوانی کنید.');
+                        toast.show('✓ بازیابی کامل انجام شد و اطلاعات با امنیت فعلی برنامه ذخیره شد. برای اطمینان یک بار برنامه را بازخوانی کنید.');
                     } catch(err) {
                         console.error('System restore failed:', err);
-                        toast.show('❌ بازیابی انجام نشد: ' + (err?.message || 'فایل نامعتبر یا خراب است'));
+                        toast.show('✕ بازیابی انجام نشد: ' + (err?.message || 'فایل نامعتبر یا خراب است'));
                     } finally {
                         e.target.value = '';
                     }
                 };
-                reader.onerror = () => { e.target.value = ''; toast.show('❌ خواندن فایل بکاپ انجام نشد.'); };
+                reader.onerror = () => { e.target.value = ''; toast.show('✕ خواندن فایل بکاپ انجام نشد.'); };
                 reader.readAsText(file);
             };
 
@@ -10623,11 +10658,12 @@ const conversionErrors = rows.filter(r => {
                     case 'backup': return 'پشتیبان‌گیری کلی';
                     case 'notes': return 'یادداشت‌ها';
                     case 'settings': return 'تنظیمات';
+                    case 'docs': return 'مستندات برنامه';
                     case 'critical': return 'بارهای بحرانی';
                     case 'reminders': return 'سررسیدها و پیگیری مشتریان';
                     case 'check-rass': return 'راس‌گیری چک';
                     case 'inventory-master': return 'گزارش مرکزی موجودی';
-                    case 'today-exits': return '🚚 خروج امروز';
+                    case 'today-exits': return 'خروج امروز';
                     case 'partial-shipments': return 'بارهای نیمه‌رفته';
                     case 'item-flow': return 'کجا رفت؟ (گردش کالا)';
                     default: return 'داشبورد';

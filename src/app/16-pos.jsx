@@ -289,7 +289,7 @@
                 setShowDescModal(false);
                 try {
                     await navigator.clipboard.writeText(text);
-                    toast.show('📋 توضیحات تولید و در کلیپ‌بورد کپی شد');
+                    toast.show('توضیحات تولید و در کلیپ‌بورد کپی شد');
                 } catch (err) {
                     toast.show('توضیحات تولید شد (کپی خودکار ممکن نشد، از روی متن کپی کنید)');
                 }
@@ -472,8 +472,8 @@
                                 <div className="flex flex-col items-stretch">
                                     <label className="block text-[11px] font-bold text-slate-500 mb-1">تاریخ فاکتور</label>
                                     <input className={`w-full h-9 px-4 rounded-2xl border text-sm font-bold text-center tabular-nums outline-none transition focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 ${dateIsManualNonToday ? 'border-amber-400 bg-amber-50' : 'border-slate-200 bg-slate-50/70'}`} placeholder="تاریخ" value={date} onChange={e => setDate(e.target.value)} onBlur={e => setDate(normalizeInvoiceDateStr(e.target.value))} title="فرمت: سال/ماه/روز — نیازی به صفر ابتدایی یا ارقام فارسی نیست، خودکار یکدست می‌شود" />
-                                    {dateIsManualNonToday && <div className="text-[10px] text-amber-600 font-bold mt-1.5 flex items-center gap-1.5">📌 تاریخ دستی (غیر از امروز) <button type="button" onClick={() => setDate(new Date().toLocaleDateString('fa-IR'))} className="text-indigo-600 underline hover:text-indigo-800">بازگشت به امروز</button></div>}
-                                    {!dateChangedThisSession && isJalaliDateStrDifferentFromToday(date) && initialData?.dateManuallySet && <div className="text-[10px] text-amber-500 font-bold mt-1.5">📌 قبلاً به‌صورت دستی ثبت شده</div>}
+                                    {dateIsManualNonToday && <div className="text-[10px] text-amber-600 font-bold mt-1.5 flex items-center gap-1.5">تاریخ دستی (غیر از امروز) <button type="button" onClick={() => setDate(new Date().toLocaleDateString('fa-IR'))} className="text-indigo-600 underline hover:text-indigo-800">بازگشت به امروز</button></div>}
+                                    {!dateChangedThisSession && isJalaliDateStrDifferentFromToday(date) && initialData?.dateManuallySet && <div className="text-[10px] text-amber-500 font-bold mt-1.5">قبلاً به‌صورت دستی ثبت شده</div>}
                                 </div>
                             </div>
                             <div className="flex gap-2.5">
@@ -581,14 +581,14 @@
                                                         </span>
                                                     ); })()}
                                                     {item.isManual && <span className="text-[10px] text-slate-400">(دستی)</span>}
-                                                    {!item.isManual && item.qty > item.stock && <span className="text-[10px] text-red-500 font-bold">⚠️ آزاد: {item.stock}</span>}
+                                                    {!item.isManual && item.qty > item.stock && <span className="text-[10px] text-red-500 font-bold">⚠ آزاد: {item.stock}</span>}
                                                     {incomingSellable > 0 && <span className="text-[9px] text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5"><Truck size={9}/> شامل {incomingSellable} از بارِ در راه</span>}
-                                                    {item.sourced && <span className="text-[9px] text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded font-bold">🛒 خریداری از: {item.sourceParty || '—'}{item.sourcePrice > 0 && ` (${formatNumber(item.sourcePrice)} ت)`}{item.sourceSettlement && <span className={item.sourceSettlement === 'settled' ? 'text-emerald-700' : 'text-red-500'}> · {item.sourceSettlement === 'settled' ? 'تسویه‌شده' : 'تسویه‌نشده'}</span>}</span>}
+                                                    {item.sourced && <span className="text-[9px] text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded font-bold">خریداری از: {item.sourceParty || '—'}{item.sourcePrice > 0 && ` (${formatNumber(item.sourcePrice)} ت)`}{item.sourceSettlement && <span className={item.sourceSettlement === 'settled' ? 'text-emerald-700' : 'text-red-500'}> · {item.sourceSettlement === 'settled' ? 'تسویه‌شده' : 'تسویه‌نشده'}</span>}</span>}
                                                 </div>
                                                 {(deducGrams > 0 || item.bagWeight > 0) && (
                                                     <div className="text-[9px] text-blue-600 mt-0.5 leading-snug">
-                                                        {deducGrams > 0 && <>📋 {item.qty}×{formatNumber(item.deductionPerBag)}گ = {deducKg % 1 === 0 ? deducKg : deducKg.toFixed(2)} کیلو کسری{item.bagWeight > 0 && <span className="text-slate-300"> • </span>}</>}
-                                                        {item.bagWeight > 0 && <span className="text-slate-400">📦 کیسه {item.bagWeight >= 1000 ? `${item.bagWeight/1000}کیلو` : `${formatNumber(item.bagWeight)}گرم`}</span>}
+                                                        {deducGrams > 0 && <>{item.qty}×{formatNumber(item.deductionPerBag)}گ = {deducKg % 1 === 0 ? deducKg : deducKg.toFixed(2)} کیلو کسری{item.bagWeight > 0 && <span className="text-slate-300"> • </span>}</>}
+                                                        {item.bagWeight > 0 && <span className="text-slate-400">کیسه {item.bagWeight >= 1000 ? `${item.bagWeight/1000}کیلو` : `${formatNumber(item.bagWeight)}گرم`}</span>}
                                                     </div>
                                                 )}
                                             </td>
@@ -669,12 +669,12 @@
                                     <div className="flex justify-between items-center gap-4 pb-2.5 border-b border-dashed border-slate-200 text-amber-700">
                                         <label className="flex items-center gap-2 cursor-pointer select-none" title="لغو/فعال‌سازی سریع هزینه بارگیری برای همین فاکتور">
                                             <input type="checkbox" className="accent-amber-600 w-4 h-4" checked={includeLoadingCostChoice} onChange={e => setIncludeLoadingCostChoice(e.target.checked)} />
-                                            <span className={includeLoadingCostChoice ? 'font-bold' : 'line-through text-slate-400'}>🚛 هزینه بارگیری</span>
+                                            <span className={includeLoadingCostChoice ? 'font-bold' : 'line-through text-slate-400'}>هزینه بارگیری</span>
                                         </label>
                                         <strong className={`text-sm tabular-nums ${includeLoadingCostChoice ? '' : 'text-slate-400 line-through'}`}>{formatNumber(getAppliedLoadingCostAmount())} تومان</strong>
                                     </div>
-                                    <div className="flex justify-between items-center gap-4 pb-2.5 border-b border-dashed border-slate-200 text-indigo-700"><span>💳 مهلت تسویه</span><strong className="text-sm">{settlementTerm.trim() || 'تعیین نشده'}</strong></div>
-                                    {dueDate && <div className="flex justify-between items-center gap-4 text-indigo-700 sm:col-span-2"><span>📅 سررسید دقیق</span><strong className="text-sm">{formatJalali(dueDate)}</strong></div>}
+                                    <div className="flex justify-between items-center gap-4 pb-2.5 border-b border-dashed border-slate-200 text-indigo-700"><span>مهلت تسویه</span><strong className="text-sm">{settlementTerm.trim() || 'تعیین نشده'}</strong></div>
+                                    {dueDate && <div className="flex justify-between items-center gap-4 text-indigo-700 sm:col-span-2"><span>سررسید دقیق</span><strong className="text-sm">{formatJalali(dueDate)}</strong></div>}
                                 </div>
                                 <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white p-4 md:min-w-[300px] flex flex-col justify-center">
                                     <div className="text-[11px] text-indigo-200 font-bold">جمع کل فاکتور</div>
@@ -770,10 +770,10 @@
                                         </div>
                                         <div className="text-[10px] text-slate-500 bg-slate-50 border rounded-xl p-3">وزن طبق واحد گرد کردن تنظیم‌شده (اکنون {formatNumber(settings.loadingWeightIncrementKg ?? 1000)} کیلوگرم) گرد شده و هزینه بر اساس نرخ فعلی تنظیمات محاسبه شده است.</div>
                                         {loadingMinWeightKg > 0 && actualWeight < loadingMinWeightKg && (
-                                            <div className="text-[10px] text-blue-700 bg-blue-50 border border-blue-200 rounded-xl p-3">ℹ️ چون وزن این بار ({formatNumber(actualWeight)} کیلو) از آستانه‌ی حداقل وزن برای بارگیری ({formatNumber(loadingMinWeightKg)} کیلو) کمتر است، هزینه‌ی بارگیری صفر محاسبه شد.</div>
+                                            <div className="text-[10px] text-blue-700 bg-blue-50 border border-blue-200 rounded-xl p-3">ℹ چون وزن این بار ({formatNumber(actualWeight)} کیلو) از آستانه‌ی حداقل وزن برای بارگیری ({formatNumber(loadingMinWeightKg)} کیلو) کمتر است، هزینه‌ی بارگیری صفر محاسبه شد.</div>
                                         )}
                                         <div className={`text-xs font-bold rounded-xl p-3 border ${includeLoadingCostChoice ? 'text-amber-800 bg-amber-50 border-amber-200' : 'text-slate-600 bg-slate-50 border-slate-200'}`}>
-                                            {includeLoadingCostChoice ? '🚛 هزینه بارگیری برای این فاکتور در مبلغ نهایی محاسبه می‌شود.' : '🚛 هزینه بارگیری برای این فاکتور محاسبه نمی‌شود و مبلغ فاکتور فقط شامل جمع اقلام است.'}
+                                            {includeLoadingCostChoice ? 'هزینه بارگیری برای این فاکتور در مبلغ نهایی محاسبه می‌شود.' : 'هزینه بارگیری برای این فاکتور محاسبه نمی‌شود و مبلغ فاکتور فقط شامل جمع اقلام است.'}
                                         </div>
                                         <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3">
                                             <div className="flex items-center gap-2 mb-2">
@@ -781,8 +781,8 @@
                                                 <div className="font-black text-indigo-900">تسویه فاکتور</div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-2 mb-2.5">
-                                                <button type="button" onClick={() => applyQuickPay('cash')} className={`py-2 rounded-lg font-black text-xs transition ${quickPayKind === 'cash' ? 'bg-emerald-600 text-white' : 'bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}>💵 نقدی</button>
-                                                <button type="button" onClick={() => applyQuickPay('cheque')} className={`py-2 rounded-lg font-black text-xs transition ${quickPayKind === 'cheque' ? 'bg-indigo-600 text-white' : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50'}`}>🧾 چک ثبتی</button>
+                                                <button type="button" onClick={() => applyQuickPay('cash')} className={`py-2 rounded-lg font-black text-xs transition ${quickPayKind === 'cash' ? 'bg-emerald-600 text-white' : 'bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}>نقدی</button>
+                                                <button type="button" onClick={() => applyQuickPay('cheque')} className={`py-2 rounded-lg font-black text-xs transition ${quickPayKind === 'cheque' ? 'bg-indigo-600 text-white' : 'bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50'}`}>چک ثبتی</button>
                                             </div>
                                             <label className="text-[10px] text-indigo-700 font-bold block mb-1">مهلت / شرایط تسویه</label>
                                             <input className="w-full p-2.5 rounded-lg border border-indigo-200 bg-white text-sm outline-none focus:border-indigo-500" placeholder="مثلاً: نقدی، ۱۵ روز، ۱ ماه، پایان ماه..." value={settlementTerm} onChange={e => setSettlementTerm(e.target.value)} />
@@ -1000,13 +1000,13 @@
                                         )}
                                         {editingCartItem.deductionPerBag > 0 && editingCartItem.qty > 0 && (
                                             <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100 text-[10px] text-blue-700">
-                                                📋 <strong>پاورقی کسری:</strong> {editingCartItem.qty} کیسه × {formatNumber(editingCartItem.deductionPerBag)}گ = <strong>{((editingCartItem.qty * editingCartItem.deductionPerBag) / 1000).toFixed(3)} کیلوگرم</strong>
+                                                <strong>پاورقی کسری:</strong> {editingCartItem.qty} کیسه × {formatNumber(editingCartItem.deductionPerBag)}گ = <strong>{((editingCartItem.qty * editingCartItem.deductionPerBag) / 1000).toFixed(3)} کیلوگرم</strong>
                                             </div>
                                         )}
                                         <div className="border-t border-dashed border-slate-200 pt-3">
                                             <label className="flex items-center gap-2 text-xs font-bold text-purple-700 cursor-pointer select-none mb-2">
                                                 <input type="checkbox" className="accent-purple-600 w-4 h-4" checked={!!editingCartItem.sourced} onChange={e => setEditingCartItem({...editingCartItem, sourced: e.target.checked})} />
-                                                🛒 این کالا را خودم از تامین‌کننده/شخص دیگری خریداری کردم
+                                                این کالا را خودم از تامین‌کننده/شخص دیگری خریداری کردم
                                             </label>
                                             {editingCartItem.sourced && (
                                                 <div className="space-y-2 bg-purple-50 border border-purple-100 rounded-lg p-2.5">

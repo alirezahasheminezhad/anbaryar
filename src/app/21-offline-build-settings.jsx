@@ -25,7 +25,7 @@
             if (text.length < 1024) throw new Error(`حجم پاسخ مشکوکانه کم بود: ${url}`);
         };
         const buildOfflineHtml = async (log) => {
-            log('📸 برداشتن نسخه‌ی فعلی برنامه...');
+            log('برداشتن نسخه‌ی فعلی برنامه...');
             const clone = document.documentElement.cloneNode(true);
             const rootEl = clone.querySelector('#root');
             if (rootEl) rootEl.innerHTML = '';
@@ -36,9 +36,9 @@
             const scripts = [];
             let m;
             while ((m = scriptRe.exec(html))) scripts.push({ fullTag: m[0], url: m[2] });
-            log(`🔗 ${scripts.length} کتابخانه‌ی خارجی پیدا شد.`);
+            log(`${scripts.length} کتابخانه‌ی خارجی پیدا شد.`);
             for (const { fullTag, url } of scripts) {
-                log(`⏳ دانلود: ${url}`);
+                log(`دانلود: ${url}`);
                 const code = await offlineFetchText(url);
                 offlineAssertScript(url, code);
                 const safeCode = code.replace(/<\/script>/gi, '<\\/script>');
@@ -54,7 +54,7 @@
             const hasFonts = fontLinkRe.test(html) || fontImportRe.test(html);
             html = html.replace(fontLinkRe, '').replace(fontImportRe, '');
             if (hasFonts) {
-                log('🔤 جاسازی فونت...');
+                log('جاسازی فونت...');
                 let fontCss = await offlineFetchText('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100;300;400;500;700;900&display=swap');
                 const fontUrls = [...new Set([...fontCss.matchAll(/url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/g)].map(x => x[1]))];
                 for (const fu of fontUrls) {
@@ -75,7 +75,7 @@
                 .replace(/<script\s+type=["']module["']\s+src=["']\/index\.tsx["']\s*><\/script>\s*/i, '');
 
             // ۴) بررسی نهایی: هیچ وابستگی اینترنتی نباید باقی بماند
-            log('🔍 بررسی نهایی...');
+            log('بررسی نهایی...');
             scriptRe.lastIndex = 0;
             const leftovers = [...html.matchAll(scriptRe)].map(x => x[2]);
             if (leftovers.length) throw new Error('این کتابخانه‌ها هنوز به اینترنت وابسته‌اند: ' + leftovers.join(' ، '));
@@ -102,10 +102,10 @@
                     a.click();
                     setTimeout(() => URL.revokeObjectURL(url), 2000);
                     setResult({ size: out.size, count: out.count, at: new Date().toLocaleString('fa-IR') });
-                    log('✅ نسخه‌ی آفلاین ساخته و دانلود شد.');
+                    log('✓ نسخه‌ی آفلاین ساخته و دانلود شد.');
                 } catch (e) {
                     setError(e.message || String(e));
-                    log('❌ ساخت انجام نشد.');
+                    log('✕ ساخت انجام نشد.');
                 } finally {
                     setBusy(false);
                 }
@@ -130,7 +130,7 @@
                     )}
                     {result && (
                         <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800 leading-6">
-                            ✅ آخرین ساخت: {result.at} · {result.count} کتابخانه جاسازی شد · حجم: {(result.size / 1024 / 1024).toFixed(2)} MB
+                            ✓ آخرین ساخت: {result.at} · {result.count} کتابخانه جاسازی شد · حجم: {(result.size / 1024 / 1024).toFixed(2)} MB
                         </div>
                     )}
                 </div>
@@ -205,7 +205,7 @@
                     <div className="flex flex-col md:flex-row gap-5 items-start">
                         <nav className="w-full md:w-56 shrink-0 bg-white rounded-3xl border border-slate-200 shadow-sm p-2 flex md:flex-col gap-1 overflow-x-auto md:sticky md:top-4">
                             {[['loading','هزینه بارگیری',Truck],['alerts','هشدارها',AlertTriangle],['warehouses','انبارها',Warehouse],['security','قفل و امنیت',Lock],['tools','ابزارهای سیستم',Wrench]].map(([id,label,Ic])=>(
-                                <button key={id} type="button" onClick={()=>setSettingsSec(id)} className={`flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-sm font-bold whitespace-nowrap border-r-4 transition-all ${settingsSec===id?'bg-indigo-600 text-white shadow-md shadow-indigo-900/20 border-brass-400':'border-transparent text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'}`}><Ic size={17}/>{label}</button>
+                                <button key={id} type="button" onClick={()=>setSettingsSec(id)} className={`flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-sm font-bold whitespace-nowrap border-r-4 transition-all ${settingsSec===id?'bg-indigo-600 text-white shadow-md shadow-indigo-900/20 border-indigo-300':'border-transparent text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'}`}><Ic size={17}/>{label}</button>
                             ))}
                         </nav>
                         <div className="flex-1 min-w-0 w-full space-y-5">

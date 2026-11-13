@@ -10,10 +10,11 @@
         const GroupTabs = ({ view, setView }) => {
             const g = getViewGroup(view);
             if (!g) return null;
+            // چیپ‌های گرد هم‌شکل فیلترهای داشبورد: فعال = سرمه‌ای، غیرفعال = سفید با سایه‌ی نرم
             return (
-                <div className="no-print mb-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-1.5 flex gap-1 overflow-x-auto" role="tablist" aria-label={g.label}>
+                <div className="no-print mb-5 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label={g.label}>
                     {g.tabs.map(t => (
-                        <button key={t.id} role="tab" aria-selected={view === t.id} onClick={() => setView(t.id)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap border-r-4 transition-all cursor-pointer ${view === t.id ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/20 border-brass-400' : 'border-transparent text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'}`}><t.icon size={16}/>{t.label}</button>
+                        <button key={t.id} role="tab" aria-selected={view === t.id} onClick={() => setView(t.id)} className={`flex items-center gap-2 h-10 px-4 rounded-full text-sm font-bold whitespace-nowrap transition cursor-pointer ${view === t.id ? 'bg-indigo-900 text-white shadow-md shadow-indigo-900/20' : 'bg-white text-slate-600 shadow-sm hover:text-indigo-700 hover:bg-indigo-50'}`}><t.icon size={16}/>{t.label}</button>
                     ))}
                 </div>
             );
@@ -112,8 +113,8 @@
                                 <div className="mt-3 flex items-center justify-between gap-2">
                                     <div className="text-[10px] text-slate-500">رزرو: <b>{formatNumber((reservedCounts&&reservedCounts[i.id])||0)}</b> • فیزیکی: <b>{formatNumber(i.quantity)}</b></div>
                                     <div className="flex gap-1.5">
-                                        <button onClick={()=>toggle(i.id, i.muted ? 'unmute' : 'mute')} className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition ${i.muted?'bg-emerald-50 text-emerald-700 border-emerald-200':'bg-slate-50 text-slate-600 border-slate-200'}`}>{i.muted?'🔔 Unmute':'🔕 Mute'}</button>
-                                        {!i.muted && <button onClick={()=>toggle(i.id,'snooze')} className="px-3 py-1.5 rounded-full text-[10px] font-bold border bg-amber-50 text-amber-700 border-amber-200">⏰ تا ۱ ساعت</button>}
+                                        <button onClick={()=>toggle(i.id, i.muted ? 'unmute' : 'mute')} className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition ${i.muted?'bg-emerald-50 text-emerald-700 border-emerald-200':'bg-slate-50 text-slate-600 border-slate-200'}`}>{i.muted?'فعال‌کردن هشدار':'بی‌صدا'}</button>
+                                        {!i.muted && <button onClick={()=>toggle(i.id,'snooze')} className="px-3 py-1.5 rounded-full text-[10px] font-bold border bg-amber-50 text-amber-700 border-amber-200">تا ۱ ساعت</button>}
                                     </div>
                                 </div>
                             </div>

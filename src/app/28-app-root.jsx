@@ -542,7 +542,7 @@
                 const deleteTxId = generateId();
                 logTransaction(item, 'DELETE', -item.quantity, 0, undefined, undefined, 'حذف کالا', deleteTxId);
                 setItems(prev => prev.filter(i => i.id !== id));
-                toast && toast.show(`🗑 کالای "${name || item.name}" حذف شد`, {
+                toast && toast.show(`کالای "${name || item.name}" حذف شد`, {
                     label: '↩ بازگردانی',
                     fn: () => {
                         setItems(prev => [deletedItem, ...prev]);
@@ -572,7 +572,7 @@
                 if (diff !== 0) {
                     logTransaction(item, 'ADJUSTMENT', diff, countedQty, undefined, undefined, reason);
                     setItems(prev => prev.map(i => i.id === itemId ? { ...i, quantity: countedQty, lastUpdated: Date.now() } : i));
-                    toast.show(`✅ شمارش ثبت شد — اختلاف ${diff > 0 ? '+' : ''}${formatNumber(diff)} اصلاح شد`);
+                    toast.show(`✓ شمارش ثبت شد — اختلاف ${diff > 0 ? '+' : ''}${formatNumber(diff)} اصلاح شد`);
                 } else {
                     toast.show('موجودی سیستم با شمارش مطابقت داشت — تغییری اعمال نشد');
                 }
@@ -642,7 +642,7 @@
                 setPurchases(prev => prev.map(p => ({ ...p, items: remapItemId(p.items) })));
                 setProcessingOrders(prev => prev.map(o => ({ ...o, items: remapItemId(o.items), returnedItems: remapItemId(o.returnedItems) })));
 
-                toast.show(`✅ ${group.length} بار با موفقیت در «${mergedItem.name}» ادغام شدند`);
+                toast.show(`✓ ${group.length} بار با موفقیت در «${mergedItem.name}» ادغام شدند`);
                 setMergeItem(null);
             };
 
@@ -672,7 +672,7 @@
                 setConsignments(prev => prev.map(c => ({ ...c, items: remap(c.items), returnedItems: remap(c.returnedItems) })));
                 setPurchases(prev => prev.map(p => ({ ...p, items: remap(p.items) })));
                 setProcessingOrders(prev => prev.map(o => ({ ...o, items: remap(o.items), returnedItems: remap(o.returnedItems) })));
-                toast.show(`✅ ${previewCount} مرجع قدیمی اصلاح شد`);
+                toast.show(`✓ ${previewCount} مرجع قدیمی اصلاح شد`);
             };
 
 
@@ -845,7 +845,7 @@
                 }
 
                 setLastSaved(new Date());
-                toast.show(allShipped ? '✅ بار نهایی شد؛ اثر موجودی و مبلغ اعمال شد.' : '🚚 بخشی از بار ثبت شد؛ باقی‌مانده همچنان رزرو است.');
+                toast.show(allShipped ? '✓ بار نهایی شد؛ اثر موجودی و مبلغ اعمال شد.' : 'بخشی از بار ثبت شد؛ باقی‌مانده همچنان رزرو است.');
             };
 
 
@@ -1069,15 +1069,15 @@
                             await restoreIDBAll('InvDB_v4','history',raw.embedded.invDb.history || []);
                         }
 
-                        toast.show('✅ بازیابی کامل انجام شد و اطلاعات با امنیت فعلی برنامه ذخیره شد. برای اطمینان یک بار برنامه را بازخوانی کنید.');
+                        toast.show('✓ بازیابی کامل انجام شد و اطلاعات با امنیت فعلی برنامه ذخیره شد. برای اطمینان یک بار برنامه را بازخوانی کنید.');
                     } catch(err) {
                         console.error('System restore failed:', err);
-                        toast.show('❌ بازیابی انجام نشد: ' + (err?.message || 'فایل نامعتبر یا خراب است'));
+                        toast.show('✕ بازیابی انجام نشد: ' + (err?.message || 'فایل نامعتبر یا خراب است'));
                     } finally {
                         e.target.value = '';
                     }
                 };
-                reader.onerror = () => { e.target.value = ''; toast.show('❌ خواندن فایل بکاپ انجام نشد.'); };
+                reader.onerror = () => { e.target.value = ''; toast.show('✕ خواندن فایل بکاپ انجام نشد.'); };
                 reader.readAsText(file);
             };
 
@@ -1123,11 +1123,12 @@
                     case 'backup': return 'پشتیبان‌گیری کلی';
                     case 'notes': return 'یادداشت‌ها';
                     case 'settings': return 'تنظیمات';
+                    case 'docs': return 'مستندات برنامه';
                     case 'critical': return 'بارهای بحرانی';
                     case 'reminders': return 'سررسیدها و پیگیری مشتریان';
                     case 'check-rass': return 'راس‌گیری چک';
                     case 'inventory-master': return 'گزارش مرکزی موجودی';
-                    case 'today-exits': return '🚚 خروج امروز';
+                    case 'today-exits': return 'خروج امروز';
                     case 'partial-shipments': return 'بارهای نیمه‌رفته';
                     case 'item-flow': return 'کجا رفت؟ (گردش کالا)';
                     default: return 'داشبورد';

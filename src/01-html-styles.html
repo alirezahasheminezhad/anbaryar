@@ -41,6 +41,31 @@
       button:not(:disabled):active { transform: scale(0.97); }
       :focus-visible { outline: 2px solid #1d5eea; outline-offset: 2px; border-radius: 4px; }
 
+      /* ------- سیستم طراحی v2 (مرجع: داشبورد Medicore) — لایه‌ی سراسری برای همه‌ی صفحه‌ها -------
+         فقط بصری. با #root اولویت بالاتر از کلاس‌های tailwind می‌گیرد و فاکتور چاپی (.invoice-paper) را لمس نمی‌کند.
+         ۱) کارت‌ها: بدون کادر، سایه‌ی نرم نیلی، گوشه‌ی گرد  ۲) فیلدها: حلقه‌ی فوکوس آبی
+         ۳) جدول‌ها: سرستون ریز و کم‌رنگ، هاور ردیف  ۴) مودال‌ها: پرده‌ی سرمه‌ای، پنل گرد
+         ۵) دکمه‌های اصلی (indigo + متن سفید): کپسولی */
+      #root :is(div,section,article,aside):is(.rounded-xl,.rounded-2xl,.rounded-3xl).bg-white.border.border-slate-200:not(.invoice-paper) {
+        border-color: transparent;
+        box-shadow: 0 1px 2px rgba(20,33,79,.04), 0 8px 24px -10px rgba(20,33,79,.14);
+      }
+      #root :is(div,section,article,aside).rounded-2xl.bg-white.border:not(.invoice-paper) { border-radius: 1.5rem; }
+      #root :is(input,select,textarea):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):focus {
+        outline: none; border-color: #1d5eea; box-shadow: 0 0 0 3px rgba(29,94,234,.16);
+      }
+      #root main table thead th { color: #6b7a94; font-size: 11px; font-weight: 600; letter-spacing: .02em; white-space: nowrap; }
+      #root main table thead { background: transparent; }
+      #root main table tbody tr { transition: background-color .12s ease; }
+      #root main table tbody tr:hover { background-color: rgba(238,243,255,.55); }
+      #root .fixed.inset-0.backdrop-blur-sm { background: rgba(13,21,54,.48); }
+      #root .fixed.inset-0 > .bg-white:is(.rounded-2xl,.rounded-3xl,.rounded-xl),
+      #root .fixed.inset-0 > div > .bg-white:is(.rounded-2xl,.rounded-3xl) {
+        border-radius: 1.75rem; box-shadow: 0 30px 80px -24px rgba(13,21,54,.5);
+      }
+      #root button[class*="bg-indigo-"][class*="text-white"]:not([class*="rounded-full"]) { border-radius: 9999px; }
+      #root main :is(h1,h2) { letter-spacing: -.01em; }
+
         /* چاپ استاندارد: A4 افقی و بدون اسکرول افقی */
         .print-invoice { width:100%; max-width:1120px; margin:0 auto; box-sizing:border-box; overflow:visible!important; }
         .print-invoice table { width:100%!important; table-layout:fixed; }

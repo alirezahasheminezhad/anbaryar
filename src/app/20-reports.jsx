@@ -181,7 +181,7 @@
                                             <tbody className="divide-y divide-slate-100">
                                                 {group.items.map((r, idx) => (
                                                     <tr key={idx} className="hover:bg-slate-50">
-                                                        <td className="p-2">{r.itemName} {r.hasManualWeight && <span className="text-amber-600" title="حداقل یکی از ارسال‌های این ردیف وزن دستی داشته">🖊</span>}</td>
+                                                        <td className="p-2">{r.itemName} {r.hasManualWeight && <span className="text-amber-600" title="حداقل یکی از ارسال‌های این ردیف وزن دستی داشته">✎</span>}</td>
                                                         <td className="p-2 text-center font-bold">{formatNumber(r.total)}</td>
                                                         <td className="p-2 text-center text-emerald-600 font-bold">{formatNumber(r.shipped)}</td>
                                                         <td className="p-2 text-center text-amber-600 font-black">{formatNumber(r.remaining)}</td>
@@ -241,7 +241,7 @@
                                         <td className="p-2 text-slate-400 font-mono">#{r.invoiceId.slice(-6)}</td>
                                         <td className="p-2">{r.itemName}</td>
                                         <td className="p-2 text-center">{formatNumber(r.qty)}</td>
-                                        <td className="p-2 text-center">{formatNumber(r.weight)} {r.weightManual && <span className="text-amber-600" title="وزن دستی">🖊</span>}</td>
+                                        <td className="p-2 text-center">{formatNumber(r.weight)} {r.weightManual && <span className="text-amber-600" title="وزن دستی">✎</span>}</td>
                                         <td className="p-2 text-center font-bold text-emerald-700">{formatNumber(r.amount)}</td>
                                         <td className="p-2 text-center"><span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${r.status === 'کامل' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>{r.status}</span></td>
                                     </tr>
@@ -377,9 +377,9 @@
                     {tab === 'due' && (
                         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                             <div className="bg-slate-50 border-b border-slate-100 p-4 flex flex-wrap items-center gap-3 text-xs font-bold">
-                                <span className="text-red-600">🔴 گذشته: {overdueCount}</span>
-                                <span className="text-amber-600">🟠 امروز: {todayCount}</span>
-                                <span className="text-yellow-600">🟡 تا ۳ روز آینده: {soonCount}</span>
+                                <span className="text-red-600 inline-flex items-center gap-1.5"><i className="inline-block w-2 h-2 rounded-full bg-red-500" aria-hidden="true"></i>گذشته: {overdueCount}</span>
+                                <span className="text-amber-600 inline-flex items-center gap-1.5"><i className="inline-block w-2 h-2 rounded-full bg-amber-500" aria-hidden="true"></i>امروز: {todayCount}</span>
+                                <span className="text-yellow-600 inline-flex items-center gap-1.5"><i className="inline-block w-2 h-2 rounded-full bg-yellow-400" aria-hidden="true"></i>تا ۳ روز آینده: {soonCount}</span>
                                 <span className="text-slate-400 font-medium mr-auto">سررسید بر اساس تقویم شمسی دقیق (با احتساب کبیسه) محاسبه می‌شود</span>
                             </div>
                             <div className="divide-y divide-slate-100">
@@ -396,7 +396,7 @@
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
                                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${urgencyStyle(inv._urgency)}`}>
-                                                📅 {formatJalali(inv.dueDate)} · {urgencyLabel(inv._urgency)}{inv._urgency === 'overdue' ? ` (${Math.abs(inv._diff)} روز)` : ''}
+                                                {formatJalali(inv.dueDate)} · {urgencyLabel(inv._urgency)}{inv._urgency === 'overdue' ? ` (${Math.abs(inv._diff)} روز)` : ''}
                                             </span>
                                             <button onClick={() => setPrintInv(inv)} className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" title="چاپ فاکتور"><Printer size={14}/></button>
                                             <button onClick={() => onEditInvoice(inv)} className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" title="ویرایش فاکتور"><Edit3 size={14}/></button>
@@ -425,7 +425,7 @@
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
                                             <span className="px-2.5 py-1 rounded-full text-[10px] font-bold border bg-rose-50 border-rose-200 text-rose-700">
-                                                ⏳ {c.daysSince} روز از آخرین خرید
+                                                {c.daysSince} روز از آخرین خرید
                                             </span>
                                             {c.lastInvoice && <button onClick={() => setPrintInv(c.lastInvoice)} className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" title="چاپ فاکتور آخر"><Printer size={14}/></button>}
                                         </div>

@@ -375,7 +375,7 @@
                             {o.returnedItems.map((it, idx) => (<span key={idx} className="inline-block ml-2"><ItemNameLabel it={it} inventoryItems={items} isPending={false} /> ×{formatNumber(it.qty)}{it.weight > 0 && <span className="text-emerald-500"> ({formatNumber(it.weight)} کیلو)</span>}</span>))}
                         </div>
                     )}
-                    {o.description && <div className="text-[11px] text-slate-400 mb-2">📝 {o.description}</div>}
+                    {o.description && <div className="text-[11px] text-slate-400 mb-2">{o.description}</div>}
                     <div className="flex gap-2 mb-1.5">
                         <button onClick={() => setPrintOrder(o)} className="flex-1 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg text-xs font-bold border border-indigo-100 flex items-center justify-center gap-1"><Printer size={13}/> چاپ</button>
                         <button onClick={() => setEditingOrder(o)} className="flex-1 py-1.5 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-bold border border-slate-200 flex items-center justify-center gap-1"><Edit3 size={13}/> ویرایش</button>
@@ -456,8 +456,8 @@
                             <button onClick={() => submit(true)} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm flex justify-center items-center gap-2"><Truck size={16}/> ارسال فوری</button>
                         </div>
                     </div>
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="md:col-span-3 flex justify-end">
+                    <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 content-start">
+                        <div className="md:col-span-3 flex justify-end items-start">
                             <button type="button" onClick={()=>setShowProcessingSummary(true)} className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"><RefreshCw size={14}/> گزارش کلی</button>
                         </div>
                         <div className="bg-white rounded-3xl border border-slate-200 p-3 shadow-sm">
@@ -479,7 +479,7 @@
                     {mergeOrder && <ProcessingMergeModal record={mergeOrder} candidates={mergeCandidatesFor(mergeOrder)} onClose={() => setMergeOrder(null)} onSubmit={(ids) => { onMerge(ids); setMergeOrder(null); }}/>}
                     {printOrder && <PrintOrderModal
                         title="سند آنالیز / پردازش"
-                        badge={printOrder.status === 'reserved' ? '📋 رزرو' : printOrder.status === 'sent' ? '🚚 در حال پردازش' : '✅ برگشته / تکمیل'}
+                        badge={printOrder.status === 'reserved' ? 'رزرو' : printOrder.status === 'sent' ? 'در حال پردازش' : '✓ برگشته / تکمیل'}
                         badgeColor={printOrder.status === 'reserved' ? {bg:'#f1f5f9',text:'#475569',border:'#e2e8f0'} : printOrder.status === 'sent' ? {bg:'#dbeafe',text:'#1e40af',border:'#93c5fd'} : {bg:'#d1fae5',text:'#065f46',border:'#a7f3d0'}}
                         rows={[{label:'مقصد / کارگاه پردازش', value: printOrder.recipient}, {label:'وضعیت', value: printOrder.status === 'reserved' ? 'رزرو' : printOrder.status === 'sent' ? 'در حال پردازش' : 'برگشته/تکمیل'}]}
                         itemsList={printOrder.status === 'returned' && printOrder.returnedItems ? printOrder.returnedItems : printOrder.items}

@@ -141,7 +141,7 @@
                             </select>
                             <button onClick={() => setShowFilters(v => !v)} className={`flex items-center gap-1 px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap border transition ${activeFilterCount > 0 ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}><Filter size={14}/> فیلتر {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}</button>
                             <button onClick={() => exportInvoicesToExcel(selectedIds.length > 0 ? selectedInvoices : sortedInvoices, selectedIds.length > 0 ? 'فاکتورهای_منتخب' : 'گزارش_فاکتورها')} className="flex items-center gap-1 bg-emerald-600 text-white px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap hover:bg-emerald-700 transition" title="خروجی ساده — یک ردیف به‌ازای هر فاکتور"><Download size={14}/> Excel ساده</button>
-                            <button onClick={() => exportInvoicesFullReport(selectedIds.length > 0 ? selectedInvoices : sortedInvoices, selectedIds.length > 0 ? 'گزارش_کامل_منتخب' : 'گزارش_کامل')} className="flex items-center gap-1 bg-brass-500 text-white px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap hover:bg-brass-600 transition" title="۵ شیت: ساده، تفکیک مشتری، تفکیک کالا، گزارش مالی، گزارش کسری — بر اساس فیلتر/انتخابِ فعلی"><FileBarChart size={14}/> گزارش کامل (۵ شیت)</button>
+                            <button onClick={() => exportInvoicesFullReport(selectedIds.length > 0 ? selectedInvoices : sortedInvoices, selectedIds.length > 0 ? 'گزارش_کامل_منتخب' : 'گزارش_کامل')} className="flex items-center gap-1 bg-indigo-900 text-white px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap hover:bg-indigo-800 transition" title="۵ شیت: ساده، تفکیک مشتری، تفکیک کالا، گزارش مالی، گزارش کسری — بر اساس فیلتر/انتخابِ فعلی"><FileBarChart size={14}/> گزارش کامل (۵ شیت)</button>
                         </div>
                     </div>
                     {showFilters && (
@@ -209,7 +209,7 @@
                                                         <span className="text-[9px] text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-200 font-bold" title={`${inv.dateChangeLogs.length} بار ویرایش شده`}>✎ {inv.dateChangeLogs.length}</span>
                                                     )}
                                                     {inv.dateManuallySet && (
-                                                        <span className="text-[9px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200 font-bold" title={`این فاکتور با تاریخِ دستیِ «${inv.date}» ثبت شده${inv.realEntryTimestamp ? ` — روزِ واقعیِ ثبت: ${formatJalali(new Date(inv.realEntryTimestamp).toISOString(), true)}` : ''}`}>📌 دستی</span>
+                                                        <span className="text-[9px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200 font-bold" title={`این فاکتور با تاریخِ دستیِ «${inv.date}» ثبت شده${inv.realEntryTimestamp ? ` — روزِ واقعیِ ثبت: ${formatJalali(new Date(inv.realEntryTimestamp).toISOString(), true)}` : ''}`}>دستی</span>
                                                     )}
                                                     <button onClick={() => startEditDate(inv)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded" title="ویرایش تاریخ"><Pencil size={12}/></button>
                                                 </div>
@@ -239,12 +239,12 @@
                                             {inv.status === 'pending' ? <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-amber-200">رزرو / در انتظار</span> : <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-lg text-[10px] font-bold border border-emerald-200">تکمیل شده</span>}
                                             {inv.status === 'pending' && (inv.items||[]).some(it => (Number(it.shippedQty)||0) > 0) && (() => {
                                                 const goneCount = (inv.items||[]).filter(it => (Number(it.qty)||0) - (Number(it.shippedQty)||0) <= 0.0001 && (Number(it.shippedQty)||0) > 0).length;
-                                                return <div className="mt-1"><span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg text-[9px] font-bold border border-blue-200">🚚 {goneCount} از {(inv.items||[]).length} قلم رفته</span></div>;
+                                                return <div className="mt-1"><span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg text-[9px] font-bold border border-blue-200">{goneCount} از {(inv.items||[]).length} قلم رفته</span></div>;
                                             })()}
                                             {/* برچسب «چندمرحله‌ای»: هر وقت حداقل یکی از ردیف‌های این فاکتور بیش از یک محموله‌ی جداگانه (با احتمال وزن/فی متفاوت)
                                                 داشته باشد — چه فاکتور هنوز رزرو باشد چه کاملاً تکمیل شده — تا در «مشاهده» بشود ریزِ هر بخش را دید. */}
                                             {(inv.items||[]).some(it => it.shipments && it.shipments.length > 1) && (
-                                                <div className="mt-1"><span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-lg text-[9px] font-bold border border-purple-200" title="حداقل یک قلم این فاکتور در چند مرحله‌ی جدا (احتمالاً با وزن/قیمت متفاوت) ارسال شده — برای ریز آن روی «مشاهده» بزنید">🔀 چندمرحله‌ای</span></div>
+                                                <div className="mt-1"><span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-lg text-[9px] font-bold border border-purple-200" title="حداقل یک قلم این فاکتور در چند مرحله‌ی جدا (احتمالاً با وزن/قیمت متفاوت) ارسال شده — برای ریز آن روی «مشاهده» بزنید">چندمرحله‌ای</span></div>
                                             )}
                                         </td>
                                         <td className="p-4 font-black text-slate-700 text-base">{formatNumber(inv.totalPrice)} <span className="text-[9px] font-normal text-slate-400">تومان</span></td>

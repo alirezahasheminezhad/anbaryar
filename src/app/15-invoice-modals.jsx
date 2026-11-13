@@ -80,7 +80,7 @@
                                                         <span className="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100 font-bold">{rItem.brand}</span>
                                                     )}
                                                     <span className="text-[9px] text-slate-400">{rItem.tag}</span>
-                                                    {item.sourced && <span className="text-[9px] text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded font-bold">🛒 از: {item.sourceParty || '—'}{item.sourcePrice > 0 && ` (${formatNumber(item.sourcePrice)} ت)`} · {item.sourceSettlement === 'settled' ? 'تسویه‌شده' : 'تسویه‌نشده'}</span>}
+                                                    {item.sourced && <span className="text-[9px] text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded font-bold">از: {item.sourceParty || '—'}{item.sourcePrice > 0 && ` (${formatNumber(item.sourcePrice)} ت)`} · {item.sourceSettlement === 'settled' ? 'تسویه‌شده' : 'تسویه‌نشده'}</span>}
                                                 </div>
                                             </td>
                                             <td className="p-2.5 text-center">{item.qty}</td>
@@ -105,21 +105,21 @@
                                                     {!shippable && !(item.shipments && item.shipments.length > 0) && <span className="text-slate-300 text-[10px]">—</span>}
                                                     {shippable && (
                                                         <div className="flex flex-wrap items-center justify-center gap-1">
-                                                            {fullyGone && <span className="text-[9px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full font-bold border border-slate-300">✅ ارسال شده</span>}
+                                                            {fullyGone && <span className="text-[9px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full font-bold border border-slate-300">✓ ارسال شده</span>}
                                                             {!fullyGone && shipped > 0 && (
                                                                 <>
-                                                                    <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold border border-emerald-200">✅ رفته: {formatNumber(shipped)}</span>
-                                                                    <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold border border-amber-200">⏳ باقی‌مانده: {formatNumber(remaining)}</span>
+                                                                    <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold border border-emerald-200">✓ رفته: {formatNumber(shipped)}</span>
+                                                                    <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold border border-amber-200">باقی‌مانده: {formatNumber(remaining)}</span>
                                                                 </>
                                                             )}
-                                                            {shipped === 0 && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold border border-amber-200">⏳ رزرو</span>}
+                                                            {shipped === 0 && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold border border-amber-200">رزرو</span>}
                                                         </div>
                                                     )}
                                                     {item.shipments && item.shipments.length > 0 && (
                                                         <div className="mt-1 text-right space-y-0.5">
                                                             {item.shipments.map((sh, sIdx) => (
                                                                 <div key={sh.id || sIdx} className="text-[9px] text-slate-400 bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5">
-                                                                    محموله {sIdx + 1} — {sh.date}: {formatNumber(sh.qty)} عدد، {formatNumber(sh.weight)} کیلو {sh.weightManual ? <span className="text-amber-600 font-bold">(🖊 وزن دستی{sh.calculatedWeight != null ? `، به‌نسبت می‌شد ${formatNumber(sh.calculatedWeight)}` : ''})</span> : <span className="text-slate-300">(🔢 به‌نسبت)</span>}، فی {formatNumber(sh.price)} {sh.priceManual && <span className="text-amber-600 font-bold">(🖊 قیمت دستی)</span>}
+                                                                    محموله {sIdx + 1} — {sh.date}: {formatNumber(sh.qty)} عدد، {formatNumber(sh.weight)} کیلو {sh.weightManual ? <span className="text-amber-600 font-bold">(✎ وزن دستی{sh.calculatedWeight != null ? `، به‌نسبت می‌شد ${formatNumber(sh.calculatedWeight)}` : ''})</span> : <span className="text-slate-300">(به‌نسبت)</span>}، فی {formatNumber(sh.price)} {sh.priceManual && <span className="text-amber-600 font-bold">(✎ قیمت دستی)</span>}
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -169,7 +169,7 @@
                             )}
                         {invoice.dateManuallySet && (
                             <div className="mt-4 bg-amber-50 rounded-xl p-3 border border-amber-200 text-amber-800 text-xs font-bold space-y-0.5">
-                                <div className="flex items-center gap-2"><span>📌</span><span>این فاکتور با یک تاریخِ دستی (متفاوت از تاریخِ واقعیِ ثبت) صادر شده — محاسبات و گزارش‌ها بر همین تاریخِ دستی هستند.</span></div>
+                                <div className="flex items-center gap-2"><span></span><span>این فاکتور با یک تاریخِ دستی (متفاوت از تاریخِ واقعیِ ثبت) صادر شده — محاسبات و گزارش‌ها بر همین تاریخِ دستی هستند.</span></div>
                                 {invoice.realEntryTimestamp && (
                                     <div className="pr-5 text-amber-600 font-medium">تاریخِ نوشته‌شده روی سند: {invoice.date} — روزِ واقعیِ ثبت در سیستم: {formatJalali(new Date(invoice.realEntryTimestamp).toISOString(), true)}</div>
                                 )}
@@ -186,7 +186,7 @@
                                     <div className="space-y-2">
                                         {invoice.dateChangeLogs.map((log, idx) => (
                                             <div key={idx} className="text-xs text-orange-800 bg-white rounded-lg px-3 py-2 border border-orange-100 flex items-center gap-2">
-                                                <span className="text-orange-400">🗓</span>
+                                                <span className="text-orange-400"></span>
                                                 <span>در تاریخ <strong>{log.changedAt}</strong>، تاریخ فاکتور از <strong className="text-red-600">{log.from}</strong> به <strong className="text-emerald-600">{log.to}</strong> تغییر کرد</span>
                                                 {log.changedBy && <span className="text-orange-400 text-[10px]">— {log.changedBy}</span>}
                                             </div>
@@ -225,7 +225,7 @@
                                             <span>اطلاعات کسری و بسته‌بندی</span>
                                             <span className="text-[9px] text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full font-medium border border-blue-200">پاورقی – فقط جنبه اطلاعاتی</span>
                                             {enrichedItems.some(it => it._enrichedFromInventory) && (
-                                                <span className="text-[9px] text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full font-medium border border-violet-200">📦 داده از انبار جاری</span>
+                                                <span className="text-[9px] text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full font-medium border border-violet-200">داده از انبار جاری</span>
                                             )}
                                         </div>
                                         <div className="space-y-3">
@@ -237,10 +237,10 @@
                                                     <span className="font-bold text-blue-900 text-sm">{it.name} {it.brand && `(${it.brand})`}</span>
                                                     {it.deductionPerBag && (
                                                         <div className="space-y-1">
-                                                            <span className="flex items-center gap-1">🔸 کسری هر کیسه: <strong>{formatNumber(it.deductionPerBag)} گرم</strong> {it.deductionDate && `— ثبت شده در تاریخ ${it.deductionDate}`}</span>
+                                                            <span className="flex items-center gap-1">کسری هر کیسه: <strong>{formatNumber(it.deductionPerBag)} گرم</strong> {it.deductionDate && `— ثبت شده در تاریخ ${it.deductionDate}`}</span>
                                                             {it.qty > 0 && (
                                                                 <div className="bg-blue-100 rounded-lg px-3 py-2 border border-blue-200 text-blue-900">
-                                                                    <div className="font-bold text-xs mb-1">📐 محاسبه کسری کل:</div>
+                                                                    <div className="font-bold text-xs mb-1">محاسبه کسری کل:</div>
                                                                     <div className="font-mono text-sm">
                                                                         {it.qty} کیسه × {formatNumber(it.deductionPerBag)} گرم = {formatNumber(deducGrams)} گرم
                                                                     </div>
@@ -251,8 +251,8 @@
                                                             )}
                                                         </div>
                                                     )}
-                                                    {it.bagWeight && <span>📦 وزن کیسه/کارتن: <strong>{it.bagWeight >= 1000 ? `${it.bagWeight/1000} کیلوگرم` : `${formatNumber(it.bagWeight)} گرم`}</strong></span>}
-                                                    {it.deductionPerBag && <span className="text-blue-500 text-[10px]">⚠️ این اطلاعات صرفاً برای مطلع ماندن شما ثبت شده و در محاسبات تأثیری ندارد.</span>}
+                                                    {it.bagWeight && <span>وزن کیسه/کارتن: <strong>{it.bagWeight >= 1000 ? `${it.bagWeight/1000} کیلوگرم` : `${formatNumber(it.bagWeight)} گرم`}</strong></span>}
+                                                    {it.deductionPerBag && <span className="text-blue-500 text-[10px]">⚠ این اطلاعات صرفاً برای مطلع ماندن شما ثبت شده و در محاسبات تأثیری ندارد.</span>}
                                                 </div>
                                                 );
                                             })}
@@ -497,7 +497,7 @@
                             </table>
                             {doneIdx.length > 0 && (
                                 <div className="text-[9px] text-slate-500 bg-emerald-50 border border-emerald-200 rounded-lg p-1.5 mt-2">
-                                    <span className="font-bold text-emerald-700">✅ {doneIdx.length} ردیف قبلاً به‌طور کامل ارسال شده</span> و نیازی به تصمیم جدید ندارد: {doneIdx.map(({ it }) => it.name).join('، ')}
+                                    <span className="font-bold text-emerald-700">✓ {doneIdx.length} ردیف قبلاً به‌طور کامل ارسال شده</span> و نیازی به تصمیم جدید ندارد: {doneIdx.map(({ it }) => it.name).join('، ')}
                                 </div>
                             )}
                             {showDueStep && (
