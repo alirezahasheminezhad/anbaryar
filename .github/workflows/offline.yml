@@ -28,6 +28,16 @@ jobs:
           name: anbar-yar-offline
           path: dist/anbar-yar-offline.html
           retention-days: 90
+      - name: Publish offline file to Releases (rolling)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view offline-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create offline-latest --repo "$GITHUB_REPOSITORY" \
+              --title "نسخه آفلاین (همیشه آخرین)" \
+              --notes "خروجی خودکار ساخت آفلاین تک‌فایلی؛ با هر push به main به‌روز می‌شود. فایل را دانلود و با دو بار کلیک اجرا کنید." \
+              --target "$GITHUB_SHA"
+          gh release upload offline-latest dist/anbar-yar-offline.html --clobber --repo "$GITHUB_REPOSITORY"
       - name: Attach to Release (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
