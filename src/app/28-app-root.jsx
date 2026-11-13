@@ -1,8 +1,10 @@
 //## ═══ app/28-app-root.jsx ═══
 //## کامپوننت ریشه‌ی App: state سراسری، handlerهای ثبت/ویرایش/حذف و مسیریابی بین view‌ها.
 //## ترتیب فایل‌ها در build.py مهم است؛ همه‌ی بخش‌ها یک scope مشترک دارند.
+        // فهرست نماهای معتبر برای همگام‌سازی سبک با location.hash (بدون router سنگین).
+        const AY_VIEWS = ['dashboard','pos','history','purchases','processing','consignments','estelam','backup','notes','docs','reminders','check-rass','inventory-master','today-exits','partial-shipments','item-flow','settings','critical','mahak-import','mother-bag-stock'];
         const App = () => {
-            const [view, setView] = useState('dashboard');
+            const [view, setView] = useState(() => { const h = (window.location.hash || '').replace(/^#/, ''); return AY_VIEWS.includes(h) ? h : 'dashboard'; });
             const [items, setItems] = useState([]);
             const [invoices, setInvoices] = useState([]);
             const [notes, setNotes] = useState([]);
@@ -12,6 +14,8 @@
             const [consignments, setConsignments] = useState([]);
             const [consignFocus, setConsignFocus] = useState(''); // نام طرفی که از «خروجی‌های در انتظار» به صفحه‌ی امانی می‌رویم تا لیست روی همان فیلتر شود
             const [lastSaved, setLastSaved] = useState(null);
+            const [saveError, setSaveError] = useState(false);
+            const [securityNudgeDismissed, setSecurityNudgeDismissed] = useState(false);
             const [loading, setLoading] = useState(true);
             const [searchTerm, setSearchTerm] = useState('');
             const [editingItem, setEditingItem] = useState(null);
@@ -28,6 +32,22 @@
             // و ذخیره‌ی «فاکتور جدید» به‌جای ثبت مستقل، به‌عنوان ویرایش همان فاکتور قدیمی اعمال و باعث محاسبه‌ی
             // نادرست موجودی (برگشت/کسر اشتباه) می‌شد. navigateTo تضمین می‌کند هر پیمایش عادی این حالت را ریست کند.
             const navigateTo = (v) => { setEditingInvoice(null); setView(v); };
+            // همگام‌سازی سبک view با location.hash تا Back/Refresh/Deep-link کار کند. تغییرِ برنامه‌ایِ
+            // hash (که از خودِ view می‌آید) در listener نادیده گرفته می‌شود تا editingInvoice هنگام ویرایش فاکتور پاک نشود.
+            const lastProgHashRef = useRef(null);
+            useEffect(() => {
+                const target = '#' + view;
+                if (window.location.hash !== target) { lastProgHashRef.current = target; window.location.hash = view; }
+            }, [view]);
+            useEffect(() => {
+                const onHash = () => {
+                    if (window.location.hash === lastProgHashRef.current) return;
+                    const h = (window.location.hash || '').replace(/^#/, '');
+                    navigateTo(AY_VIEWS.includes(h) ? h : 'dashboard');
+                };
+                window.addEventListener('hashchange', onHash);
+                return () => window.removeEventListener('hashchange', onHash);
+            }, []);
             const [appSettings, setAppSettings] = useState(loadSettings());
             const [inventoryViewMode, setInventoryViewMode] = useState('table'); // 'card' | 'table'
             const [showAddForm, setShowAddForm] = useState(false); // فرم افزودن کالا فقط با دکمه‌ی «+ افزودن کالا» باز می‌شود
@@ -41,6 +61,7 @@
                 let timer=null;
                 const schedule=()=>{
                     if(timer) clearTimeout(timer);
+                    if(!getSecurityConfig()) return; // بدون رمز، قفل خودکار معنا ندارد (حالت دمو/بدون رمز)
                     const configured=Number(appSettings.autoLockMinutes||0);
                     if(!configured) return;
                     const remaining=trustedUnlockRemaining();
@@ -70,10 +91,20 @@
 
 
             useEffect(() => {
-                if(!loading) {
-                    saveData(items, invoices, notes, transactions, purchases, processingOrders, consignments);
-                    setLastSaved(new Date());
-                }
+                if (loading) return;
+                // debounce کوتاه: تغییرهای پشت‌سرهم (تایپ/چند setState) یک‌بار ذخیره شوند.
+                const t = setTimeout(async () => {
+                    try {
+                        await saveData(items, invoices, notes, transactions, purchases, processingOrders, consignments);
+                        setLastSaved(new Date());
+                        setSaveError(false);
+                    } catch (e) {
+                        console.error('ذخیره‌سازی ناموفق:', e);
+                        setSaveError(true);
+                        notifyToast('ذخیره‌سازی ناموفق بود؛ تغییرات ممکن است حفظ نشوند. از بخش پشتیبان‌گیری یک نسخه‌ی خارجی بگیرید.', null, 8000);
+                    }
+                }, 400);
+                return () => clearTimeout(t);
             }, [items, invoices, notes, transactions, purchases, processingOrders, consignments, loading]);
 
             const logTransaction = (item, type, quantity, newStock, invoiceId, recipient, desc, txId) => {
@@ -1162,9 +1193,17 @@
 
             return (
                 <div className="app-shell flex flex-col h-screen font-[Vazirmatn]">
-                    <TopNav view={view} setView={navigateTo} items={items} invoices={invoices} reservedCounts={reservedCounts} lowStockThreshold={appSettings.lowStockThreshold ?? 100} lastSaved={lastSaved} />
+                    <TopNav view={view} setView={navigateTo} items={items} invoices={invoices} reservedCounts={reservedCounts} lowStockThreshold={appSettings.lowStockThreshold ?? 100} lastSaved={lastSaved} saveError={saveError} />
                     <main className="flex-1 min-h-0 overflow-y-auto px-4 md:px-8 pb-8">
                       <div className="max-w-[1400px] mx-auto">
+                        {!getSecurityConfig() && !securityNudgeDismissed && (
+                            <div className="no-print mt-4 flex flex-wrap items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-xs text-amber-800">
+                                <ShieldCheck size={16} className="shrink-0"/>
+                                <span className="flex-1 min-w-[200px] leading-6 font-bold">رمزنگاری غیرفعال است. برای حفاظت از اطلاعات روی این دستگاه، یک رمز عبور تعیین کنید.</span>
+                                <button onClick={()=>window.dispatchEvent(new Event('anbaryar:open-security'))} className="h-9 px-4 rounded-full bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 transition cursor-pointer">فعال‌سازی رمز</button>
+                                <button onClick={()=>setSecurityNudgeDismissed(true)} className="h-9 px-3 rounded-full border border-amber-300 text-amber-700 text-xs font-bold hover:bg-amber-100 transition cursor-pointer">بعداً</button>
+                            </div>
+                        )}
                         {/* عنوان صفحه: بزرگ و ساده مثل رابط مرجع؛ در داشبورد زیرعنوان و دکمه‌ی اصلی هم دارد */}
                         <div className="no-print flex items-end justify-between gap-4 pt-6 pb-6">
                             <div className="min-w-0">
@@ -1221,7 +1260,24 @@
                                             </div>
                                         </div>
                                         <div>
-                                        {Object.keys(grouped).sort().map(name => (
+                                        {filteredItems.length === 0 ? (
+                                            <div className="px-6 py-14 text-center">
+                                                <div className="w-14 h-14 mx-auto rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4"><PackageOpen size={26}/></div>
+                                                {items.length === 0 ? (
+                                                    <div>
+                                                        <div className="font-black text-slate-700 text-sm mb-1">هنوز کالایی در انبار ثبت نشده است</div>
+                                                        <div className="text-xs text-slate-500 mb-5 leading-6">با «+ افزودن کالا» اولین کالا را اضافه کنید، یا موجودی را از «ورود اکسل» / «همگام‌سازی محک» یک‌جا وارد کنید.</div>
+                                                        <button onClick={() => setShowAddForm(true)} className="h-11 px-6 rounded-full bg-indigo-600 text-white text-sm font-bold shadow-md hover:bg-indigo-700 transition cursor-pointer">+ افزودن اولین کالا</button>
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <div className="font-black text-slate-700 text-sm mb-1">کالایی با این جستجو/فیلتر یافت نشد</div>
+                                                        <div className="text-xs text-slate-500 mb-5">عبارت جستجو یا فیلتر انبار را تغییر دهید.</div>
+                                                        <button onClick={() => { setSearchTerm(''); setWarehouseFilter(''); }} className="h-10 px-5 rounded-full border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer">پاک‌کردن جستجو و فیلتر</button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : Object.keys(grouped).sort().map(name => (
                                             <InventoryGroup key={name} name={name} items={grouped[name]} reservedCounts={reservedCounts} onUpdateQuantity={handleUpdateQuantity} onDelete={handleDelete} onEdit={setEditingItem} onShowHistory={setHistoryItem} onMerge={setMergeItem} onCount={setCountingItem} viewMode={inventoryViewMode} lowStockThreshold={appSettings.lowStockThreshold ?? 100} warehouses={appSettings.warehouses} />
                                         ))}
                                     </div>
@@ -1256,8 +1312,8 @@
                                     <div className="bg-white rounded-3xl border border-amber-200 shadow-sm p-6 mt-5">
                                         <div className="flex items-center gap-3"><div className="bg-amber-100 text-amber-600 p-3 rounded-2xl"><AlertTriangle size={22}/></div><div><h2 className="text-xl font-black text-slate-800">بارهای کاملاً تکراری ({duplicateItemGroups.length} گروه)</h2><p className="text-xs text-slate-400 mt-1">این بارها دقیقاً هم‌نام/هم‌برند/هم‌تگ هستند (مثلاً از ثبت دستی یا ورود اکسل تکراری) — پیشنهاد می‌شود با «ادغام کالا» یکی شوند تا در سرچ چند بار نمایش داده نشوند.</p></div></div>
                                         <div className="space-y-2 mt-4">
-                                            {duplicateItemGroups.map((g, idx) => (
-                                                <div key={idx} className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3 text-sm">
+                                            {duplicateItemGroups.map((g) => (
+                                                <div key={g[0].id} className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3 text-sm">
                                                     <div>
                                                         <span className="font-bold text-slate-700">{g[0].name}</span>
                                                         <ItemDistinguishBadges item={g[0]}/>

@@ -3,6 +3,7 @@
 //## ترتیب فایل‌ها در build.py مهم است؛ همه‌ی بخش‌ها یک scope مشترک دارند.
         // --- Print Invoice Component ---
         const PrintInvoiceModal = ({ invoice, settings, inventoryItems, onClose }) => {
+            const dialogRef = useDialogA11y(onClose);
             if (!invoice) return null;
             const toast = useToast();
             // حالت اسکرین‌شات/چاپِ «فقط باقی‌مانده»: فقط یک فیلترِ نمایشی روی همین پیش‌نمایش است؛ ردیف‌هایی که
@@ -79,7 +80,7 @@
                     link.download = `${baseName}.${format === 'jpeg' ? 'jpg' : 'png'}`;
                     link.href = format === 'jpeg' ? canvas.toDataURL('image/jpeg',0.95) : canvas.toDataURL('image/png');
                     document.body.appendChild(link); link.click(); link.remove();
-                } catch (err) { console.error('Invoice image export failed',err); alert('ساخت خروجی تصویر انجام نشد. لطفاً دوباره تلاش کنید.'); }
+                } catch (err) { console.error('Invoice image export failed',err); toast.show('ساخت خروجی تصویر انجام نشد. لطفاً دوباره تلاش کنید.'); }
                 finally { setBusy(false); }
             };
             const downloadJpeg = () => downloadImage('jpeg');
@@ -100,11 +101,11 @@
 
             return (
                 <div className="print-modal-backdrop fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[9998] flex items-center justify-center p-3 sm:p-6">
-                    <div className="print-modal-panel bg-slate-100 rounded-[28px] w-full max-w-6xl overflow-hidden shadow-2xl ring-1 ring-white/10 flex flex-col max-h-[94vh]" onClick={e => e.stopPropagation()}>
+                    <div ref={dialogRef} className="print-modal-panel bg-slate-100 rounded-3xl w-full max-w-6xl overflow-hidden shadow-2xl ring-1 ring-white/10 flex flex-col max-h-[94vh]" onClick={e => e.stopPropagation()}>
                         <div className="no-print bg-white border-b border-slate-200 px-5 sm:px-6 pt-2.5 pb-2.5 flex flex-col gap-2 shrink-0">
                             <div className="flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center shadow-lg shadow-indigo-600/25 shrink-0"><Printer size={16}/></div>
+                                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center shadow-lg shadow-indigo-900/20 shrink-0"><Printer size={16}/></div>
                                     <div className="min-w-0">
                                         <h3 className="font-black text-slate-900 text-sm leading-tight">پیش‌نمایش چاپ فاکتور</h3>
                                         <div className="text-[10px] text-slate-400 mt-0.5 truncate">{invoice.customer} · {invoice.date} · {formatNumber(enrichedItems.length)} قلم</div>
@@ -115,7 +116,7 @@
                             <div className="flex flex-wrap items-center gap-2">
                                 <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 h-9 flex-1 min-w-[180px] max-w-sm focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-100 transition"><FileText size={14} className="text-slate-400 shrink-0"/><input value={pdfFileName} onChange={e=>setPdfFileName(e.target.value)} className="w-full bg-transparent text-xs font-bold text-slate-700 outline-none" placeholder="نام فایل PDF"/></div>
                                 {invoice.status === 'pending' && invoice.items.length > 0 && (
-                                    <label className={`flex items-center gap-2 px-3 h-9 rounded-xl font-bold text-xs border cursor-pointer transition select-none ${screenshotMode ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+                                    <label className={`flex items-center gap-2 px-3 h-9 rounded-xl font-bold text-xs border cursor-pointer transition select-none ${screenshotMode ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-900/20' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
                                         <input type="checkbox" className="accent-white w-4 h-4" checked={screenshotMode} onChange={e => setScreenshotMode(e.target.checked)} />
                                         🖼️ فقط باقی‌مانده
                                     </label>
@@ -134,7 +135,7 @@
                                     <button onClick={downloadBw} disabled={downloadingBw} title="مناسب چاپگرهای غیررنگی — پس‌زمینه سفید و متن مشکی تمیز" className="h-7 px-2.5 rounded-lg bg-white text-slate-700 font-bold text-xs shadow-sm hover:bg-slate-50 transition disabled:opacity-60">{downloadingBw ? 'در حال ساخت...' : 'سیاه‌وسفید'}</button>
                                 </div>
                                 <button onClick={savePdf} title="پنجره‌ی چاپ باز می‌شود؛ مقصد را روی Save as PDF بگذارید تا یک PDF دقیق و متن‌دار بگیرید" className="flex items-center gap-2 h-9 px-4 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-black transition shadow-md"><Download size={14}/> ذخیره PDF</button>
-                                <button onClick={doPrint} className="flex items-center gap-2 h-9 px-5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition shadow-lg shadow-indigo-600/30 active:scale-95"><Printer size={14}/> چاپ فاکتور</button>
+                                <button onClick={doPrint} className="flex items-center gap-2 h-9 px-5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition shadow-lg shadow-indigo-900/20 active:scale-95"><Printer size={14}/> چاپ فاکتور</button>
                             </div>
                             {showFieldOptions && (
                                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-2.5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
@@ -416,6 +417,7 @@
         // بازاستفاده از همان کلاس‌های print-modal-backdrop / print-modal-panel / print-area
         // که در CSS چاپ اصلاح شده‌اند، تا همان رفع باگ صفحات خالی این‌جا هم اعمال شود.
         const PrintOrderModal = ({ title, badge, badgeColor, rows, itemsList, inventoryItems, isPending, description, docId, docDate, onClose }) => {
+            const dialogRef = useDialogA11y(onClose);
             const paperRef = useRef(null);
             const [downloadingJpeg, setDownloadingJpeg] = useState(false);
             const partyName = rows?.find(r => /فروشنده|تامین‌کننده|تامین کننده|تحویل|گیرنده|مشتری|طرف/.test(String(r.label||'')))?.value || '';
@@ -435,12 +437,12 @@
                     const link = document.createElement('a');
                     link.download = `${(pdfFileName || title || 'سند').replace(/[\\/:*?"<>|]/g,'-').trim()}.jpg`;
                     link.href = canvas.toDataURL('image/jpeg',0.95); link.click();
-                } catch (err) { console.error(err); alert('ساخت خروجی تصویر انجام نشد. لطفاً دوباره تلاش کنید.'); }
+                } catch (err) { console.error(err); toast.show('ساخت خروجی تصویر انجام نشد. لطفاً دوباره تلاش کنید.'); }
                 finally { setDownloadingJpeg(false); }
             };
             return (
-                <div className="print-modal-backdrop fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
-                    <div className="print-modal-panel bg-white rounded-3xl w-full max-w-6xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="print-modal-backdrop fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
+                    <div ref={dialogRef} className="print-modal-panel bg-white rounded-3xl w-full max-w-6xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
                         <div className="p-4 bg-slate-50 border-b flex justify-between items-center no-print">
                             <h3 className="font-black text-slate-800 flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><Printer size={15}/></div> پیش‌نمایش چاپ</h3>
                             <div className="flex gap-2 flex-wrap items-center">

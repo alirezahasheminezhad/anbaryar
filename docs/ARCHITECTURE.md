@@ -1,26 +1,28 @@
 # معماری «انبار یار»
 
-برنامه یک فایل HTML واحد (`index.html`) است که بدون سرور و آفلاین کار می‌کند: React 18 + Babel-standalone + Tailwind (CDN)،
+برنامه یک فایل HTML واحد (`index.html`) است که بدون سرور کار می‌کند: React 18 + Tailwind (CDN) و SheetJS/Lucide/html2canvas.
 داده‌ها فقط در مرورگر (localStorage + IndexedDB با قفل رمزنگاری‌شده). برای نگه‌داری، سورس به بخش‌های کوچک در `src/` شکسته شده
-و `build.py` آن‌ها را **فقط به‌هم می‌چسباند** (هیچ تبدیل/کامپایلی نیست). خروجی نسخه‌ی اول با فایل اصلیِ کاربر **بایت‌به‌بایت یکسان** بود.
+و `build.py` آن‌ها را به‌هم می‌چسباند و **JSX را با Babel در Node پیش‌کامپایل می‌کند** (`tools/compile-jsx.js`، خروجی `React.createElement`).
+از build 10.8 دیگر Babel در مرورگر اجرا نمی‌شود. بارگذاری اول برای کتابخانه‌های CDN به اینترنت نیاز دارد؛ سازنده‌ی آفلاینِ داخل برنامه نسخه‌ی خودبسنده می‌سازد.
 
 ## جریان کار
 ```
-ویرایش src/…  →  python3 build.py  →  index.html  →  git commit/push
+npm install (یک‌بار)  →  ویرایش src/…  →  python3 build.py  →  index.html  →  git commit/push
 ```
-CI (`.github/workflows/check.yml`) با `python3 build.py --check` مطمئن می‌شود `index.html` با `src/` هم‌خوان است.
+`build.py` ابتدا بخش‌ها را می‌چسباند، سپس بلوک JSX را با `node tools/compile-jsx.js` کامپایل و جایگزین می‌کند.
+CI (`.github/workflows/check.yml`) با setup-node + `npm ci` و سپس `python3 build.py --check` مطمئن می‌شود `index.html` با `src/` بایت‌به‌بایت هم‌خوان است.
 
 ## قاعده‌ی مهم scope
-همه‌ی فایل‌های `src/app/*.jsx` داخل **یک** تگ `<script type="text/babel">` می‌روند و scope مشترک دارند
+همه‌ی فایل‌های `src/app/*.jsx` به‌هم چسبانده و یک‌جا کامپایل می‌شوند و داخل **یک** تگ `<script>` معمولی در `index.html` می‌روند؛ scope مشترک دارند
 (مثل یک فایل بزرگ). پس `import/export` نداریم و ترتیب در `MODULES` (در `build.py`) مهم است: هر `const` باید قبل از اولین اجرای استفاده‌اش تعریف شود
 (برای کامپوننت‌ها معمولاً مشکلی نیست چون در زمان render صدا زده می‌شوند). فایل جدید = یک خط در `MODULES`.
 
 ## نقشه‌ی بخش‌ها
 | فایل | حجم | محتوا |
 |---|---|---|
-| `src/00-html-head.html` | 4 KB | سربرگ HTML: CDNها (React، Babel، Tailwind، SheetJS، Lucide، html2canvas) و تنظیمات Tailwind (پالت رنگ ink-navy/brass). (خطوط 1–64 نسخه‌ی اولیه) |
+| `src/00-html-head.html` | 4 KB | سربرگ HTML: CDNها (React، Tailwind، SheetJS، Lucide، html2canvas) و تنظیمات Tailwind (پالت رنگ ink-navy/brass). Babel حذف شده (پیش‌کامپایل در build). |
 | `src/assets/vazirmatn-font.js` | 144 KB | فونت Vazirmatn (base64) — ویرایش نکن |
-| `src/01-html-styles.html` | 10 KB | CSS سراسری، importmap، <body>، راه‌اندازی آیکن‌ها و باز شدن تگ <script type=text/babel>. (خطوط 66–225 نسخه‌ی اولیه) |
+| `src/01-html-styles.html` | 10 KB | CSS سراسری، <body>، راه‌اندازی آیکن‌ها و نشانگر شروع بلوک JSX (که build آن را با کد کامپایل‌شده جایگزین می‌کند). |
 | `src/app/01-core-utils.jsx` | 28 KB | ابزارهای پایه: ارقام فارسی، فرمت عدد، badge اقلام، چاپ در پنجره‌ی جدید، عدد به حروف، کمک‌های انبار/خرید در راه. |
 | `src/app/02-toast-confirm.jsx` | 5 KB | سیستم Toast و مودال تأیید سفارشی (جایگزین window.confirm، با شمارش معکوس). |
 | `src/app/03-print-modals.jsx` | 56 KB | چاپ/خروجی فاکتور (PrintInvoiceModal) و چاپ عمومی خرید/پردازش (PrintOrderModal). |

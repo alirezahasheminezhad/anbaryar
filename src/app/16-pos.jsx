@@ -8,6 +8,8 @@
             const liveInvoice = initialData ? (invoices.find(i => i.id === initialData.id) || initialData) : null;
             const [showFinalizeShipmentModal, setShowFinalizeShipmentModal] = useState(false);
             const [customer, setCustomer] = useState(initialData?.customer || '');
+            const [customerError, setCustomerError] = useState(false);
+            const customerRef = useRef(null);
             const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
             const [date, setDate] = useState(initialData?.date || new Date().toLocaleDateString('fa-IR'));
             // مقدار اولیه‌ی تاریخ (هنگام باز شدن فرم) — برای تشخیص اینکه کاربر همین حالا/همین جلسه واقعاً تاریخ را
@@ -37,6 +39,8 @@
             const [dueJYear, setDueJYear] = useState(initialDueJ.jy || '');
             const [dueJMonth, setDueJMonth] = useState(initialDueJ.jm || '');
             const [dueJDay, setDueJDay] = useState(initialDueJ.jd || '');
+            // حالت پیش‌فرض ساده: فقط محاسبه‌ی سریع «چند روز از…»؛ فیلدهای دستی سال/ماه/روز پشت «تنظیم دقیق» تاشو هستند.
+            const [showExactDue, setShowExactDue] = useState(false);
             const updateDueDate = (jy, jm, jd) => setDueDate(jy && jm && jd ? fromJalaliInput(jy, jm, jd) : '');
             // اگر با تغییر سال/ماه، روزِ فعلاً انتخاب‌شده دیگر در آن ماه معنا نداشته باشد (مثلاً ۳۰ اسفند بعد از
             // خروج از سال کبیسه)، به آخرین روز معتبر همان ماه محدود می‌شود تا سررسید بی‌صدا یک روز جابه‌جا نشود.
@@ -359,7 +363,7 @@
 
             const handleCheck = async (isPending) => {
                 if (cart.length === 0) return toast.show('سبد خرید خالی است');
-                if (!customer) return toast.show('نام مشتری را وارد کنید');
+                if (!customer) { setCustomerError(true); customerRef.current?.focus(); return toast.show('نام مشتری را وارد کنید'); }
                 const zeroWeight = cart.find(c => c.weight <= 0);
                 if (zeroWeight) return toast.show(`وزن برای کالای "${zeroWeight.name}" وارد نشده است.`);
                 if (isEditMode && !changeReason.trim()) return toast.show('لطفاً علت این ویرایش را در کادر مربوطه بنویسید.');
@@ -457,7 +461,8 @@
                             <div className="grid grid-cols-1 sm:grid-cols-[1fr_200px] gap-2.5">
                                 <div className="relative">
                                     <label className="block text-[11px] font-bold text-slate-500 mb-1">نام مشتری <span className="text-rose-500">*</span></label>
-                                    <input className="w-full h-9 px-4 rounded-2xl border border-slate-200 bg-slate-50/70 text-sm font-bold text-slate-800 placeholder:font-normal placeholder:text-slate-400 outline-none transition focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100" placeholder="نام یا عنوان مشتری…" value={customer} onFocus={() => setShowCustomerSuggestions(true)} onChange={e => { setCustomer(e.target.value); setShowCustomerSuggestions(true); }} />
+                                    <input ref={customerRef} aria-invalid={customerError} className={`w-full h-9 px-4 rounded-2xl border text-sm font-bold text-slate-800 placeholder:font-normal placeholder:text-slate-400 outline-none transition focus:bg-white focus:ring-4 ${customerError ? 'border-rose-400 bg-rose-50/70 focus:border-rose-400 focus:ring-rose-100' : 'border-slate-200 bg-slate-50/70 focus:border-indigo-400 focus:ring-indigo-100'}`} placeholder="نام یا عنوان مشتری…" value={customer} onFocus={() => setShowCustomerSuggestions(true)} onChange={e => { setCustomer(e.target.value); setCustomerError(false); setShowCustomerSuggestions(true); }} />
+                                    {customerError && <div className="text-[10px] text-rose-600 font-bold mt-1 flex items-center gap-1"><AlertTriangle size={11}/> نام مشتری را وارد کنید.</div>}
                                     {showCustomerSuggestions && customerSuggestions.length > 0 && (
                                         <div className="absolute z-40 top-full mt-2 right-0 left-0 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
                                             {customerSuggestions.map(c => (
@@ -648,11 +653,16 @@
                                             <select value={quickDueBase} onChange={e => setQuickDueBase(e.target.value)} className="h-8 px-3 border border-indigo-200 rounded-xl text-xs font-bold bg-white outline-none focus:border-indigo-400"><option value="today">تاریخ فاکتور</option><option value="tomorrow">روز بعد از فاکتور</option></select>
                                             <button type="button" onClick={applyQuickDueDays} className="h-8 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold whitespace-nowrap shadow-sm transition active:scale-95">محاسبه سررسید</button>
                                         </div>
+                                        <button type="button" onClick={() => setShowExactDue(v => !v)} aria-expanded={showExactDue} className="self-start flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition">
+                                            <ChevronDown size={13} className={showExactDue ? 'rotate-180 transition' : 'transition'}/> {showExactDue ? 'بستن تنظیم دقیق تاریخ' : 'تنظیم دقیق تاریخ (سال/ماه/روز)'}
+                                        </button>
+                                        {showExactDue && (
                                         <div className="grid grid-cols-3 gap-2" dir="rtl">
                                             <input inputMode="numeric" value={dueJYear} onChange={e => { const v = e.target.value.replace(/\D/g, ''); setDueJYear(v); updateDueDateClamped(v, dueJMonth, dueJDay); }} placeholder="سال" className="h-8 px-2 border border-indigo-200 rounded-xl text-sm text-center font-bold bg-white outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100" />
                                             <select value={dueJMonth} onChange={e => { setDueJMonth(e.target.value); updateDueDateClamped(dueJYear, e.target.value, dueJDay); }} className="h-8 px-2 border border-indigo-200 rounded-xl text-sm font-bold bg-white outline-none focus:border-indigo-400"><option value="">ماه</option>{Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}</select>
                                             <select value={dueJDay} onChange={e => { setDueJDay(e.target.value); updateDueDate(dueJYear, dueJMonth, e.target.value); }} className="h-8 px-2 border border-indigo-200 rounded-xl text-sm font-bold bg-white outline-none focus:border-indigo-400"><option value="">روز</option>{Array.from({length:daysInJalaliMonth(dueJYear,dueJMonth)},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}</select>
                                         </div>
+                                        )}
                                         {dueDate && <div className="text-xs text-indigo-700 font-bold bg-white border border-indigo-100 rounded-xl px-3 py-1.5">سررسید: {formatJalali(dueDate)} {(() => { const u = getDueUrgency(dueDate); const diff = daysDiffFromToday(dueDate); if (u === 'overdue') return `• ${formatNumber(Math.abs(diff))} روز گذشته`; if (u === 'today') return '• امروز'; return `• ${formatNumber(diff)} روز دیگر`; })()}</div>}
                                     </div>
                                     {(settlementTerm || dueDate || quickDueDays) && (
@@ -693,7 +703,7 @@
                             </div>
                             <div className="flex gap-2.5 flex-1">
                                 <button onClick={() => handleCheck(true)} className="flex-1 h-12 border-2 border-amber-300 text-amber-800 bg-amber-50 rounded-2xl font-bold text-sm hover:bg-amber-100 hover:border-amber-400 transition active:scale-[0.98] flex justify-center items-center gap-2"><Clock size={18}/> {initialData ? 'ذخیره تغییرات (رزرو)' : 'ثبت سفارش (رزرو)'}</button>
-                                <button onClick={() => (isEditMode && liveInvoice?.status === 'pending') ? setShowFinalizeShipmentModal(true) : handleCheck(false)} className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-sm shadow-lg shadow-emerald-600/25 transition active:scale-[0.98] flex justify-center items-center gap-2"><Check size={18}/> ثبت نهایی (تحویل)</button>
+                                <button onClick={() => (isEditMode && liveInvoice?.status === 'pending') ? setShowFinalizeShipmentModal(true) : handleCheck(false)} className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-sm shadow-lg shadow-emerald-900/20 transition active:scale-[0.98] flex justify-center items-center gap-2"><Check size={18}/> ثبت نهایی (تحویل)</button>
                                 {cart.length > 0 && customer && <button onClick={() => setShowPrint(true)} className="h-12 px-5 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl font-bold text-sm transition active:scale-[0.98] flex justify-center items-center gap-2 shadow-md" title="پیش‌نمایش و چاپ"><Printer size={18}/> <span className="hidden sm:inline">پیش‌نمایش و چاپ</span></button>}
                             </div>
                         </div>
@@ -707,8 +717,7 @@
                             />
                         )}
                         {showPriceDropReview && (
-                            <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-                                <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-rose-200" onClick={e => e.stopPropagation()}>
+                            <DialogFrame onClose={() => setShowPriceDropReview(false)} closeOnBackdrop={false} backdropClassName="absolute inset-0 bg-slate-950/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" panelClassName="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-rose-200" label="هشدار کاهش قیمت">
                                     <div className="bg-rose-50 border-b border-rose-200 p-4 flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center"><AlertTriangle size={22}/></div>
                                         <div><h3 className="font-black text-rose-900">قیمت پایین‌تر از خرید قبلی همین مشتری</h3><p className="text-[11px] text-rose-700 mt-0.5">برای «{customer}» این کالاها قبلاً با قیمت بالاتری فروخته شده‌اند.</p></div>
@@ -733,8 +742,7 @@
                                         <button onClick={() => setShowPriceDropReview(false)} className="flex-1 py-3 rounded-xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-100">بازگشت و ویرایش</button>
                                         <button onClick={() => { setShowPriceDropReview(false); proceedAfterPriceCheck(pendingCheckMode); }} className="flex-1 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black">تأیید و ادامه</button>
                                     </div>
-                                </div>
-                            </div>
+                            </DialogFrame>
                         )}
                         {showLoadingReview && (() => {
                             const actualWeight = getCartWeight();
@@ -744,8 +752,7 @@
                             const rate = Number(settings.loadingCostPerTon || 0);
                             const loadingMinWeightKg = settings.loadingMinWeightEnabled ? (settings.loadingMinWeightKg || 0) : 0;
                             const calculated = calculateLoadingCost(actualWeight, rate, loadingIncrementKg, loadingRoundUpThreshold, loadingMinWeightKg);
-                            return <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-                                <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-amber-200" onClick={e => e.stopPropagation()}>
+                            return <DialogFrame onClose={() => setShowLoadingReview(false)} closeOnBackdrop={false} backdropClassName="absolute inset-0 bg-slate-950/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" panelClassName="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-amber-200" label="هزینه بارگیری و تسویه فاکتور">
                                     <div className="bg-amber-50 border-b border-amber-200 p-4 flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center"><Truck size={22}/></div>
                                         <div className="flex-1"><h3 className="font-black text-amber-900">هزینه بارگیری و تسویه فاکتور</h3><p className="text-[11px] text-amber-700 mt-0.5">برای مشتری «{customer}» هزینه بارگیری لحاظ شود؟</p></div>
@@ -806,13 +813,11 @@
                                             {includeLoadingCostChoice ? `تأیید و ثبت فاکتور با ${formatNumber(calculated)} تومان هزینه بارگیری` : 'تأیید و ثبت فاکتور بدون هزینه بارگیری'}
                                         </button>
                                     </div>
-                                </div>
-                            </div>;
+                            </DialogFrame>;
                         })()}
-                        {showConfirm && <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center p-6"><div className="bg-white border-2 border-red-100 rounded-2xl shadow-2xl max-w-md w-full p-6"><div className="bg-red-50 w-12 h-12 rounded-full flex items-center justify-center text-red-500 mb-4 mx-auto"><AlertTriangle size={24}/></div><h3 className="text-xl font-black text-center text-slate-800 mb-2">هشدار کسری موجودی</h3><p className="text-center text-slate-500 text-sm mb-6">موجودی آزاد برای درخواست شما کافی نیست. تایید باعث منفی شدن موجودی می‌شود.</p><div className="flex gap-3"><button onClick={() => setShowConfirm(false)} className="flex-1 py-3 border border-slate-200 rounded-xl text-slate-600 font-bold hover:bg-slate-50">لغو</button><button onClick={() => { setShowConfirm(false); checkMotherBagsAndProceedPOS(pendingMode); }} className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600">تایید و ادامه</button></div></div></div>}
+                        {showConfirm && <DialogFrame onClose={() => setShowConfirm(false)} closeOnBackdrop={false} backdropClassName="absolute inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center p-6" panelClassName="bg-white border-2 border-red-100 rounded-2xl shadow-2xl max-w-md w-full p-6" label="هشدار کسری موجودی"><div className="bg-red-50 w-12 h-12 rounded-full flex items-center justify-center text-red-500 mb-4 mx-auto"><AlertTriangle size={24}/></div><h3 className="text-xl font-black text-center text-slate-800 mb-2">هشدار کسری موجودی</h3><p className="text-center text-slate-500 text-sm mb-6">موجودی آزاد برای درخواست شما کافی نیست. تایید باعث منفی شدن موجودی می‌شود.</p><div className="flex gap-3"><button onClick={() => setShowConfirm(false)} className="flex-1 py-3 border border-slate-200 rounded-xl text-slate-600 font-bold hover:bg-slate-50">لغو</button><button onClick={() => { setShowConfirm(false); checkMotherBagsAndProceedPOS(pendingMode); }} className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600">تایید و ادامه</button></div></DialogFrame>}
                         {motherBagReviewPOS && (
-                            <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-                                <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-amber-200">
+                            <DialogFrame onClose={() => setMotherBagReviewPOS(null)} closeOnBackdrop={false} backdropClassName="absolute inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center p-6" panelClassName="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-amber-200" label="پیش‌بینی مصرف کیسه مادر">
                                     <div className="bg-amber-50 border-b border-amber-200 p-4 flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center"><PackageOpen size={22}/></div>
                                         <div><h3 className="font-black text-amber-900">پیش‌بینی مصرف کیسه‌ی مادر</h3><p className="text-[11px] text-amber-700 mt-0.5">تعداد کیسه‌ی ۵ کیلویی این ردیف‌ها مضربی از ۶ (۳۰ کیلو) است — همین الان، {motherBagReviewPOS.isPending ? 'موقع رزرو' : 'موقع ثبت نهایی'}، پیش‌بینی مصرف کیسه‌ی مادر را ببین.</p></div>
@@ -837,16 +842,14 @@
                                         <button onClick={() => setMotherBagReviewPOS(null)} className="flex-1 py-3 rounded-xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-100">بازگشت و ویرایش</button>
                                         <button onClick={() => { const isPending = motherBagReviewPOS.isPending; setMotherBagReviewPOS(null); openLoadingReview(isPending); }} className="flex-1 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black">متوجه شدم، ادامه</button>
                                     </div>
-                                </div>
-                            </div>
+                            </DialogFrame>
                         )}
                         {showDescModal && (() => {
                             const previewText = generateAutoDescription(descOpts);
                             const toggles = [['weight', 'وزن کل'], ['brand', 'برند'], ['tag', 'مشخصه'], ['motherBag', 'معادل کیسه مادر'], ['totals', 'جمع کل (قلم / کیسه / وزن)']];
                             const setRow = (id, patch) => setCalcRows(r => ({ ...r, [id]: { ...r[id], ...patch } }));
                             const tabCls = (t) => `flex-1 py-2 rounded-xl text-xs font-black transition ${descTab === t ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:bg-white'}`;
-                            return <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setShowDescModal(false)}>
-                                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200" onClick={e => e.stopPropagation()}>
+                            return <DialogFrame onClose={() => setShowDescModal(false)} backdropClassName="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" panelClassName="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200" label="تولید و کپی توضیحات">
                                     <div className="px-5 py-3 border-b flex items-center justify-between">
                                         <h3 className="font-black text-slate-800 text-sm flex items-center gap-2"><ClipboardList size={16}/> تولید و کپی توضیحات</h3>
                                         <button type="button" onClick={() => setShowDescModal(false)} className="text-slate-400 hover:text-slate-700 text-lg leading-none px-2">✕</button>
@@ -901,14 +904,12 @@
                                         <button type="button" onClick={() => setShowDescModal(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">انصراف</button>
                                         <button type="button" onClick={commitDescription} className="px-4 py-2 rounded-xl text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 transition flex items-center gap-1.5"><ClipboardList size={14}/> درج در توضیحات و کپی</button>
                                     </div>
-                                </div>
-                            </div>;
+                            </DialogFrame>;
                         })()}
                         {showManualModal && <ManualItemModal onClose={() => setShowManualModal(false)} onAdd={addManualItem} items={items} />}
                         {showPrint && <PrintInvoiceModal invoice={{id: initialData?.id || 'draft', date, customer, items: cart, description, settlementTerm, dueDate, includeLoadingCost: includeLoadingCostChoice, loadingCostAmount: includeLoadingCostChoice ? getLoadingCostAmount() : 0, totalPrice: getTotal(), status: initialData?.status || 'draft', notices: getSelectedNoticeTexts()}} settings={settings} inventoryItems={items} onClose={() => setShowPrint(false)} />}
                         {editingCartItem && (
-                            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                                <div className="bg-white rounded-2xl p-5 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                            <DialogFrame onClose={() => setEditingCartItem(null)} closeOnBackdrop={false} backdropClassName="absolute inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" panelClassName="bg-white rounded-2xl p-5 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto" label="ویرایش ردیف فاکتور">
                                     <div className="flex justify-between items-center mb-4">
                                         <h3 className="font-bold text-slate-800 flex items-center gap-2"><Pencil size={16} className="text-indigo-500"/> ویرایش ردیف فاکتور</h3>
                                         <button onClick={() => setEditingCartItem(null)}><X size={18} className="text-slate-400 hover:text-red-500"/></button>
@@ -1041,11 +1042,10 @@
                                                 const { _originalItemId, ...toSave } = editingCartItem;
                                                 setCart(cart.map(c => c.itemId === _originalItemId ? toSave : c));
                                                 setEditingCartItem(null);
-                                            }} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-200">ذخیره</button>
+                                            }} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 shadow-lg shadow-indigo-900/20">ذخیره</button>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
+                            </DialogFrame>
                         )}
                     </div>
                 </div>

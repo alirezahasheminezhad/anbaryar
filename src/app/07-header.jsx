@@ -3,7 +3,7 @@
 //## ترتیب فایل‌ها در build.py مهم است؛ همه‌ی بخش‌ها یک scope مشترک دارند.
         // --- Components ---
 
-        const TopNav = ({ view, setView, items, invoices, reservedCounts, lowStockThreshold = 100, lastSaved }) => {
+        const TopNav = ({ view, setView, items, invoices, reservedCounts, lowStockThreshold = 100, lastSaved, saveError }) => {
             const [moreOpen, setMoreOpen] = useState(false);
             const moreRef = useRef(null);
             useEffect(() => {
@@ -93,7 +93,11 @@
                         </nav>
 
                         <div className="flex items-center gap-2 shrink-0">
-                            {lastSaved && (
+                            {saveError ? (
+                                <div className="hidden xl:flex items-center gap-1.5 h-9 text-[11px] font-bold text-red-700 bg-red-50 px-3 rounded-full" title="آخرین ذخیره‌سازی ناموفق بود؛ از پشتیبان‌گیری یک نسخه‌ی خارجی بگیرید.">
+                                    <AlertTriangle size={13} /> ذخیره ناموفق
+                                </div>
+                            ) : lastSaved && (
                                 <div className="hidden xl:flex items-center gap-1.5 h-9 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-3 rounded-full">
                                     <CloudCheck size={13} /> ذخیره شد {lastSaved.toLocaleTimeString('fa-IR')}
                                 </div>

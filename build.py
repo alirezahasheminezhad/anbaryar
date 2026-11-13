@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
-"""ساخت index.html از روی src/ — فقط به هم‌چسباندنِ بخش‌ها به ترتیبِ MODULES.
+"""ساخت index.html از روی src/ — به‌هم‌چسباندنِ بخش‌ها به ترتیبِ MODULES و پیش‌کامپایلِ JSX.
 
 استفاده:
-    python3 build.py            # ساخت index.html
+    npm install                 # یک‌بار: نصب @babel/standalone برای پیش‌کامپایل
+    python3 build.py            # ساخت index.html (JSX از پیش کامپایل می‌شود)
     python3 build.py --check    # فقط بررسی هم‌خوانی index.html با src/ (برای CI)
 
-سرخط‌های توضیحی هر بخش با `//##` (یا `<!--##`) شروع می‌شوند و هنگام ساخت حذف می‌شوند،
+بلوکِ <script type="text/babel"> هنگام ساخت به JS ساده (React.createElement) کامپایل می‌شود
+تا مرورگر دیگر به Babel نیاز نداشته باشد (حذفِ ~۵۰۰KB و هشدارِ deopt و بارِ اولِ سریع‌تر).
+سرخط‌های توضیحیِ هر بخش با `//##` (یا `<!--##`) شروع می‌شوند و هنگام ساخت حذف می‌شوند،
 پس توضیح‌دادن یا مرتب‌کردنِ آن‌ها هرگز رفتار برنامه را تغییر نمی‌دهد.
 """
+import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -15,8 +21,8 @@ ROOT = Path(__file__).parent
 SRC = ROOT / "src"
 OUT = ROOT / "index.html"
 
-# ترتیب مهم است: همه‌ی بخش‌های .jsx داخل «یک» تگ <script type="text/babel"> قرار می‌گیرند
-# و scope مشترک دارند، پس جابه‌جاییِ بی‌دقت ترتیبِ تعریف‌ها (const) را می‌شکند.
+# ترتیب مهم است: همه‌ی بخش‌های .jsx داخل «یک» تگ <script> قرار می‌گیرند و scope مشترک دارند،
+# پس جابه‌جاییِ بی‌دقت ترتیبِ تعریف‌ها (const) را می‌شکند.
 MODULES = [
     "00-html-head.html",
     "assets/vazirmatn-font.js",
@@ -60,8 +66,31 @@ def read_part(name):
         lines.pop(0)
     return "".join(lines)
 
-def build():
+def concat():
     return "".join(read_part(m) for m in MODULES)
+
+# بلوکِ Babel از <script type="text/babel"> تا </script></body></html> (انتهای فایل) کشیده می‌شود.
+BABEL_BLOCK = re.compile(r'<script type="text/babel">([\s\S]*?)</script>\s*</body>\s*</html>')
+
+def compile_jsx(jsx):
+    node = shutil.which("node")
+    if not node:
+        sys.exit("خطا: node پیدا نشد. پیش‌کامپایلِ JSX به Node.js نیاز دارد؛ سپس: npm install")
+    proc = subprocess.run(
+        [node, str(ROOT / "tools" / "compile-jsx.js")],
+        input=jsx, text=True, capture_output=True, encoding="utf-8",
+    )
+    if proc.returncode != 0:
+        sys.exit("خطای کامپایل JSX:\n" + (proc.stderr or proc.stdout))
+    return proc.stdout
+
+def build():
+    html = concat()
+    m = BABEL_BLOCK.search(html)
+    if not m:
+        sys.exit('خطا: بلوک <script type="text/babel"> در خروجی پیدا نشد.')
+    compiled = compile_jsx(m.group(1))
+    return html[:m.start()] + "<script>\n" + compiled + "\n</script>\n</body>\n</html>" + html[m.end():]
 
 if __name__ == "__main__":
     html = build()
@@ -71,4 +100,4 @@ if __name__ == "__main__":
         print("OK: index.html is in sync with src/")
     else:
         OUT.write_text(html, encoding="utf-8", newline="")
-        print(f"built {OUT.name}: {len(html):,} chars from {len(MODULES)} parts")
+        print(f"built {OUT.name}: {len(html):,} chars from {len(MODULES)} parts (JSX precompiled)")

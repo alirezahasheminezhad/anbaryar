@@ -30,7 +30,7 @@
                         <div className="w-11 h-11 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0"><FileText size={18}/></div>
                         <div><h3 className="font-black text-slate-800">استعلام</h3><p className="text-[11px] text-slate-400 mt-0.5">ابزار مستقل استعلام قیمت/کالا — در یک محیط ایزوله اجرا می‌شود</p></div>
                     </div>
-                    <div className="w-full h-[calc(100vh-200px)] min-h-[640px] bg-[#e9eff6] rounded-3xl overflow-hidden">
+                    <div className="w-full h-[calc(100vh-200px)] min-h-[640px] bg-slate-100 rounded-3xl overflow-hidden">
                     <iframe
                         title={label}
                         srcDoc={srcDoc}

@@ -41,6 +41,7 @@
             const stock = settings?.motherBagStock || [];
             const [purchaseAmount, setPurchaseAmount] = useState({});
             const [expandedId, setExpandedId] = useState(null);
+            const askConfirm = useConfirm();
 
             const updateStock = (next) => onSaveSettings({ ...settings, motherBagStock: next });
 
@@ -51,8 +52,8 @@
             const addRow = () => {
                 updateStock([...stock, { id: 'mbs' + Date.now(), color: 'رنگ جدید', colorHex: '#cccccc', product: '', qty: 0, bagKg: 5, motherKg: 30, descriptionEnabled: true, descriptionTemplate: DEFAULT_MOTHER_BAG_TEMPLATE }]);
             };
-            const deleteRow = (id) => {
-                if (!confirm('این ردیف از موجودی کیسه مادر حذف شود؟')) return;
+            const deleteRow = async (id) => {
+                if (!(await askConfirm('این ردیف از موجودی کیسه مادر حذف شود؟'))) return;
                 updateStock(stock.filter(r => r.id !== id));
             };
             const applyPurchase = (id) => {

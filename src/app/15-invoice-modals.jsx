@@ -2,6 +2,7 @@
 //## مودال جزئیات فاکتور (InvoiceDetailsModal) و تأیید ارسال (ConfirmShipmentModal).
 //## ترتیب فایل‌ها در build.py مهم است؛ همه‌ی بخش‌ها یک scope مشترک دارند.
         const InvoiceDetailsModal = ({ invoice, onClose, settings, inventoryItems }) => {
+            const dialogRef = useDialogA11y(onClose);
             // حالت نمایشِ «فقط باقی‌مانده»: صرفاً یک فیلترِ نمایشی برای گرفتن اسکرین‌شات/نگاهِ سریع تمیز است؛
             // هیچ داده‌ای تغییر نمی‌کند و ردیف‌هایی که کاملاً «رفته‌اند» موقتاً از این لیست پنهان می‌شوند.
             const [screenshotMode, setScreenshotMode] = useState(false);
@@ -36,8 +37,8 @@
                 return it;
             });
             return (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl max-w-[96vw] w-fit min-w-[min(900px,96vw)] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div ref={dialogRef} className="bg-white rounded-3xl max-w-[96vw] w-fit min-w-[min(900px,96vw)] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                         <div className="relative bg-gradient-to-l from-indigo-700 to-indigo-600 text-white px-6 py-5 flex justify-between items-start gap-4">
                             <div className="flex items-center gap-3"><div className="w-11 h-11 rounded-2xl bg-white/15 ring-1 ring-white/25 flex items-center justify-center"><FileText size={20}/></div><div><h3 className="font-black text-lg">جزئیات فاکتور</h3><div className="text-[11px] text-indigo-100 mt-0.5">{invoice.customer} • {invoice.date}</div></div></div>
                             <div className="flex items-center gap-3"><span className={`px-3 py-1 rounded-full text-[11px] font-black ${isPendingInvoice?'bg-amber-300 text-amber-950':invoice.status==='cancelled'?'bg-red-200 text-red-900':'bg-emerald-300 text-emerald-950'}`}>{isPendingInvoice?'رزرو / در انتظار':invoice.status==='cancelled'?'لغو شده':'تکمیل شده'}</span><button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition" aria-label="بستن"><X size={20}/></button></div>
@@ -271,6 +272,7 @@
         // اگر فاکتور سررسیدِ تسویه داشته باشد، در پایان می‌پرسد مبنای سررسید همان تاریخ فاکتور بماند یا از
         // همین امروز (تاریخِ ارسال واقعی) دوباره حساب شود.
         const ConfirmShipmentModal = ({ invoice, onClose, onSubmit, invoices, motherBagStock }) => {
+            const dialogRef = useDialogA11y(onClose);
             const remainingOf = (it) => (Number(it.qty) || 0) - (Number(it.shippedQty) || 0);
             // همه‌ی ردیف‌های فاکتور (چه متصل به انبار، چه دستی/متفرقه) اگر چیزی از آن‌ها هنوز نرفته باشد،
             // همین‌جا برای تصمیم‌گیری (کامل/بخشی/لغو + تغییر وزن و قیمت همان بخش) نمایش داده می‌شوند.
@@ -434,7 +436,7 @@
 
             return (
                 <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl max-w-[96vw] w-fit min-w-[min(1100px,96vw)] max-h-[92vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                    <div ref={dialogRef} className="bg-white rounded-3xl shadow-2xl max-w-[96vw] w-fit min-w-[min(1100px,96vw)] max-h-[92vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
                         <div className="bg-gradient-to-l from-emerald-600 to-emerald-700 text-white px-4 py-3 flex items-center justify-between shrink-0">
                             <div className="flex items-center gap-2.5 font-black text-xs"><div className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center"><Check size={14}/></div> تایید نهایی / ثبت ارسال — {invoice.customer}</div>
                             <button onClick={onClose} className="p-1.5 rounded-full hover:bg-white/15 transition text-white/80 hover:text-white"><X size={18}/></button>
@@ -544,8 +546,7 @@
                         </div>
                     </div>
                     {priceDropReview && (
-                        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
-                            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-rose-200" onClick={e => e.stopPropagation()}>
+                        <DialogFrame onClose={() => setPriceDropReview(null)} closeOnBackdrop={false} backdropClassName="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[80] flex items-center justify-center p-4" panelClassName="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-rose-200" label="هشدار کاهش قیمت">
                                 <div className="bg-rose-50 border-b border-rose-200 p-4 flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center"><AlertTriangle size={22}/></div>
                                     <div><h3 className="font-black text-rose-900">قیمت پایین‌تر از خرید قبلی همین مشتری</h3><p className="text-[11px] text-rose-700 mt-0.5">برای «{invoice.customer}» این کالاها قبلاً با قیمت بالاتری فروخته شده‌اند.</p></div>
@@ -563,12 +564,10 @@
                                     <button onClick={() => setPriceDropReview(null)} className="flex-1 py-3 rounded-xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-100">بازگشت و ویرایش</button>
                                     <button onClick={() => { setPriceDropReview(null); checkMotherBagsAndProceed(); }} className="flex-1 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black">تأیید و ادامه</button>
                                 </div>
-                            </div>
-                        </div>
+                        </DialogFrame>
                     )}
                     {motherBagReview && (
-                        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
-                            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-amber-200" onClick={e => e.stopPropagation()}>
+                        <DialogFrame onClose={() => setMotherBagReview(null)} closeOnBackdrop={false} backdropClassName="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[80] flex items-center justify-center p-4" panelClassName="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-amber-200" label="تأیید مصرف کیسه مادر">
                                 <div className="bg-amber-50 border-b border-amber-200 p-4 flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center"><PackageOpen size={22}/></div>
                                     <div><h3 className="font-black text-amber-900">تأیید مصرف کیسه‌ی مادر</h3><p className="text-[11px] text-amber-700 mt-0.5">تعداد کیسه‌ی ۵ کیلویی این ردیف‌ها دقیقاً مضربی از ۶ (۳۰ کیلو) است؛ پیش‌بینی مصرف کیسه‌ی مادر را تأیید کنید.</p></div>
@@ -593,8 +592,7 @@
                                     <button onClick={() => setMotherBagReview(null)} className="flex-1 py-3 rounded-xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-100">بازگشت و ویرایش</button>
                                     <button onClick={confirmMotherBagsAndSubmit} className="flex-1 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black">تأیید مصرف و ثبت ارسال</button>
                                 </div>
-                            </div>
-                        </div>
+                        </DialogFrame>
                     )}
                 </div>
             );

@@ -12,6 +12,8 @@
             return 0;
         };
         const getLowStockState = (item, reserved = 0, globalThreshold = 100) => {
+            // آستانه یعنی «هشدار وقتی موجودیِ آزاد به زیرِ این عدد برسد»؛ پس مقدارِ دقیقاً برابرِ آستانه
+            // هنوز کمبود نیست (با <= قبلی، کالای دارای موجودیِ دقیقاً ۱۰۰ بلافاصله قرمز می‌شد).
             const custom = item?.lowStockCustomThreshold != null && Number(item.lowStockCustomThreshold) > 0;
             const threshold = custom ? Number(item.lowStockCustomThreshold) : Number(globalThreshold || 0);
             const mode = custom ? (item.lowStockThresholdMode || 'quantity') : 'quantity';
@@ -24,9 +26,9 @@
                 else if (unit === 'کیلو' || unit === 'کیلوگرم' || unit === 'kg') reservedWeightKg = Number(reserved) || 0;
                 else if (unit === 'تن' || unit === 'ton' || unit === 'tons') reservedWeightKg = (Number(reserved) || 0) * 1000;
                 const availableWeightKg = Math.max(0, getInventoryWeightKg(item) - reservedWeightKg);
-                return { isLowStock: availableWeightKg > 0 && availableWeightKg <= threshold, threshold, mode, value: availableWeightKg };
+                return { isLowStock: availableWeightKg > 0 && availableWeightKg < threshold, threshold, mode, value: availableWeightKg };
             }
-            return { isLowStock: availableQty > 0 && availableQty <= threshold, threshold, mode, value: availableQty };
+            return { isLowStock: availableQty > 0 && availableQty < threshold, threshold, mode, value: availableQty };
         };
 
         const InventoryItemCard = ({ item, reserved, onUpdateQuantity, onDelete, onEdit, onShowHistory, onMerge, onCount, grouped, lowStockThreshold = 2, warehouses }) => {
@@ -68,9 +70,10 @@
                                     <button onClick={() => onUpdateQuantity(item.id, -1)} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 rounded-lg text-slate-500 transition-all active:scale-95 shadow-sm"><Minus size={14} strokeWidth={2.5}/></button>
                                     <div className="min-w-[80px] flex flex-col items-center justify-center px-2 cursor-default">
                                         <div className={`text-lg font-black tabular-nums ${isZeroStock ? 'text-red-500' : isLowStock ? 'text-orange-500' : reserved > 0 ? 'text-amber-700' : 'text-slate-700'}`}>{availableStock}</div>
-                                        <div className="flex items-center gap-1 text-[9px] text-slate-400 font-bold -mt-1">
+                                        <div className="flex flex-wrap items-center justify-center gap-1 text-[9px] text-slate-400 font-bold -mt-1">
                                             <span>{item.unit || 'عدد'}</span>
-                                            {reserved > 0 && <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded-full ml-1" title={`${reserved} عدد رزرو شده`}><Lock size={8} /> {reserved}</span>}
+                                            {isZeroStock ? <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-red-700 bg-red-50 px-1.5 py-0.5 rounded-full" title="موجودی تمام شده"><PackageX size={8}/> اتمام</span> : isLowStock ? <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-orange-700 bg-orange-50 px-1.5 py-0.5 rounded-full" title="موجودی رو به اتمام"><AlertTriangle size={8}/> کم‌موجودی</span> : null}
+                                            {reserved > 0 && <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded-full" title={`${reserved} عدد رزرو شده`}><Lock size={8} /> {reserved}</span>}
                                         </div>
                                     </div>
                                     <button onClick={() => onUpdateQuantity(item.id, 1)} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 rounded-lg text-slate-500 transition-all active:scale-95 shadow-sm"><Plus size={14} strokeWidth={2.5}/></button>
@@ -195,6 +198,7 @@
         // بارهای رزروشده (در فاکتور، پردازش و ...) اصلاً در لیست جستجو نشان داده نمی‌شوند تا فاکتورهای
         // در انتظار خراب نشوند.
         const MergeInventoryModal = ({ baseItem, items, reservedCounts, warehouses, onClose, onConfirm }) => {
+            const dialogRef = useDialogA11y(onClose);
             const toast = useToast();
             const [search, setSearch] = useState('');
             const [selectedIds, setSelectedIds] = useState([]); // بارهای اضافه‌شده به ادغام (به‌جز خودِ baseItem)
@@ -263,8 +267,8 @@
             };
 
             return (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-2xl animate-in zoom-in-95 max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div ref={dialogRef} className="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-2xl animate-in zoom-in-95 max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-5">
                             <h3 className="font-black text-lg text-slate-800 flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><GitMerge size={17}/></div> ادغام / ترکیب بارها</h3>
                             <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 transition"><X size={20} className="text-slate-400 hover:text-red-500"/></button>
@@ -447,7 +451,7 @@
                             {(warehouses || []).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                         </select>
                     </div>
-                    <div className="md:col-span-2"><button className="w-full h-full bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 flex items-center justify-center gap-2"><Plus size={18}/> افزودن</button></div>
+                    <div className="md:col-span-2"><button className="w-full h-full bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2"><Plus size={18}/> افزودن</button></div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 border-t border-dashed border-slate-200 pt-3">
                         <div className="flex items-start gap-2">
@@ -491,6 +495,7 @@
         };
 
         const HistoryModal = ({ item, transactions, invoices, purchases = [], processingOrders = [], consignments = [], onViewDocument, onClose }) => {
+            const dialogRef = useDialogA11y(onClose);
             const history = transactions.filter(t => t.itemId === item.id).sort((a, b) => b.date - a.date);
             // وزنِ واقعیِ هر تراکنش را از روی همان سندِ متصل به آن پیدا می‌کند (نه یک محاسبه‌ی جدید) — چون خودِ
             // Transaction Log فقط تعداد را ذخیره می‌کند؛ وزن واقعی همیشه روی خودِ سند (فاکتور/خرید/پردازش/امانی) هست.
@@ -525,8 +530,8 @@
                 return map[type] || 'تراکنش';
             };
             return (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div ref={dialogRef} className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
                         <div className="bg-white p-5 border-b border-slate-100 flex justify-between items-center shrink-0">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0"><History size={18}/></div>
@@ -577,6 +582,7 @@
         };
 
         const EditItemModal = ({ item, invoices, processingOrders, purchases, warehouses, onClose, onSave }) => {
+            const dialogRef = useDialogA11y(onClose);
             const toast = useToast();
             const [data, setData] = useState({ ...item });
             const [modifyAmount, setModifyAmount] = useState('');
@@ -632,8 +638,8 @@
             const displayGrams = (g) => g >= 1000 ? `${g/1000} کیلوگرم` : `${g} گرم`;
 
             return (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <form onSubmit={handleSubmit} className="bg-white rounded-3xl p-6 w-full max-w-3xl shadow-2xl animate-in zoom-in-95 max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <form ref={dialogRef} onSubmit={handleSubmit} className="bg-white rounded-3xl p-6 w-full max-w-3xl shadow-2xl animate-in zoom-in-95 max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-5"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><Edit3 size={18}/></div><h3 className="font-black text-lg text-slate-800">ویرایش کالا</h3></div><button type="button" onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 transition"><X size={20} className="text-slate-400 hover:text-red-500"/></button></div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div className="space-y-4">
@@ -758,6 +764,7 @@
         };
 
         const ManualItemModal = ({ onClose, onAdd, items }) => {
+            const dialogRef = useDialogA11y(onClose);
             const toast = useToast();
             const [data, setData] = useState({ name: '', qty: '', weight: '', price: '', unit: 'عدد', tag: '' });
             const [linkedItem, setLinkedItem] = useState(null);
@@ -785,8 +792,8 @@
                 onAdd(data, linkedItem);
             };
             return (
-                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <form onSubmit={submit} className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95">
+                <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <form ref={dialogRef} onSubmit={submit} className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95">
                         <div className="flex items-center justify-center gap-2.5 mb-5"><div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><FilePlus size={16}/></div><h3 className="font-black text-lg text-center">ثبت کالای متفرقه</h3></div>
                         <div className="space-y-3">
                             <div className="relative">
@@ -830,13 +837,14 @@
         // پیش‌نمایش ورود اکسل: قبل از اعمال روی موجودی، برای هر ردیف نشان می‌دهد کالا جدید است یا موجود،
         // و کاربر انتخاب می‌کند: جمع بزند، جایگزین کند یا نادیده بگیرد.
         const ExcelImportPreviewModal = ({ rows: initialRows, onClose, onConfirm }) => {
+            const dialogRef = useDialogA11y(onClose);
             const [rows, setRows] = useState(initialRows);
             const setAction = (key, action) => setRows(prev => prev.map(r => r.key === key ? { ...r, action } : r));
             const newCount = rows.filter(r => !r.existingId).length;
             const matchCount = rows.filter(r => r.existingId).length;
             return (
-                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-5 w-full max-w-2xl shadow-2xl max-h-[85vh] flex flex-col">
+                <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div ref={dialogRef} className="bg-white rounded-3xl p-5 w-full max-w-2xl shadow-2xl max-h-[85vh] flex flex-col">
                         <div className="flex items-center justify-center gap-2.5 mb-1"><div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><FileSpreadsheet size={16}/></div><h3 className="font-black text-lg text-center">پیش‌نمایش ورود اکسل</h3></div>
                         <p className="text-xs text-slate-500 text-center mb-3">{rows.length} ردیف — {matchCount} مطابق با کالای موجود، {newCount} کالای جدید. قبل از اعمال روی موجودی بررسی کنید.</p>
                         <div className="overflow-y-auto flex-1 border rounded-2xl divide-y">
@@ -882,6 +890,7 @@
         // ولی وزنِ واقعیِ توزین‌شده خیلی با وزنِ موردانتظار فرق داشت، کاربر متوجه بشود (مثلاً کیسه‌ای گم شده
         // یا وزن کیسه‌ها عوض شده)، بدون این‌که خودِ وزن روی محاسبه‌ی تعداد اثر بگذارد.
         const InventoryCountModal = ({ item, onClose, onConfirm }) => {
+            const dialogRef = useDialogA11y(onClose);
             const [counted, setCounted] = useState(String(item.quantity ?? ''));
             const [actualWeight, setActualWeight] = useState('');
             const [reason, setReason] = useState('');
@@ -901,8 +910,8 @@
                 onConfirm(item.id, countedNum, reason.trim() || 'شمارش موجودی — بدون اختلاف');
             };
             return (
-                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <form onSubmit={submit} className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95">
+                <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <form ref={dialogRef} onSubmit={submit} className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95">
                         <div className="flex items-center justify-center gap-2.5 mb-1"><div className="w-9 h-9 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center"><ClipboardList size={16}/></div><h3 className="font-black text-lg text-center">شمارش موجودی</h3></div>
                         <p className="text-xs text-slate-500 text-center mb-4">{item.name} {item.brand ? `(${item.brand})` : ''}</p>
                         <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 mb-3 flex justify-between items-center text-sm">

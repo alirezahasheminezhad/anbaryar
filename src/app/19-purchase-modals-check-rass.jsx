@@ -6,12 +6,15 @@
         // می‌شد با کلیک روی «خریدها»/«تنظیمات» React خطا بدهد و صفحه سفید شود.
         // ------------------------------------------------------------------
         const NewPurchaseItemModal = ({ onClose, onAdd }) => {
+            const dialogRef = useDialogA11y(onClose);
             const [data,setData]=useState({name:'',brand:'',tag:'عمومی',unit:'عدد',qty:1,weight:0,price:0});
-            const submit=()=>{ if(!data.name.trim()) return alert('نام کالا را وارد کنید.'); onAdd({...data,name:data.name.trim(),qty:Number(data.qty)||1,weight:Number(data.weight)||0,price:Number(data.price)||0}); };
-            return <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"><div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden" onClick={e=>e.stopPropagation()}>
+            const [nameError,setNameError]=useState('');
+            const nameRef=useRef(null);
+            const submit=()=>{ if(!data.name.trim()){ setNameError('نام کالا را وارد کنید.'); nameRef.current?.focus(); return; } onAdd({...data,name:data.name.trim(),qty:Number(data.qty)||1,weight:Number(data.weight)||0,price:Number(data.price)||0}); };
+            return <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"><div ref={dialogRef} className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden" onClick={e=>e.stopPropagation()}>
                 <div className="p-5 border-b flex items-center justify-between"><div className="flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><FilePlus size={16}/></div><div><h3 className="font-black text-slate-800">افزودن کالای جدید به خرید</h3><p className="text-[10px] text-slate-400 mt-1">این کالا فعلاً در فهرست موجودی نیست و همراه خرید ثبت می‌شود.</p></div></div><button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 transition"><X size={18}/></button></div>
                 <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <label className="md:col-span-2 text-xs font-bold">نام کالا<input autoFocus value={data.name} onChange={e=>setData({...data,name:e.target.value})} className="mt-1 w-full p-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-500"/></label>
+                    <label className="md:col-span-2 text-xs font-bold">نام کالا<input autoFocus ref={nameRef} value={data.name} onChange={e=>{setData({...data,name:e.target.value}); if(nameError) setNameError('');}} className={`mt-1 w-full p-3 rounded-xl border outline-none focus:border-indigo-500 ${nameError?'border-red-400':'border-slate-200'}`}/>{nameError&&<span className="block text-[10px] font-bold text-red-600 mt-1">{nameError}</span>}</label>
                     <label className="text-xs font-bold">برند<input value={data.brand} onChange={e=>setData({...data,brand:e.target.value})} className="mt-1 w-full p-3 rounded-xl border border-slate-200"/></label>
                     <label className="text-xs font-bold">تگ<input value={data.tag} onChange={e=>setData({...data,tag:e.target.value})} className="mt-1 w-full p-3 rounded-xl border border-slate-200"/></label>
                     <label className="text-xs font-bold">واحد<select value={data.unit} onChange={e=>setData({...data,unit:e.target.value})} className="mt-1 w-full p-3 rounded-xl border border-slate-200 bg-white"><option>عدد</option><option>کیلوگرم</option><option>تن</option><option>کیسه</option><option>کارتن</option></select></label>
@@ -24,13 +27,14 @@
         };
 
         const EditPurchaseModal = ({ purchase, items, onClose, onSave }) => {
+            const dialogRef = useDialogA11y(onClose);
             const received=purchase?.status==='received';
             const [supplier,setSupplier]=useState(purchase?.supplier||''); const [date,setDate]=useState(purchase?.date||''); const [description,setDescription]=useState(purchase?.description||'');
             const [priority,setPriority]=useState(purchase?.priority||'normal'); const [countAsStock,setCountAsStock]=useState(!!purchase?.countAsStock);
             const [expectedDate,setExpectedDate]=useState(purchase?.expectedDate||'');
             const [status,setStatus]=useState(purchase?.status||'in_transit');
             const save=()=>onSave({...purchase,supplier:supplier.trim(),date,description,priority,countAsStock,expectedDate,status});
-            return <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"><div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden" onClick={e=>e.stopPropagation()}>
+            return <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"><div ref={dialogRef} className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden" onClick={e=>e.stopPropagation()}>
                 <div className="p-5 border-b flex justify-between items-center"><div className="flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><Edit3 size={16}/></div><div><h3 className="font-black text-slate-800">ویرایش خرید در راه</h3><p className="text-[10px] text-slate-400 mt-1">{received?'خرید دریافت‌شده است؛ اقلام برای جلوگیری از تغییر موجودی قفل هستند.':'اطلاعات بار، اولویت و وضعیت را ویرایش کنید.'}</p></div></div><button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 transition"><X size={18}/></button></div>
                 <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-3">
                     <label className="text-xs font-bold">فروشنده / تأمین‌کننده<input value={supplier} onChange={e=>setSupplier(e.target.value)} className="mt-1 w-full p-3 rounded-xl border border-slate-200"/></label>
@@ -56,6 +60,7 @@
         // به تاریخ مبنا اضافه می‌کنیم تا «تاریخ راس» به دست بیاید.
         const CheckRassView = ({ invoices, appSettings, onSaveSettings }) => {
             const toast = useToast();
+            const askConfirm = useConfirm();
             const startOfDay = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
             const safeDate = s => { if (!s) return null; const d = new Date(s); return Number.isNaN(d.getTime()) ? null : d; };
             const todayJ = useMemo(() => toJalaliInput(new Date().toISOString()), []);
@@ -77,7 +82,7 @@
             const updateRow = (id, patch) => setRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
             const removeRow = (id) => setRows(prev => prev.filter(r => r.id !== id));
             const addRow = () => setRows(prev => [...prev, makeRow()]);
-            const clearAll = () => { if (!confirm('همه‌ی ردیف‌های چک پاک شوند؟')) return; setRows([makeRow(), makeRow()]); };
+            const clearAll = async () => { if (!(await askConfirm('همه‌ی ردیف‌های چک پاک شوند؟'))) return; setRows([makeRow(), makeRow()]); };
 
             // فاکتورهای غیرِ لغوشده، جدیدترین اول؛ با جستجوی مشتری/تاریخ/شماره
             const invoiceOptions = useMemo(() => {

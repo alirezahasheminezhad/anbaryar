@@ -2,6 +2,7 @@
 //## خروجی‌های در انتظار: جزئیات سند، گزارش خروجی‌های در انتظار، PendingOrders.
 //## ترتیب فایل‌ها در build.py مهم است؛ همه‌ی بخش‌ها یک scope مشترک دارند.
         const DocumentDetailsModal = ({ row, onClose, inventoryItems = [] }) => {
+            const dialogRef = useDialogA11y(onClose);
             if (!row || !row.data) return null;
             const { kind, data } = row;
             const meta = {
@@ -13,8 +14,8 @@
             const rows = Array.isArray(data.items) ? data.items : [];
             const rowTotal = it => { const w=parseDecimal(it.weight),q=parseDecimal(it.qty),p=parseDecimal(it.price); return (w>0?w:q)*p; };
             const total = data.totalPrice || rows.reduce((s,it)=>s+rowTotal(it),0);
-            return <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9997] flex items-center justify-center p-4">
-                <div className="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden" onClick={e=>e.stopPropagation()}>
+            return <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[9997] flex items-center justify-center p-4">
+                <div ref={dialogRef} className="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden" onClick={e=>e.stopPropagation()}>
                     <div className="bg-gradient-to-l from-indigo-700 to-indigo-600 text-white px-6 py-5 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><div className="w-11 h-11 rounded-2xl bg-white/15 ring-1 ring-white/25 flex items-center justify-center"><FileText size={20}/></div><div><h3 className="font-black text-lg">{m.title}</h3><div className="text-[11px] text-indigo-100 mt-0.5">{m.party} • {m.date || '—'}</div></div></div><button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition" aria-label="بستن"><X size={20}/></button></div>
                     <div className="p-5 max-h-[70vh] overflow-y-auto bg-slate-50/60">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4 text-xs">
@@ -42,6 +43,7 @@
         // خریدهای در راه (که در حال ورود هستند، نه خروج) و امانی‌های در انتظار برگشت (که از قبل خارج
         // شده‌اند و منتظر خروج نیستند) در این گزارش نمی‌آیند چون معنای «قراره خارج بشود» ندارند.
         const PendingOutputsReportModal = ({ invoices, processingOrders, inventoryItems, onClose, onViewDoc }) => {
+            const dialogRef = useDialogA11y(onClose);
             const [query, setQuery] = useState('');
             const [groupBy, setGroupBy] = useState('item'); // item | party | table
 
@@ -116,8 +118,8 @@
                 </button>
             );
             return (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl animate-in zoom-in-95 overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div ref={dialogRef} className="bg-white rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl animate-in zoom-in-95 overflow-hidden" onClick={e => e.stopPropagation()}>
                         <div className="bg-gradient-to-l from-indigo-700 to-indigo-600 text-white px-6 py-5 flex justify-between items-center shrink-0">
                             <div className="flex items-center gap-3"><div className="w-11 h-11 rounded-2xl bg-white/15 ring-1 ring-white/25 flex items-center justify-center"><FileBarChart size={20}/></div><div><h3 className="font-black text-lg">گزارش جامع خروجی‌های در انتظار</h3><div className="text-[11px] text-indigo-100 mt-0.5">هر کالا قراره برای کدام فاکتور یا گیرنده برود</div></div></div>
                             <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-full transition" aria-label="بستن"><X size={20}/></button>

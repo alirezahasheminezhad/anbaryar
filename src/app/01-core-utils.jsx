@@ -23,6 +23,60 @@
             if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
             return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9);
         };
+
+        // دسترس‌پذیری مشترک همه‌ی مودال‌ها: بستن با Escape، به‌دام‌انداختن Tab داخل مودال،
+        // بازگرداندن فوکوس به عنصر قبلی هنگام بسته‌شدن، قفل اسکرول پس‌زمینه و نقش‌های ARIA.
+        // یک پشته‌ی سراسری نگه می‌داریم تا وقتی چند مودال روی هم بازند، Escape فقط بالاترین را ببندد.
+        const AY_DIALOG_STACK = [];
+        const useDialogA11y = (onClose, opts = {}) => {
+            const ref = useRef(null);
+            const onCloseRef = useRef(onClose);
+            onCloseRef.current = onClose;
+            useEffect(() => {
+                const node = ref.current;
+                if (!node) return;
+                const token = {};
+                AY_DIALOG_STACK.push(token);
+                const prevFocus = document.activeElement;
+                if (AY_DIALOG_STACK.length === 1) document.body.style.overflow = 'hidden';
+                if (!node.hasAttribute('role')) node.setAttribute('role', 'dialog');
+                node.setAttribute('aria-modal', 'true');
+                if (!node.hasAttribute('tabindex')) node.setAttribute('tabindex', '-1');
+                const focusables = () => Array.from(node.querySelectorAll(
+                    'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),[tabindex]:not([tabindex="-1"])'
+                )).filter(el => el.getClientRects().length > 0);
+                if (!node.contains(document.activeElement)) {
+                    const target = (opts.initialFocusRef && opts.initialFocusRef.current) || focusables()[0] || node;
+                    if (target && target.focus) target.focus();
+                }
+                const onKey = (e) => {
+                    if (AY_DIALOG_STACK[AY_DIALOG_STACK.length - 1] !== token) return;
+                    if (e.key === 'Escape' && opts.closeOnEscape !== false) {
+                        e.stopPropagation();
+                        if (onCloseRef.current) onCloseRef.current();
+                    } else if (e.key === 'Tab') {
+                        const f = focusables();
+                        if (f.length === 0) { e.preventDefault(); node.focus(); return; }
+                        const first = f[0], last = f[f.length - 1];
+                        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+                        else if (!node.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+                    }
+                };
+                document.addEventListener('keydown', onKey, true);
+                return () => {
+                    document.removeEventListener('keydown', onKey, true);
+                    const i = AY_DIALOG_STACK.indexOf(token);
+                    if (i > -1) AY_DIALOG_STACK.splice(i, 1);
+                    if (AY_DIALOG_STACK.length === 0) document.body.style.overflow = '';
+                    if (prevFocus && prevFocus.focus) prevFocus.focus();
+                };
+            }, []);
+            return ref;
+        };
+
+        // ارسال Toast از هر جای برنامه (حتی توابعِ غیرکامپوننت مثل چاپ) بدونِ نیاز به context.
+        const notifyToast = (msg, action, duration) => window.dispatchEvent(new CustomEvent('anbaryar:toast', { detail: { msg, action, duration } }));
         
         // تبدیل ارقام فارسی/عربی داخل یک رشته به ارقام انگلیسی و یکسان‌سازی جداکننده اعشار
         const toEnglishDigits = (val) => {
@@ -198,7 +252,7 @@
             const printableHeightPx = Math.floor((PAPER_HEIGHT_MM[paper] - 16) * PX_PER_MM);
             const printWin = window.open('', '_blank', 'width=900,height=1200');
             if (!printWin) {
-                alert('مرورگر اجازه‌ی باز شدن پنجره‌ی چاپ را نداد. لطفاً باز شدن پنجره‌های بازشو (Pop-up) را برای این صفحه مجاز کنید، یا از دکمه‌ی دانلود عکس (JPEG/PNG) استفاده کنید و همان فایل را چاپ بگیرید.');
+                notifyToast('مرورگر اجازه‌ی باز شدن پنجره‌ی چاپ را نداد. لطفاً باز شدن پنجره‌های بازشو (Pop-up) را برای این صفحه مجاز کنید، یا از دکمه‌ی دانلود عکس (JPEG/PNG) استفاده کنید و همان فایل را چاپ بگیرید.');
                 return;
             }
             printWin.document.write(`<!DOCTYPE html>

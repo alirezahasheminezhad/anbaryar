@@ -18,6 +18,11 @@
                 setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
                 setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 350);
             };
+            React.useEffect(() => {
+                const onToast = (e) => { const d = e.detail || {}; if (d.msg) show(d.msg, d.action, d.duration); };
+                window.addEventListener('anbaryar:toast', onToast);
+                return () => window.removeEventListener('anbaryar:toast', onToast);
+            }, []);
             return (
                 <ToastContext.Provider value={{ show, dismiss }}>
                     {children}
@@ -39,6 +44,31 @@
 
         // --- Confirm Modal System (جایگزین window.confirm بومی مرورگر، هماهنگ با ظاهر برنامه) ---
         const ConfirmContext = React.createContext(null);
+        const ConfirmDialog = ({ state, secondsLeft, onResult }) => {
+            const dialogRef = useDialogA11y(() => onResult(false));
+            return (
+                <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[10000] flex items-center justify-center p-4 no-print" onMouseDown={e => { if (e.target === e.currentTarget) onResult(false); }}>
+                    <div ref={dialogRef} aria-label="تأیید عملیات" className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-2xl animate-in" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-start gap-3 mb-4">
+                            <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${state.danger ? 'bg-red-100 text-red-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                <AlertTriangle size={18}/>
+                            </div>
+                            <p className="text-sm text-slate-700 leading-relaxed pt-1">{state.message}</p>
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                            <button onClick={() => onResult(false)} className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">انصراف</button>
+                            <button
+                                onClick={() => secondsLeft <= 0 && onResult(true)}
+                                disabled={secondsLeft > 0}
+                                className={`px-4 py-2 rounded-xl text-sm font-bold text-white transition flex items-center gap-1.5 ${secondsLeft > 0 ? 'bg-slate-300 cursor-not-allowed' : (state.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700')}`}
+                            >
+                                {secondsLeft > 0 ? <><Clock size={14}/> تایید ({secondsLeft})</> : 'تایید'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
         const ConfirmProvider = ({ children }) => {
             const [state, setState] = useState(null); // { message, resolve, danger, countdown }
             const [secondsLeft, setSecondsLeft] = useState(0);
@@ -61,30 +91,20 @@
             return (
                 <ConfirmContext.Provider value={confirmAction}>
                     {children}
-                    {state && (
-                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[10000] flex items-center justify-center p-4 no-print">
-                            <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-2xl animate-in" onClick={e => e.stopPropagation()}>
-                                <div className="flex items-start gap-3 mb-4">
-                                    <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${state.danger ? 'bg-red-100 text-red-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                                        <AlertTriangle size={18}/>
-                                    </div>
-                                    <p className="text-sm text-slate-700 leading-relaxed pt-1">{state.message}</p>
-                                </div>
-                                <div className="flex gap-2 justify-end">
-                                    <button onClick={() => handle(false)} className="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">انصراف</button>
-                                    <button
-                                        onClick={() => secondsLeft <= 0 && handle(true)}
-                                        disabled={secondsLeft > 0}
-                                        className={`px-4 py-2 rounded-xl text-sm font-bold text-white transition flex items-center gap-1.5 ${secondsLeft > 0 ? 'bg-slate-300 cursor-not-allowed' : (state.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700')}`}
-                                    >
-                                        {secondsLeft > 0 ? <><Clock size={14}/> تایید ({secondsLeft})</> : 'تایید'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    {state && <ConfirmDialog state={state} secondsLeft={secondsLeft} onResult={handle} />}
                 </ConfirmContext.Provider>
             );
         };
         const useConfirm = () => React.useContext(ConfirmContext);
+
+        // قابِ مشترک برای مودال‌هایی که درونِ JSX والد رندر می‌شوند (نه کامپوننتِ مستقل):
+        // همان دسترس‌پذیریِ useDialogA11y را می‌دهد بدونِ نقضِ قواعدِ hook در callback/شرط.
+        const DialogFrame = ({ onClose, backdropClassName, panelClassName, label, closeOnBackdrop = true, children }) => {
+            const dialogRef = useDialogA11y(onClose);
+            return (
+                <div className={backdropClassName} onMouseDown={closeOnBackdrop ? (e => { if (e.target === e.currentTarget && onClose) onClose(); }) : undefined}>
+                    <div ref={dialogRef} aria-label={label} className={panelClassName} onClick={e => e.stopPropagation()}>{children}</div>
+                </div>
+            );
+        };
 

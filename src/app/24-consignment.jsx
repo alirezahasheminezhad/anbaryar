@@ -5,6 +5,7 @@
         const normalizePartyName = (value) => String(value || '').trim().replace(/\s+/g, ' ');
         const consignmentItemKey = (it) => it?.itemId || `${it?.name || ''}|${it?.brand || ''}|${it?.tag || ''}`;
         const ConsignmentMergeModal = ({ record, candidates, onClose, onSubmit }) => {
+            const dialogRef = useDialogA11y(onClose);
             const [selected, setSelected] = useState([]);
             const toggle = id => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
             const itemLabel = (it) => {
@@ -29,8 +30,8 @@
             const shown = [record, ...candidates.filter(c => selected.includes(c.id))];
             const totalRows = shown.reduce((sum,c) => sum + (c.items || []).length, 0);
             return (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-5 w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+                    <div ref={dialogRef} className="bg-white rounded-3xl p-5 w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between mb-2">
                             <h3 className="font-black text-slate-800 flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><Layers size={16}/></div> ادغام امانی‌های {record.party}</h3>
                             <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition"><X size={17}/></button>
@@ -65,14 +66,15 @@
         };
 
         const ConsignmentSummaryModal = ({ summary, onClose }) => {
+            const dialogRef = useDialogA11y(onClose);
             const [mode, setMode] = useState('owed');
             const data = summary[mode] || { parties: [], totalWeight: 0, totalQty: 0 };
             const isOwed = mode === 'owed';
             const title = isOwed ? 'گزارش بدهی امانی' : 'گزارش طلب امانی';
             const emptyText = isOwed ? 'در حال حاضر بدهی امانی بازی وجود ندارد.' : 'در حال حاضر طلب امانی بازی وجود ندارد.';
             return (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[75] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl max-w-[96vw] w-fit min-w-[min(1000px,96vw)] shadow-2xl overflow-hidden max-h-[92vh] flex flex-col" onClick={e=>e.stopPropagation()}>
+                <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[75] flex items-center justify-center p-4">
+                    <div ref={dialogRef} className="bg-white rounded-3xl max-w-[96vw] w-fit min-w-[min(1000px,96vw)] shadow-2xl overflow-hidden max-h-[92vh] flex flex-col" onClick={e=>e.stopPropagation()}>
                         <div className="p-4 border-b bg-slate-50 flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0"><Scale size={18}/></div>
@@ -482,6 +484,7 @@
         // مقدار برگشتی هر ردیف پیش‌فرض «باقیمانده» تا این لحظه است، ولی آزادانه قابل تغییر است تا برگشت با تعداد بیشتر/کمتر از حد ثبت‌شده هم ثبت شود؛
         // چون این برگشت می‌تواند چندمرحله‌ای باشد، مودال هربار فقط همین محموله را می‌گیرد و منطق تجمیع/مانده در handleReturnConsignment انجام می‌شود.
         const ReturnConsignmentModal = ({ record, onClose, onSubmit }) => {
+            const dialogRef = useDialogA11y(onClose);
             const toast = useToast();
             const itemKey = (it) => it.itemId || `${it.name}|${it.brand || ''}|${it.tag || ''}`;
             const alreadyReturnedQty = (it) => {
@@ -502,8 +505,8 @@
                 onSubmit(valid);
             };
             return (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-5 w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div ref={dialogRef} className="bg-white rounded-3xl p-5 w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-3">
                             <h3 className="font-black text-slate-800 flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><Check size={16}/></div> ثبت برگشت {dirLabel} — {record.party}</h3>
                             <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 transition"><X size={18} className="text-slate-400 hover:text-red-500"/></button>
@@ -533,6 +536,7 @@
         };
 
         const EditConsignmentModal = ({ record, items, onClose, onSave }) => {
+            const dialogRef = useDialogA11y(onClose);
             const toast = useToast();
             const [party, setParty] = useState(record.party);
             const [date, setDate] = useState(record.date);
@@ -554,8 +558,8 @@
                 onSave({ ...record, party, date, description, items: cart, priority: record.priority || 'normal' });
             };
             return (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-5 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div ref={dialogRef} className="bg-white rounded-3xl p-5 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-3">
                             <h3 className="font-black text-slate-800 flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><Edit3 size={16}/></div> ویرایش امانی</h3>
                             <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 transition"><X size={18} className="text-slate-400 hover:text-red-500"/></button>

@@ -3,6 +3,7 @@
 //## ترتیب فایل‌ها در build.py مهم است؛ همه‌ی بخش‌ها یک scope مشترک دارند.
         // --- آنالیز / پردازش (Outsourced Processing) ---
         const ReturnProcessingModal = ({ items, onClose, onSubmit, expectedBags = [] }) => {
+            const dialogRef = useDialogA11y(onClose);
             const toast = useToast();
             // تعداد کیسه‌های خالی برگشتیِ واقعی؛ پیش‌فرض همان تعداد «در انتظار» است و کاربر باید عدد واقعی را وارد کند
             const [bagRows, setBagRows] = useState(() => (expectedBags || []).map(b => ({ name: b.name, unit: b.unit || 'کیسه', expected: Number(b.qty) || 0, qty: String(Number(b.qty) || 0) })));
@@ -22,8 +23,8 @@
                 onSubmit(valid, bagRows.map(b => ({ name: b.name, qty: Number(b.qty) || 0 })).filter(b => b.qty > 0));
             };
             return (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-5 w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div ref={dialogRef} className="bg-white rounded-3xl p-5 w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-3">
                             <h3 className="font-black text-slate-800 flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><RefreshCw size={16}/></div> ثبت بازگشت از پردازش</h3>
                             <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 transition"><X size={18} className="text-slate-400 hover:text-red-500"/></button>
@@ -73,6 +74,7 @@
         };
 
         const EditProcessingModal = ({ order, items, onClose, onSave }) => {
+            const dialogRef = useDialogA11y(onClose);
             const toast = useToast();
             const [recipient, setRecipient] = useState(order.recipient);
             const [date, setDate] = useState(order.date);
@@ -97,8 +99,8 @@
                 onSave({ ...order, recipient, date, description, items: cart });
             };
             return (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-5 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div ref={dialogRef} className="bg-white rounded-3xl p-5 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-3">
                             <h3 className="font-black text-slate-800 flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><Edit3 size={16}/></div> ویرایش سفارش آنالیز/پردازش</h3>
                             <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 transition"><X size={18} className="text-slate-400 hover:text-red-500"/></button>
@@ -158,12 +160,13 @@
         };
 
         const ProcessingMergeModal = ({ record, candidates, onClose, onSubmit }) => {
+            const dialogRef = useDialogA11y(onClose);
             const [selected, setSelected] = useState([]);
             const toggle = id => setSelected(prev => prev.includes(id) ? prev.filter(x=>x!==id) : [...prev,id]);
             const itemLabel = it => { const d=itemDetailParts(it); return d.length ? `${it.name} — ${d.join(' • ')}` : it.name; };
             const renderItems = (items=[]) => items.map((it,i)=><div key={i} className="flex justify-between gap-2 py-1 border-b border-slate-100 last:border-0"><span className="font-bold text-slate-700 text-[10px] truncate">{itemLabel(it)}</span><span className="text-[9px] text-slate-500 shrink-0">×{formatNumber(it.qty)}{it.weight>0?` · ${formatNumber(it.weight)}kg`:''}</span></div>);
-            return <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-                <div className="bg-white rounded-3xl p-5 w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            return <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+                <div ref={dialogRef} className="bg-white rounded-3xl p-5 w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
                     <div className="flex items-center justify-between mb-2"><h3 className="font-black text-slate-800 flex items-center gap-3"><div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><Layers size={16}/></div> ادغام آنالیزهای {record.recipient}</h3><button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition"><X size={17}/></button></div>
                     <p className="text-[10px] text-slate-400 mb-3">فقط اسناد هم‌مقصد و هم‌وضعیت ادغام می‌شوند؛ اثر موجودی دوباره محاسبه نمی‌شود.</p>
                     <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 mb-3"><div className="font-black text-indigo-800 text-sm mb-2">سند اصلی · #{record.id.slice(-6)} · {record.date}</div><div className="bg-white rounded-lg border border-indigo-100 px-3">{renderItems(record.items)}</div></div>
@@ -179,14 +182,15 @@
 
         // --- گزارش کلی آنالیز/پردازش (همان الگوی نمایش گزارش کلی امانی، برای سفارش‌های هنوز برنگشته) ---
         const ProcessingSummaryModal = ({ summary, onClose }) => {
+            const dialogRef = useDialogA11y(onClose);
             const [mode, setMode] = useState('sent');
             const data = summary[mode] || { parties: [], totalWeight: 0, totalQty: 0 };
             const isSent = mode === 'sent';
             const title = isSent ? 'گزارش کلی در حال پردازش' : 'گزارش کلی رزروشده (هنوز ارسال نشده)';
             const emptyText = isSent ? 'در حال حاضر هیچ باری نزد کارگاه‌های پردازش نیست.' : 'در حال حاضر سفارش رزروشده‌ای وجود ندارد.';
             return (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[75] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl max-w-[96vw] w-fit min-w-[min(1000px,96vw)] shadow-2xl overflow-hidden max-h-[92vh] flex flex-col" onClick={e=>e.stopPropagation()}>
+                <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-[75] flex items-center justify-center p-4">
+                    <div ref={dialogRef} className="bg-white rounded-3xl max-w-[96vw] w-fit min-w-[min(1000px,96vw)] shadow-2xl overflow-hidden max-h-[92vh] flex flex-col" onClick={e=>e.stopPropagation()}>
                         <div className="p-4 border-b bg-slate-50 flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0"><RefreshCw size={18}/></div>

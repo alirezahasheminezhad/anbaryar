@@ -9,7 +9,7 @@
         const IDB_DATA_KEY = 'secure-data';
         const IDB_FALLBACK_KEY = 'plain-data-fallback';
         const APP_SCHEMA_VERSION = 11;
-        const APP_BUILD = '10.8-offline-local';
+        const APP_BUILD = '10.10-design-a11y';
 
         // ------------------------------------------------------------------
         // امنیت و ذخیره‌سازی محلی، IndexedDB
@@ -85,20 +85,22 @@
                 if (!Number.isFinite(ttlMinutes) || ttlMinutes <= 0) { clearTrustedUnlock(); return; }
                 const raw = await crypto.subtle.exportKey('raw', key);
                 const ttl = ttlMinutes * 60 * 1000;
-                localStorage.setItem(TRUSTED_UNLOCK_KEY, JSON.stringify({ v: 3, until: Date.now() + ttl, key: b64(raw) }));
+                // کلیدِ ورود سریع در sessionStorage می‌ماند نه localStorage: با Refreshِ همین تب
+                // باز می‌ماند ولی با بستنِ تب/مرورگر پاک می‌شود و روی دیسک ذخیره نمی‌گردد.
+                sessionStorage.setItem(TRUSTED_UNLOCK_KEY, JSON.stringify({ v: 4, until: Date.now() + ttl, key: b64(raw) }));
             } catch (e) { console.warn('فعال‌سازی ورود سریع موقت انجام نشد:', e); }
         };
-        const clearTrustedUnlock = () => { try { localStorage.removeItem(TRUSTED_UNLOCK_KEY); } catch(e) {} };
+        const clearTrustedUnlock = () => { try { sessionStorage.removeItem(TRUSTED_UNLOCK_KEY); } catch(e) {} try { localStorage.removeItem(TRUSTED_UNLOCK_KEY); } catch(e) {} };
         const restoreTrustedUnlock = async () => {
             try {
-                const rec = JSON.parse(localStorage.getItem(TRUSTED_UNLOCK_KEY) || 'null');
+                const rec = JSON.parse(sessionStorage.getItem(TRUSTED_UNLOCK_KEY) || 'null');
                 if (!rec || !rec.key || Number(rec.until) <= Date.now()) { clearTrustedUnlock(); return false; }
                 AY_SECURITY.key = await crypto.subtle.importKey('raw', unb64(rec.key), {name:'AES-GCM'}, true, ['encrypt','decrypt']);
                 AY_SECURITY.unlocked = true;
                 return true;
             } catch(e) { clearTrustedUnlock(); return false; }
         };
-        const trustedUnlockRemaining = () => { try { const r=JSON.parse(localStorage.getItem(TRUSTED_UNLOCK_KEY)||'null'); return Math.max(0, Number(r?.until||0)-Date.now()); } catch(e) { return 0; } };
+        const trustedUnlockRemaining = () => { try { const r=JSON.parse(sessionStorage.getItem(TRUSTED_UNLOCK_KEY)||'null'); return Math.max(0, Number(r?.until||0)-Date.now()); } catch(e) { return 0; } };
         const makeDataPayload = (items, invoices, notes, transactions, purchases, processingOrders, consignments) => ({
             schemaVersion: APP_SCHEMA_VERSION, appBuild: APP_BUILD, updatedAt: new Date().toISOString(),
             items, invoices, notes, transactions, purchases, processingOrders, consignments
@@ -214,7 +216,13 @@
                 }
                 // localStorage فقط مسیر سوم است؛ پر بودن آن نباید داده‌ای را که در IDB ذخیره شده خراب کند.
                 if (saved) {
-                    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch (mirrorErr) { console.warn('کپی localStorage انجام نشد:', mirrorErr); }
+                    if (AY_SECURITY.key) {
+                        // وقتی رمزنگاری فعال است، نسخه‌ی متن‌ساده در localStorage نوشته نمی‌شود؛
+                        // نوشتنِ آن کلِ رمزنگاری را خنثی می‌کرد. آینه‌ی قدیمیِ به‌جامانده هم پاک می‌شود.
+                        try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+                    } else {
+                        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch (mirrorErr) { console.warn('کپی localStorage انجام نشد:', mirrorErr); }
+                    }
                     return true;
                 }
                 try {

@@ -1,0 +1,14 @@
+{
+  "name": "anbaryar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "انبار یار — ابزار ساخت (پیش‌کامپایل JSX با Babel)",
+  "scripts": {
+    "compile": "node tools/compile-jsx.js",
+    "build": "python build.py",
+    "check": "python build.py --check"
+  },
+  "devDependencies": {
+    "@babel/standalone": "7.29.14"
+  }
+}

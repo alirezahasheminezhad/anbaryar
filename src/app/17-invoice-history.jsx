@@ -345,8 +345,7 @@
                     </>)}
                     {printInv && <PrintInvoiceModal invoice={invoices.find(i => i.id === printInv.id) || printInv} settings={settings} inventoryItems={inventoryItems} onClose={() => setPrintInv(null)} />}
                     {showSelectionReport && (
-                        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowSelectionReport(false)}>
-                            <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                        <DialogFrame onClose={() => setShowSelectionReport(false)} backdropClassName="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" panelClassName="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" label="گزارش سندهای انتخاب‌شده">
                                 <div className="p-4 border-b border-slate-100 flex justify-between items-center shrink-0">
                                     <h3 className="font-bold text-slate-800 flex items-center gap-2"><FileBarChart size={18} className="text-indigo-600"/> گزارش {formatNumber(selectionTotals.count)} سند انتخاب‌شده</h3>
                                     <button onClick={() => setShowSelectionReport(false)} className="bg-slate-50 p-2 rounded-full hover:bg-red-50 hover:text-red-500"><X size={18}/></button>
@@ -368,8 +367,7 @@
                                     <div><div className="text-[10px] text-slate-400 font-bold">جمع وزن</div><div className="font-black text-slate-800">{formatNumber(selectionTotals.weight)}</div></div>
                                     <div><div className="text-[10px] text-slate-400 font-bold">جمع مبلغ</div><div className="font-black text-emerald-700">{formatNumber(selectionTotals.amount)}</div></div>
                                 </div>
-                            </div>
-                        </div>
+                        </DialogFrame>
                     )}
                 </div>
             );
