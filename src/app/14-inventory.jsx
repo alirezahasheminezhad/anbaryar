@@ -70,7 +70,7 @@
                                         <div className={`text-lg font-black tabular-nums ${isZeroStock ? 'text-red-500' : isLowStock ? 'text-orange-500' : reserved > 0 ? 'text-amber-700' : 'text-slate-700'}`}>{availableStock}</div>
                                         <div className="flex items-center gap-1 text-[9px] text-slate-400 font-bold -mt-1">
                                             <span>{item.unit || 'عدد'}</span>
-                                            {reserved > 0 && <span className="flex items-center gap-0.5 text-amber-600 bg-amber-100 px-1 rounded ml-1" title={`${reserved} عدد رزرو شده`}><Lock size={8} /> {reserved}</span>}
+                                            {reserved > 0 && <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded-full ml-1" title={`${reserved} عدد رزرو شده`}><Lock size={8} /> {reserved}</span>}
                                         </div>
                                     </div>
                                     <button onClick={() => onUpdateQuantity(item.id, 1)} className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 rounded-lg text-slate-500 transition-all active:scale-95 shadow-sm"><Plus size={14} strokeWidth={2.5}/></button>
@@ -120,18 +120,19 @@
                     {!collapsed && (
                         viewMode === 'table' ? (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-right">
+                                <table className="w-full min-w-[760px] table-fixed text-sm text-right">
+                                    <colgroup>{[13,14,11,8,8,10,6,9,21].map((w,i)=><col key={i} style={{width:w+'%'}}/>)}</colgroup>
                                     <thead className="text-slate-400 text-[11px] tracking-wide border-b border-slate-100">
                                         <tr>
-                                            <th className="whitespace-nowrap px-6 py-3.5 font-medium">برند / مدل</th>
-                                            <th className="whitespace-nowrap px-6 py-3.5 font-medium">تگ</th>
-                                            <th className="whitespace-nowrap px-6 py-3.5 font-medium">انبار</th>
-                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">موجودی</th>
-                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">رزرو</th>
-                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">قابل فروش</th>
-                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">واحد</th>
-                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">وضعیت</th>
-                                            <th className="whitespace-nowrap px-6 py-3.5 text-center font-medium">عملیات</th>
+                                            <th className="whitespace-nowrap px-3 py-3.5 font-medium">برند / مدل</th>
+                                            <th className="whitespace-nowrap px-3 py-3.5 font-medium">تگ</th>
+                                            <th className="whitespace-nowrap px-3 py-3.5 font-medium">انبار</th>
+                                            <th className="whitespace-nowrap px-3 py-3.5 text-center font-medium">موجودی</th>
+                                            <th className="whitespace-nowrap px-3 py-3.5 text-center font-medium">رزرو</th>
+                                            <th className="whitespace-nowrap px-3 py-3.5 text-center font-medium">قابل فروش</th>
+                                            <th className="whitespace-nowrap px-3 py-3.5 text-center font-medium">واحد</th>
+                                            <th className="whitespace-nowrap px-3 py-3.5 text-center font-medium">وضعیت</th>
+                                            <th className="whitespace-nowrap px-3 py-3.5 text-center font-medium">عملیات</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
@@ -141,34 +142,34 @@
                                             const itemLowState = getLowStockState(item, reserved, lowStockThreshold);
                                             return (
                                                 <tr key={item.id} className={`hover:bg-slate-50 transition ${item.quantity <= 0 ? 'bg-red-50/30' : itemLowState.isLowStock ? 'bg-orange-50/30' : ''}`}>
-                                                    <td className="px-6 py-3.5 font-bold text-slate-700">{item.brand || '—'}</td>
-                                                    <td className="px-6 py-3.5"><span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">{item.tag}</span></td>
-                                                    <td className="px-6 py-3.5 whitespace-nowrap"><WarehouseBadge warehouse={getWarehouseById(warehouses, item.warehouseId)} /></td>
-                                                    <td className="px-6 py-3.5 text-center font-black tabular-nums text-slate-700">{item.quantity}</td>
-                                                    <td className="px-6 py-3.5 text-center">
-                                                        {reserved > 0 ? <span className="text-xs text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full font-bold border border-amber-200"><Lock size={8} className="inline ml-0.5"/>{reserved}</span> : <span className="text-slate-300">—</span>}
+                                                    <td className="px-3 py-3.5 font-bold text-slate-700">{item.brand || '—'}</td>
+                                                    <td className="px-3 py-3.5"><span title={item.tag} className="inline-block max-w-full truncate align-middle text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full font-medium">{item.tag}</span></td>
+                                                    <td className="px-3 py-3.5 whitespace-nowrap"><WarehouseBadge warehouse={getWarehouseById(warehouses, item.warehouseId)} /></td>
+                                                    <td className="px-3 py-3.5 text-center font-black tabular-nums text-slate-700">{item.quantity}</td>
+                                                    <td className="px-3 py-3.5 text-center">
+                                                        {reserved > 0 ? <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full font-bold tabular-nums"><Lock size={11}/>{reserved}</span> : <span className="text-slate-400">—</span>}
                                                     </td>
-                                                    <td className="px-6 py-3.5 text-center">
+                                                    <td className="px-3 py-3.5 text-center">
                                                         <div className="flex flex-col items-center gap-1.5">
                                                             <span className={`font-black text-base tabular-nums ${avail <= 0 ? 'text-red-500' : itemLowState.isLowStock ? 'text-orange-500' : 'text-indigo-900'}`}>{avail}</span>
                                                             <div className="w-16 h-1 rounded-full bg-slate-100 overflow-hidden" aria-hidden="true"><div className={`h-full rounded-full ${avail <= 0 ? 'bg-red-400' : itemLowState.isLowStock ? 'bg-orange-400' : 'bg-indigo-600'}`} style={{ width: `${item.quantity > 0 ? Math.max(0, Math.min(100, avail / item.quantity * 100)) : 0}%` }}/></div>
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-3.5 text-center text-xs text-slate-400">{item.unit||'عدد'}</td>
-                                                    <td className="px-6 py-3.5 text-center">
+                                                    <td className="px-3 py-3.5 text-center text-xs text-slate-500">{item.unit||'عدد'}</td>
+                                                    <td className="px-3 py-3.5 text-center">
                                                         <span className={`inline-block text-[11px] font-bold px-3 py-1 rounded-full ${item.quantity <= 0 || avail <= 0 ? 'bg-red-50 text-red-600' : itemLowState.isLowStock ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-700'}`}>{item.quantity <= 0 || avail <= 0 ? 'اتمام' : itemLowState.isLowStock ? 'کم‌موجودی' : 'موجود'}</span>
                                                     </td>
-                                                    <td className="px-6 py-3.5">
-                                                        <div className="flex items-center gap-1 justify-center">
+                                                    <td className="px-3 py-3.5">
+                                                        <div className="flex flex-wrap items-center gap-1 justify-center">
                                                             <button onClick={() => onUpdateQuantity(item.id, -1)} className="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 hover:bg-red-50 hover:text-red-500 rounded-lg text-slate-400 transition active:scale-95"><Minus size={12}/></button>
                                                             <button onClick={() => onUpdateQuantity(item.id, 1)} className="w-7 h-7 flex items-center justify-center bg-white border border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg text-slate-400 transition active:scale-95"><Plus size={12}/></button>
-                                                            <button onClick={() => onEdit(item)} className="w-7 h-7 flex items-center justify-center text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition"><Edit3 size={13}/></button>
-                                                            <button onClick={() => onShowHistory(item)} className="w-7 h-7 flex items-center justify-center text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><History size={13}/></button>
-                                                            {onCount && <button onClick={(e) => { e.stopPropagation(); onCount(item); }} className="w-7 h-7 flex items-center justify-center text-slate-300 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition" title="شمارش فیزیکی موجودی"><ClipboardList size={13}/></button>}
+                                                            <button onClick={() => onEdit(item)} className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition"><Edit3 size={13}/></button>
+                                                            <button onClick={() => onShowHistory(item)} className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"><History size={13}/></button>
+                                                            {onCount && <button onClick={(e) => { e.stopPropagation(); onCount(item); }} className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition" title="شمارش فیزیکی موجودی"><ClipboardList size={13}/></button>}
                                                             {onMerge && (reserved > 0
-                                                                ? <div className="w-7 h-7 flex items-center justify-center text-slate-200 cursor-not-allowed" title="این بار رزرو دارد و قابل ادغام نیست"><GitMerge size={13}/></div>
-                                                                : <button onClick={(e) => { e.stopPropagation(); onMerge(item); }} className="w-7 h-7 flex items-center justify-center text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition" title="ادغام با بار(های) دیگر"><GitMerge size={13}/></button>)}
-                                                            <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="w-7 h-7 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition"><Trash2 size={13}/></button>
+                                                                ? <div className="w-7 h-7 flex items-center justify-center text-slate-300 cursor-not-allowed" title="این بار رزرو دارد و قابل ادغام نیست"><GitMerge size={13}/></div>
+                                                                : <button onClick={(e) => { e.stopPropagation(); onMerge(item); }} className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition" title="ادغام با بار(های) دیگر"><GitMerge size={13}/></button>)}
+                                                            <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="w-7 h-7 flex items-center justify-center text-slate-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition"><Trash2 size={13}/></button>
                                                         </div>
                                                     </td>
                                                 </tr>

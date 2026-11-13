@@ -341,7 +341,7 @@
         };
         const getWarehouseById = (warehouses, id) => (warehouses || []).find(w => w.id === id) || null;
         const WarehouseBadge = ({ warehouse, size = 'sm' }) => {
-            if (!warehouse) return <span className="text-[10px] text-slate-300">— بدون انبار —</span>;
+            if (!warehouse) return <span className="text-[10px] text-slate-500 whitespace-nowrap">— بدون انبار —</span>;
             const st = WAREHOUSE_COLOR_STYLES[warehouse.color] || WAREHOUSE_COLOR_STYLES.slate;
             return (
                 <span className={`inline-flex items-center gap-1 ${st.bg} ${st.text} border ${st.border} rounded-md font-bold ${size === 'sm' ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-1'}`}>
