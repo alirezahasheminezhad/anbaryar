@@ -6,9 +6,16 @@
   "scripts": {
     "compile": "node tools/compile-jsx.js",
     "build": "python build.py",
-    "check": "python build.py --check"
+    "check": "python build.py --check",
+    "offline": "node tools/build-offline.js"
   },
   "devDependencies": {
-    "@babel/standalone": "7.29.14"
+    "@babel/standalone": "7.29.14",
+    "html2canvas": "1.4.1",
+    "lucide": "1.72.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "tailwindcss": "3.4.17",
+    "xlsx": "0.18.5"
   }
 }

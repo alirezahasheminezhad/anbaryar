@@ -1,0 +1,17 @@
+{
+  "name": "انبار یار",
+  "short_name": "انبار یار",
+  "description": "مدیریت هوشمند موجودی، فاکتور فروش و خرید کالا",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f8fc",
+  "theme_color": "#14214f",
+  "icons": [
+    { "src": "./assets/pwa-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "./assets/pwa-icon-512.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
