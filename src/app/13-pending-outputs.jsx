@@ -230,41 +230,48 @@
                 { key: 'processing', label: 'آنالیز / ارسال', count: activeProcessing.length, cls: 'text-purple-600' },
                 { key: 'consignment', label: 'امانی', count: pendingConsignments.length, cls: 'text-teal-600' },
             ];
+            // کارت سند (خرید/پردازش/امانی): ردیف اقدامات همیشه تک‌خطی است — دکمه‌ی اصلی کشسان
+            // و دکمه‌های آیکنی جمع‌وجور و shrink-0 تا در هیچ عرضی دکمه‌ای به خط بعد نیفتد.
             const docCard = (key, accent, badge, label, title, date, items, onDetail, extra) => (
-                <div key={key} className={`bg-white border border-slate-200 border-r-4 ${accent} rounded-2xl p-4 shadow-sm hover:shadow-md transition-all`}>
-                    <div className="flex justify-between items-start gap-3 mb-3">
-                        <div className="min-w-0"><span className={`inline-block mb-1.5 text-[10px] px-2 py-0.5 rounded-full border font-black ${badge}`}>{label}</span><div className="font-black text-slate-800 text-sm truncate">{title}</div></div>
-                        <div className="text-left shrink-0"><div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold"><Calendar size={11}/> {date}</div><div className="mt-1 text-[10px] font-black text-slate-500 bg-slate-100 rounded-full px-2 py-0.5 w-fit mr-auto">{items.length} قلم</div></div>
+                <div key={key} className={`animate-in bg-white border border-slate-200 border-r-4 ${accent} rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all`}>
+                    <div className="flex justify-between items-start gap-3 mb-3.5">
+                        <div className="min-w-0"><span className={`inline-block mb-1.5 text-[10px] px-2.5 py-1 rounded-full border font-black ${badge}`}>{label}</span><div className="font-black text-slate-800 text-[15px] truncate">{title}</div></div>
+                        <div className="text-left shrink-0"><div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold"><Calendar size={11}/> {date}</div><div className="mt-1.5 text-[10px] font-black text-slate-500 bg-slate-100 rounded-full px-2.5 py-0.5 w-fit mr-auto">{items.length} قلم</div></div>
                     </div>
-                    <div className="flex flex-wrap gap-1.5 pt-3 border-t border-dashed border-slate-200">
-                        {items.map((it, idx) => (<span key={idx} className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px]"><ItemNameLabel it={it} inventoryItems={inventoryItems} isPending={true} className="font-bold text-slate-700" /><b className="text-indigo-700">×{formatNumber(it.qty || 0)}</b></span>))}
+                    <div className="flex flex-wrap gap-2 pt-3.5 border-t border-dashed border-slate-200">
+                        {items.map((it, idx) => (<span key={idx} className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px]"><ItemNameLabel it={it} inventoryItems={inventoryItems} isPending={true} className="font-bold text-slate-700" /><b className="text-indigo-700">×{formatNumber(it.qty || 0)}</b></span>))}
                     </div>
-                    <div className="mt-3 flex justify-end items-center gap-2 flex-wrap">{extra}<button type="button" onClick={onDetail} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-black transition"><Eye size={13}/> جزئیات بار</button></div>
+                    <div className="mt-4 pt-3.5 border-t border-slate-100 flex items-center gap-1.5 sm:gap-2">
+                        <button type="button" onClick={onDetail} className="flex-1 min-w-0 h-10 sm:h-11 px-2 sm:px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap"><Eye size={15} className="hidden min-[350px]:block"/> جزئیات بار</button>
+                        {extra}
+                    </div>
                 </div>
             );
 
             return (
                 <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm h-full flex flex-col">
-                    <div className="bg-gradient-to-l from-indigo-700 via-indigo-600 to-indigo-800 text-white px-5 py-5 shrink-0">
-                        <div className="flex items-center justify-between gap-3 flex-wrap">
-                            <div className="flex items-center gap-3"><div className="w-11 h-11 rounded-2xl bg-white/15 ring-1 ring-white/25 flex items-center justify-center"><Truck size={20}/></div><div><div className="font-black text-lg">خروجی‌های در انتظار</div><div className="text-[11px] text-indigo-100 mt-0.5">هنوز نهایی یا تحویل نشده‌اند • {totalCount} مورد</div></div></div>
-                            <button type="button" onClick={()=>setShowOutputsReport(true)} className="flex items-center gap-1.5 text-xs font-black bg-white text-indigo-700 hover:bg-indigo-50 px-4 py-2.5 rounded-full shadow-sm transition"><FileBarChart size={14}/> گزارش جامع خروجی‌ها</button>
+                    <div className="relative overflow-hidden bg-gradient-to-l from-indigo-700 via-indigo-600 to-indigo-800 text-white px-5 sm:px-6 py-5 sm:py-6 shrink-0">
+                        <div className="absolute -left-12 -top-20 w-48 h-48 rounded-full bg-white/10 blur-2xl pointer-events-none" aria-hidden="true"></div>
+                        <div className="relative flex flex-col gap-4">
+                            <div className="flex items-center gap-3"><div className="w-11 h-11 rounded-2xl bg-white/15 ring-1 ring-white/25 flex items-center justify-center shrink-0"><Truck size={20}/></div><div className="min-w-0"><div className="font-black text-lg">خروجی‌های در انتظار</div><div className="text-[11px] text-indigo-100 mt-0.5">هنوز نهایی یا تحویل نشده‌اند • {totalCount} مورد</div></div></div>
+                            <button type="button" onClick={()=>setShowOutputsReport(true)} className="flex items-center justify-center gap-1.5 text-xs font-black bg-white text-indigo-700 hover:bg-indigo-50 h-11 px-5 rounded-full shadow-sm transition w-full shrink-0"><FileBarChart size={14}/> گزارش جامع خروجی‌ها</button>
                         </div>
                     </div>
-                    <div className="px-4 pt-4 shrink-0">
-                        <div className="grid grid-cols-5 gap-2">
+                    <div className="px-3 sm:px-4 pt-4 shrink-0">
+                        <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
                             {tiles.map(t => (
-                                <button key={t.key} type="button" onClick={() => setPendingFilter(t.key)} className={`rounded-2xl border px-2 py-2.5 text-center transition-all ${pendingFilter===t.key ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
-                                    <div className={`text-lg font-black leading-none ${t.cls}`}>{t.count}</div>
-                                    <div className="text-[10px] font-bold text-slate-500 mt-1.5 leading-4">{t.label}</div>
+                                <button key={t.key} type="button" onClick={() => setPendingFilter(t.key)} aria-pressed={pendingFilter===t.key} className={`rounded-2xl border px-1.5 sm:px-2 py-3 text-center transition-all ${pendingFilter===t.key ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
+                                    <div className={`text-xl font-black leading-none ${t.cls}`}>{t.count}</div>
+                                    <div className="text-[10px] font-bold text-slate-500 mt-1.5 leading-4 min-h-8 flex items-center justify-center">{t.label}</div>
                                 </button>
                             ))}
                         </div>
-                        <div className="flex items-center gap-2 mt-3 text-[11px]"><span className="text-slate-400 font-bold">مرتب‌سازی:</span>
-                            {[{key:'newest',label:'جدیدترین'},{key:'oldest',label:'قدیمی‌ترین'}].map(s => (<button key={s.key} type="button" onClick={()=>setPendingFilter(s.key)} className={`px-3 py-1 rounded-full border font-bold transition ${pendingFilter===s.key?'bg-slate-800 text-white border-slate-800':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>{s.label}</button>))}
+                        <div className="flex items-center gap-2 mt-3.5 text-[11px]"><span className="text-slate-400 font-bold">مرتب‌سازی:</span>
+                            {[{key:'newest',label:'جدیدترین'},{key:'oldest',label:'قدیمی‌ترین'}].map(s => (<button key={s.key} type="button" onClick={()=>setPendingFilter(s.key)} aria-pressed={pendingFilter===s.key} className={`px-3 py-1 rounded-full border font-bold transition ${pendingFilter===s.key?'bg-slate-800 text-white border-slate-800':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>{s.label}</button>))}
+                            <span className="mr-auto text-[10px] text-slate-400 font-bold hidden sm:inline">{formatNumber(combined.length)} مورد</span>
                         </div>
                     </div>
-                    <div className="p-4 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+                    <div className="p-3 sm:p-4 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
                         {combined.length === 0 ? (
                             <div className="h-40 flex flex-col items-center justify-center text-slate-300"><PackageX size={48} className="mb-2" strokeWidth={1.5} /><p className="text-sm font-bold text-slate-400">هیچ موردی در صف نیست</p></div>
                         ) : (
@@ -272,31 +279,33 @@
                                 if (row.kind === 'invoice') {
                                     const inv = row.data;
                                     return (
-                                        <div key={`inv-${inv.id}`} className="bg-white border border-slate-200 border-r-4 border-amber-400 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
-                                            <div className="flex justify-between items-start gap-3 mb-3">
-                                                <div className="min-w-0"><span className={`inline-block mb-1.5 text-[10px] px-2 py-0.5 rounded-full border font-black ${kindMeta.invoice.badge}`}>{kindMeta.invoice.label}</span><div className="font-black text-slate-800 text-sm truncate">{inv.customer}</div></div>
-                                                <div className="text-left shrink-0"><div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold"><Calendar size={11}/> {inv.date}</div><div className="mt-1 text-[10px] font-black text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5 w-fit mr-auto">{inv.items.length} قلم</div></div>
+                                        <div key={`inv-${inv.id}`} className="animate-in bg-white border border-slate-200 border-r-4 border-amber-400 rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all">
+                                            <div className="flex justify-between items-start gap-3 mb-3.5">
+                                                <div className="min-w-0"><span className={`inline-block mb-1.5 text-[10px] px-2.5 py-1 rounded-full border font-black ${kindMeta.invoice.badge}`}>{kindMeta.invoice.label}</span><div className="font-black text-slate-800 text-[15px] truncate">{inv.customer}</div></div>
+                                                <div className="text-left shrink-0"><div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold"><Calendar size={11}/> {inv.date}</div><div className="mt-1.5 text-[10px] font-black text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2.5 py-0.5 w-fit mr-auto">{inv.items.length} قلم</div></div>
                                             </div>
-                                            <div className="flex flex-wrap gap-1.5 pt-3 border-t border-dashed border-slate-200">
+                                            <div className="flex flex-wrap gap-2 pt-3.5 border-t border-dashed border-slate-200">
                                                 {inv.items.map((i, idx) => (
-                                                    <span key={idx} className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px]">
+                                                    <span key={idx} className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px]">
                                                         <ItemNameLabel it={i} inventoryItems={inventoryItems} isPending={true} className="font-bold text-slate-700" />
                                                         {(() => { const b = resolveItemDisplay(i, inventoryItems, true).display.brand; return b && b !== 'متفرقه' && (<span className="bg-indigo-50 text-indigo-600 text-[9px] px-1.5 py-0.5 rounded border border-indigo-100 font-bold">{b}</span>); })()}
                                                         <b className="text-indigo-700">×{formatNumber(i.qty || 0)}</b>
                                                     </span>
                                                 ))}
                                             </div>
-                                            <div className="mt-3 flex items-center gap-2 flex-wrap">
-                                                <button onClick={() => setConfirmingInv(inv)} className="flex-1 min-w-[120px] py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex items-center justify-center gap-1.5 text-xs font-black transition shadow-sm"><Check size={15}/> تایید نهایی</button>
-                                                <button onClick={() => onEdit(inv)} className="w-10 h-10 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl flex items-center justify-center transition border border-blue-100" title="ویرایش" aria-label="ویرایش"><Edit3 size={15}/></button>
-                                                <button onClick={() => setPrintInv(inv)} className="w-10 h-10 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl flex items-center justify-center transition border border-indigo-100" title="چاپ" aria-label="چاپ"><Printer size={15}/></button>
-                                                <button onClick={() => onCancel(inv.id)} className="w-10 h-10 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl flex items-center justify-center transition border border-red-100" title="لغو فاکتور" aria-label="لغو فاکتور"><X size={15}/></button>
+                                            {/* ردیف اقدامات: تک‌خطی و بدون flex-wrap؛ «تایید نهایی» کشسان (min-w-0) و
+                                                آیکن‌ها shrink-0 تا دکمه‌ی حذف هرگز به خط بعد نیفتد (باگ عرض‌های کم). */}
+                                            <div className="mt-4 pt-3.5 border-t border-slate-100 flex items-center gap-1.5 sm:gap-2">
+                                                <button onClick={() => setConfirmingInv(inv)} className="flex-1 min-w-0 h-10 sm:h-11 px-2 sm:px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex items-center justify-center gap-1.5 text-xs font-black transition shadow-sm whitespace-nowrap"><Check size={15} className="hidden min-[350px]:block"/> تایید نهایی</button>
+                                                <button onClick={() => onEdit(inv)} className="w-10 h-10 sm:w-11 sm:h-11 shrink-0 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl flex items-center justify-center transition border border-blue-100" title="ویرایش" aria-label="ویرایش"><Edit3 size={15}/></button>
+                                                <button onClick={() => setPrintInv(inv)} className="w-10 h-10 sm:w-11 sm:h-11 shrink-0 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl flex items-center justify-center transition border border-indigo-100" title="چاپ" aria-label="چاپ"><Printer size={15}/></button>
+                                                <button onClick={() => onCancel(inv.id)} className="w-10 h-10 sm:w-11 sm:h-11 shrink-0 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl flex items-center justify-center transition border border-red-100" title="لغو فاکتور" aria-label="لغو فاکتور"><X size={15}/></button>
                                             </div>
                                         </div>
                                     );
                                 }
                                 if (row.kind === 'purchase') { const x = row.data; return docCard(`pur-${x.id}`, 'border-sky-400', kindMeta.purchase.badge, kindMeta.purchase.label, x.supplier, x.date, x.items, () => setDetailRow({kind:'purchase',data:x})); }
-                                if (row.kind === 'consignment') { const c = row.data; const cm = kindMeta[c.direction === 'borrowed' ? 'consignment_borrowed' : 'consignment_lent']; return docCard(`cons-${c.id}`, c.direction === 'borrowed' ? 'border-teal-400' : 'border-fuchsia-400', cm.badge, cm.label, c.party, c.date, c.items, () => setDetailRow({kind:'consignment',data:c}), (<><button type="button" onClick={() => onManageConsignment && onManageConsignment(c)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-[11px] font-black transition"><Edit3 size={13}/> ویرایش</button><button type="button" onClick={() => onDeleteConsignment && onDeleteConsignment(c.id)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-red-50 border border-red-100 hover:bg-red-100 text-red-600 text-[11px] font-black transition"><Trash2 size={13}/> حذف</button></>)); }
+                                if (row.kind === 'consignment') { const c = row.data; const cm = kindMeta[c.direction === 'borrowed' ? 'consignment_borrowed' : 'consignment_lent']; return docCard(`cons-${c.id}`, c.direction === 'borrowed' ? 'border-teal-400' : 'border-fuchsia-400', cm.badge, cm.label, c.party, c.date, c.items, () => setDetailRow({kind:'consignment',data:c}), (<><button type="button" onClick={() => onManageConsignment && onManageConsignment(c)} className="w-10 h-10 sm:w-11 sm:h-11 shrink-0 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl flex items-center justify-center transition border border-blue-100" title="ویرایش" aria-label="ویرایش"><Edit3 size={15}/></button><button type="button" onClick={() => onDeleteConsignment && onDeleteConsignment(c.id)} className="w-10 h-10 sm:w-11 sm:h-11 shrink-0 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl flex items-center justify-center transition border border-red-100" title="حذف" aria-label="حذف"><Trash2 size={15}/></button></>)); }
                                 const o = row.data;
                                 return docCard(`proc-${o.id}`, 'border-purple-400', kindMeta.processing.badge, kindMeta.processing.label, o.recipient, o.date, o.items, () => setDetailRow({kind:'processing',data:o}));
                             })

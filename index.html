@@ -97,9 +97,10 @@
       ::-webkit-scrollbar-thumb { background: #c4d4fd; border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
       ::-webkit-scrollbar-thumb:hover { background: #6b91f5; background-clip: padding-box; }
 
-      .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #c99f5e transparent; }
-      .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-      .custom-scrollbar::-webkit-scrollbar-thumb { background: #c99f5e; border-radius: 2px; }
+      .custom-scrollbar { scrollbar-width: thin; scrollbar-color: #c4d4fd transparent; }
+      .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background: #c4d4fd; border-radius: 3px; }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #6b91f5; }
 
       .animate-in { animation: fadeIn 0.3s ease-out; }
       @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -2613,7 +2614,7 @@ const IDB_STORE = 'app';
 const IDB_DATA_KEY = 'secure-data';
 const IDB_FALLBACK_KEY = 'plain-data-fallback';
 const APP_SCHEMA_VERSION = 11;
-const APP_BUILD = '10.12-pwa-icons';
+const APP_BUILD = '10.13-pending-outputs-ui';
 
 // ------------------------------------------------------------------
 // امنیت و ذخیره‌سازی محلی، IndexedDB
@@ -5077,7 +5078,7 @@ const MotherBagRow = ({
 // ===== مستندات برنامه =====
 // نگهداری: هر تغییری که در برنامه داده می‌شود، باید این متن هم به‌روز شود (و شماره‌ی نسخه/تاریخ بالای آن).
 // هدف: هر هوش مصنوعی یا هر فردی که این فایل را می‌بیند، در کمترین زمان بفهمد برنامه چیست و کجا را باید بخواند.
-const APP_DOCS_VERSION = 'v7.9 — ۱۴۰۵/۰۸/۲۳';
+const APP_DOCS_VERSION = 'v7.10 — ۱۴۰۵/۰۸/۲۳';
 const APP_DOCS_MD = `# مستندات کامل برنامه‌ی «انبار یار» (Pro Mahak Sync)
 
 نسخه‌ی مستندات: ${APP_DOCS_VERSION}
@@ -5101,7 +5102,7 @@ const APP_DOCS_MD = `# مستندات کامل برنامه‌ی «انبار ی
 
 ## ۲. ماژول‌های برنامه (منوی کناری، به ترتیب نمایش)
 هر ماژول: شناسه‌ی منو، برچسب فارسی، کامپوننت اصلی.
-1. داشبورد و موجودی (dashboard): خلاصه‌ی موجودی، آمار کلی و فاکتورهای در انتظار (رزرو).
+1. داشبورد و موجودی (dashboard): خلاصه‌ی موجودی، آمار کلی و فاکتورهای در انتظار (رزرو). ستون «خروجی‌های در انتظار» از عرض xl چهار ستون از دوازده است و در عرض‌های کمتر تمام‌عرض زیر موجودی می‌آید؛ ردیف دکمه‌های هر کارت تک‌خطی است (دکمه‌ی اصلی کشسان + آیکن‌های ثابت) و در هیچ عرضی نمی‌شکند.
 2. همگام‌سازی موجودی محک (mahak-import): خواندن فایل اکسل محک، تطبیق نام کالاها، ساخت نگاشت کالا و جایگزینی موجودی‌ها. قبل از Sync، بکاپ خودکار ساخته می‌شود.
 3. فاکتور فروش وزنی (pos): ثبت فاکتور با اقلام، هزینه‌ی بارگیری (قابل حذف برای هر فاکتور)، مهلت تسویه (متن آزاد)، سررسید دقیق، توضیحات و تأیید ارسال (بار کامل یا نیمه‌رفته). فیلد settlementTerm متن مهلت تسویه است؛ dueDate سررسید دقیق ISO است.
 4. گزارش فاکتورها (history): تاریخچه‌ی فاکتورها؛ ویرایش، تغییر تاریخ (با لاگ تغییرات dateChangeLogs)، چاپ و خروجی اکسل. فاکتورهای لغوشده (status = cancelled) در محاسبات رزرو و سررسید نادیده گرفته می‌شوند.
@@ -5261,6 +5262,7 @@ const APP_DOCS_MD = `# مستندات کامل برنامه‌ی «انبار ی
 - هر تغییر در برنامه (ماژول جدید، تغییر قانون محاسبه، فیلد جدید، تغییر نام کامپوننت) باید در همین متن ثبت شود.
 - شماره‌ی نسخه و تاریخ بالای همین بخش را با هر تغییر به‌روز کن.
 - تاریخچه‌ی تغییرات:
+  - v7.10 (build 10.13): بازطراحی بصری «خروجی‌های در انتظار» (فقط لایه‌ی ظاهر): رفع افتادن دکمه‌ی لغو به خط بعد در موبایل (ردیف اقدامات تک‌خطی با دکمه‌ی اصلی کشسان و آیکن‌های shrink-0، بدون flex-wrap)؛ فاصله‌گذاری بازتر کارت‌ها/چیپ‌ها/کاشی‌های فیلتر؛ دکمه‌ی گزارش در موبایل تمام‌عرض؛ ستون این بخش در xl از ۳ به ۴ ستون و در عرض‌های کمتر تمام‌عرض؛ اسکرول‌بار لیست هم‌رنگ پالت سرمه‌ای؛ دکمه‌های ویرایش/حذف امانی آیکنی و هم‌اندازه‌ی کارت فاکتور.
   - v7.9 (build 10.11): ساخت نسخه‌ی آفلاین تک‌فایلی توسط خود GitHub (tools/build-offline.js + workflow offline-build؛ خروجی Artifact/Release بدون هیچ fetch از CDN، کتابخانه‌ها از npm و تیلویند از پیش کامپایل می‌شود)؛ افزودن PWA قابل‌نصب ویندوز/موبایل با manifest و service worker و آیکن (ثبت فقط روی https)؛ رفع باگ تفسیر الگوهای replace هنگام inline کردن کتابخانه‌ها.
   - v7.8 (build 10.10): یکسان‌سازی سیستم دیزاین در همه‌ی بخش‌ها (پس‌زمینه‌ی مودال‌ها به توکن سرمه‌ای slate-950، گردی‌ها به مقیاس rounded-2xl/3xl، حذف رنگ‌های hex hardcoded و سایه‌های روشنِ خارج از پالت، اصلاح نگاشت رنگ یادداشت‌ها به پالت معنایی)؛ تکمیل دسترس‌پذیری مودال‌های inline در POS (بارگیری/تسویه، کاهش قیمت، کسری موجودی، کیسه‌ی مادر، ویرایش ردیف) با DialogFrame (Escape/focus-trap/role=dialog/بازگردانی فوکوس).
   - v7.7 (build 10.9): پیش‌کامپایل JSX در build و حذف Babel مرورگر؛ امنیت opt-in (ورود بدون رمز/دمو + بنر یادآور + فعال‌سازی از بخش امنیت)؛ حذف آینه‌ی متن‌ساده هنگام رمزنگاری فعال؛ کلید ورود موقت در sessionStorage؛ حداقل رمز ۸ کاراکتر + سنجه‌ی قدرت؛ فرم تغییر رمز ماسک‌دار؛ یکدست‌سازی دیالوگ‌های بومی با Toast/Confirm؛ دسترس‌پذیری مودال‌ها (Escape/focus-trap/بازگردانی فوکوس)؛ اعتبارسنجی درون‌خطی مشتری در POS؛ empty-state داشبورد؛ مسیریابی سبک با location.hash (back/refresh/deep-link)؛ اصلاح مرز آستانه‌ی کمبود؛ نشانگر وضعیت آیکن+متن در کارت‌ها؛ سررسید POS با «تنظیم دقیق» تاشو؛ شاخص ذخیره‌ی صادقانه (await/catch) + debounce.
@@ -6381,17 +6383,19 @@ const PendingOrders = ({
     count: pendingConsignments.length,
     cls: 'text-teal-600'
   }];
+  // کارت سند (خرید/پردازش/امانی): ردیف اقدامات همیشه تک‌خطی است — دکمه‌ی اصلی کشسان
+  // و دکمه‌های آیکنی جمع‌وجور و shrink-0 تا در هیچ عرضی دکمه‌ای به خط بعد نیفتد.
   const docCard = (key, accent, badge, label, title, date, items, onDetail, extra) => /*#__PURE__*/React.createElement("div", {
     key: key,
-    className: `bg-white border border-slate-200 border-r-4 ${accent} rounded-2xl p-4 shadow-sm hover:shadow-md transition-all`
+    className: `animate-in bg-white border border-slate-200 border-r-4 ${accent} rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all`
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex justify-between items-start gap-3 mb-3"
+    className: "flex justify-between items-start gap-3 mb-3.5"
   }, /*#__PURE__*/React.createElement("div", {
     className: "min-w-0"
   }, /*#__PURE__*/React.createElement("span", {
-    className: `inline-block mb-1.5 text-[10px] px-2 py-0.5 rounded-full border font-black ${badge}`
+    className: `inline-block mb-1.5 text-[10px] px-2.5 py-1 rounded-full border font-black ${badge}`
   }, label), /*#__PURE__*/React.createElement("div", {
-    className: "font-black text-slate-800 text-sm truncate"
+    className: "font-black text-slate-800 text-[15px] truncate"
   }, title)), /*#__PURE__*/React.createElement("div", {
     className: "text-left shrink-0"
   }, /*#__PURE__*/React.createElement("div", {
@@ -6399,12 +6403,12 @@ const PendingOrders = ({
   }, /*#__PURE__*/React.createElement(Calendar, {
     size: 11
   }), " ", date), /*#__PURE__*/React.createElement("div", {
-    className: "mt-1 text-[10px] font-black text-slate-500 bg-slate-100 rounded-full px-2 py-0.5 w-fit mr-auto"
+    className: "mt-1.5 text-[10px] font-black text-slate-500 bg-slate-100 rounded-full px-2.5 py-0.5 w-fit mr-auto"
   }, items.length, " \u0642\u0644\u0645"))), /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-wrap gap-1.5 pt-3 border-t border-dashed border-slate-200"
+    className: "flex flex-wrap gap-2 pt-3.5 border-t border-dashed border-slate-200"
   }, items.map((it, idx) => /*#__PURE__*/React.createElement("span", {
     key: idx,
-    className: "inline-flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px]"
+    className: "inline-flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px]"
   }, /*#__PURE__*/React.createElement(ItemNameLabel, {
     it: it,
     inventoryItems: inventoryItems,
@@ -6413,51 +6417,58 @@ const PendingOrders = ({
   }), /*#__PURE__*/React.createElement("b", {
     className: "text-indigo-700"
   }, "\xD7", formatNumber(it.qty || 0))))), /*#__PURE__*/React.createElement("div", {
-    className: "mt-3 flex justify-end items-center gap-2 flex-wrap"
-  }, extra, /*#__PURE__*/React.createElement("button", {
+    className: "mt-4 pt-3.5 border-t border-slate-100 flex items-center gap-1.5 sm:gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: onDetail,
-    className: "flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-black transition"
+    className: "flex-1 min-w-0 h-10 sm:h-11 px-2 sm:px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-black transition flex items-center justify-center gap-1.5 whitespace-nowrap"
   }, /*#__PURE__*/React.createElement(Eye, {
-    size: 13
-  }), " \u062C\u0632\u0626\u06CC\u0627\u062A \u0628\u0627\u0631")));
+    size: 15,
+    className: "hidden min-[350px]:block"
+  }), " \u062C\u0632\u0626\u06CC\u0627\u062A \u0628\u0627\u0631"), extra));
   return /*#__PURE__*/React.createElement("div", {
     className: "bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm h-full flex flex-col"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-gradient-to-l from-indigo-700 via-indigo-600 to-indigo-800 text-white px-5 py-5 shrink-0"
+    className: "relative overflow-hidden bg-gradient-to-l from-indigo-700 via-indigo-600 to-indigo-800 text-white px-5 sm:px-6 py-5 sm:py-6 shrink-0"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between gap-3 flex-wrap"
+    className: "absolute -left-12 -top-20 w-48 h-48 rounded-full bg-white/10 blur-2xl pointer-events-none",
+    "aria-hidden": "true"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "relative flex flex-col gap-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-3"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "w-11 h-11 rounded-2xl bg-white/15 ring-1 ring-white/25 flex items-center justify-center"
+    className: "w-11 h-11 rounded-2xl bg-white/15 ring-1 ring-white/25 flex items-center justify-center shrink-0"
   }, /*#__PURE__*/React.createElement(Truck, {
     size: 20
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "min-w-0"
+  }, /*#__PURE__*/React.createElement("div", {
     className: "font-black text-lg"
   }, "\u062E\u0631\u0648\u062C\u06CC\u200C\u0647\u0627\u06CC \u062F\u0631 \u0627\u0646\u062A\u0638\u0627\u0631"), /*#__PURE__*/React.createElement("div", {
     className: "text-[11px] text-indigo-100 mt-0.5"
   }, "\u0647\u0646\u0648\u0632 \u0646\u0647\u0627\u06CC\u06CC \u06CC\u0627 \u062A\u062D\u0648\u06CC\u0644 \u0646\u0634\u062F\u0647\u200C\u0627\u0646\u062F \u2022 ", totalCount, " \u0645\u0648\u0631\u062F"))), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setShowOutputsReport(true),
-    className: "flex items-center gap-1.5 text-xs font-black bg-white text-indigo-700 hover:bg-indigo-50 px-4 py-2.5 rounded-full shadow-sm transition"
+    className: "flex items-center justify-center gap-1.5 text-xs font-black bg-white text-indigo-700 hover:bg-indigo-50 h-11 px-5 rounded-full shadow-sm transition w-full shrink-0"
   }, /*#__PURE__*/React.createElement(FileBarChart, {
     size: 14
   }), " \u06AF\u0632\u0627\u0631\u0634 \u062C\u0627\u0645\u0639 \u062E\u0631\u0648\u062C\u06CC\u200C\u0647\u0627"))), /*#__PURE__*/React.createElement("div", {
-    className: "px-4 pt-4 shrink-0"
+    className: "px-3 sm:px-4 pt-4 shrink-0"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-5 gap-2"
+    className: "grid grid-cols-5 gap-1.5 sm:gap-2"
   }, tiles.map(t => /*#__PURE__*/React.createElement("button", {
     key: t.key,
     type: "button",
     onClick: () => setPendingFilter(t.key),
-    className: `rounded-2xl border px-2 py-2.5 text-center transition-all ${pendingFilter === t.key ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`
+    "aria-pressed": pendingFilter === t.key,
+    className: `rounded-2xl border px-1.5 sm:px-2 py-3 text-center transition-all ${pendingFilter === t.key ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'}`
   }, /*#__PURE__*/React.createElement("div", {
-    className: `text-lg font-black leading-none ${t.cls}`
+    className: `text-xl font-black leading-none ${t.cls}`
   }, t.count), /*#__PURE__*/React.createElement("div", {
-    className: "text-[10px] font-bold text-slate-500 mt-1.5 leading-4"
+    className: "text-[10px] font-bold text-slate-500 mt-1.5 leading-4 min-h-8 flex items-center justify-center"
   }, t.label)))), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-2 mt-3 text-[11px]"
+    className: "flex items-center gap-2 mt-3.5 text-[11px]"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-slate-400 font-bold"
   }, "\u0645\u0631\u062A\u0628\u200C\u0633\u0627\u0632\u06CC:"), [{
@@ -6470,9 +6481,12 @@ const PendingOrders = ({
     key: s.key,
     type: "button",
     onClick: () => setPendingFilter(s.key),
+    "aria-pressed": pendingFilter === s.key,
     className: `px-3 py-1 rounded-full border font-bold transition ${pendingFilter === s.key ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`
-  }, s.label)))), /*#__PURE__*/React.createElement("div", {
-    className: "p-4 space-y-3 overflow-y-auto flex-1 custom-scrollbar"
+  }, s.label)), /*#__PURE__*/React.createElement("span", {
+    className: "mr-auto text-[10px] text-slate-400 font-bold hidden sm:inline"
+  }, formatNumber(combined.length), " \u0645\u0648\u0631\u062F"))), /*#__PURE__*/React.createElement("div", {
+    className: "p-3 sm:p-4 space-y-3 overflow-y-auto flex-1 custom-scrollbar"
   }, combined.length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "h-40 flex flex-col items-center justify-center text-slate-300"
   }, /*#__PURE__*/React.createElement(PackageX, {
@@ -6486,15 +6500,15 @@ const PendingOrders = ({
       const inv = row.data;
       return /*#__PURE__*/React.createElement("div", {
         key: `inv-${inv.id}`,
-        className: "bg-white border border-slate-200 border-r-4 border-amber-400 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all"
+        className: "animate-in bg-white border border-slate-200 border-r-4 border-amber-400 rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all"
       }, /*#__PURE__*/React.createElement("div", {
-        className: "flex justify-between items-start gap-3 mb-3"
+        className: "flex justify-between items-start gap-3 mb-3.5"
       }, /*#__PURE__*/React.createElement("div", {
         className: "min-w-0"
       }, /*#__PURE__*/React.createElement("span", {
-        className: `inline-block mb-1.5 text-[10px] px-2 py-0.5 rounded-full border font-black ${kindMeta.invoice.badge}`
+        className: `inline-block mb-1.5 text-[10px] px-2.5 py-1 rounded-full border font-black ${kindMeta.invoice.badge}`
       }, kindMeta.invoice.label), /*#__PURE__*/React.createElement("div", {
-        className: "font-black text-slate-800 text-sm truncate"
+        className: "font-black text-slate-800 text-[15px] truncate"
       }, inv.customer)), /*#__PURE__*/React.createElement("div", {
         className: "text-left shrink-0"
       }, /*#__PURE__*/React.createElement("div", {
@@ -6502,12 +6516,12 @@ const PendingOrders = ({
       }, /*#__PURE__*/React.createElement(Calendar, {
         size: 11
       }), " ", inv.date), /*#__PURE__*/React.createElement("div", {
-        className: "mt-1 text-[10px] font-black text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5 w-fit mr-auto"
+        className: "mt-1.5 text-[10px] font-black text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2.5 py-0.5 w-fit mr-auto"
       }, inv.items.length, " \u0642\u0644\u0645"))), /*#__PURE__*/React.createElement("div", {
-        className: "flex flex-wrap gap-1.5 pt-3 border-t border-dashed border-slate-200"
+        className: "flex flex-wrap gap-2 pt-3.5 border-t border-dashed border-slate-200"
       }, inv.items.map((i, idx) => /*#__PURE__*/React.createElement("span", {
         key: idx,
-        className: "inline-flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px]"
+        className: "inline-flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px]"
       }, /*#__PURE__*/React.createElement(ItemNameLabel, {
         it: i,
         inventoryItems: inventoryItems,
@@ -6521,29 +6535,30 @@ const PendingOrders = ({
       })(), /*#__PURE__*/React.createElement("b", {
         className: "text-indigo-700"
       }, "\xD7", formatNumber(i.qty || 0))))), /*#__PURE__*/React.createElement("div", {
-        className: "mt-3 flex items-center gap-2 flex-wrap"
+        className: "mt-4 pt-3.5 border-t border-slate-100 flex items-center gap-1.5 sm:gap-2"
       }, /*#__PURE__*/React.createElement("button", {
         onClick: () => setConfirmingInv(inv),
-        className: "flex-1 min-w-[120px] py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex items-center justify-center gap-1.5 text-xs font-black transition shadow-sm"
+        className: "flex-1 min-w-0 h-10 sm:h-11 px-2 sm:px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex items-center justify-center gap-1.5 text-xs font-black transition shadow-sm whitespace-nowrap"
       }, /*#__PURE__*/React.createElement(Check, {
-        size: 15
+        size: 15,
+        className: "hidden min-[350px]:block"
       }), " \u062A\u0627\u06CC\u06CC\u062F \u0646\u0647\u0627\u06CC\u06CC"), /*#__PURE__*/React.createElement("button", {
         onClick: () => onEdit(inv),
-        className: "w-10 h-10 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl flex items-center justify-center transition border border-blue-100",
+        className: "w-10 h-10 sm:w-11 sm:h-11 shrink-0 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl flex items-center justify-center transition border border-blue-100",
         title: "\u0648\u06CC\u0631\u0627\u06CC\u0634",
         "aria-label": "\u0648\u06CC\u0631\u0627\u06CC\u0634"
       }, /*#__PURE__*/React.createElement(Edit3, {
         size: 15
       })), /*#__PURE__*/React.createElement("button", {
         onClick: () => setPrintInv(inv),
-        className: "w-10 h-10 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl flex items-center justify-center transition border border-indigo-100",
+        className: "w-10 h-10 sm:w-11 sm:h-11 shrink-0 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-xl flex items-center justify-center transition border border-indigo-100",
         title: "\u0686\u0627\u067E",
         "aria-label": "\u0686\u0627\u067E"
       }, /*#__PURE__*/React.createElement(Printer, {
         size: 15
       })), /*#__PURE__*/React.createElement("button", {
         onClick: () => onCancel(inv.id),
-        className: "w-10 h-10 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl flex items-center justify-center transition border border-red-100",
+        className: "w-10 h-10 sm:w-11 sm:h-11 shrink-0 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl flex items-center justify-center transition border border-red-100",
         title: "\u0644\u063A\u0648 \u0641\u0627\u06A9\u062A\u0648\u0631",
         "aria-label": "\u0644\u063A\u0648 \u0641\u0627\u06A9\u062A\u0648\u0631"
       }, /*#__PURE__*/React.createElement(X, {
@@ -6566,16 +6581,20 @@ const PendingOrders = ({
       }), /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => onManageConsignment && onManageConsignment(c),
-        className: "flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-[11px] font-black transition"
+        className: "w-10 h-10 sm:w-11 sm:h-11 shrink-0 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl flex items-center justify-center transition border border-blue-100",
+        title: "\u0648\u06CC\u0631\u0627\u06CC\u0634",
+        "aria-label": "\u0648\u06CC\u0631\u0627\u06CC\u0634"
       }, /*#__PURE__*/React.createElement(Edit3, {
-        size: 13
-      }), " \u0648\u06CC\u0631\u0627\u06CC\u0634"), /*#__PURE__*/React.createElement("button", {
+        size: 15
+      })), /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => onDeleteConsignment && onDeleteConsignment(c.id),
-        className: "flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-red-50 border border-red-100 hover:bg-red-100 text-red-600 text-[11px] font-black transition"
+        className: "w-10 h-10 sm:w-11 sm:h-11 shrink-0 bg-red-50 text-red-500 hover:bg-red-100 rounded-xl flex items-center justify-center transition border border-red-100",
+        title: "\u062D\u0630\u0641",
+        "aria-label": "\u062D\u0630\u0641"
       }, /*#__PURE__*/React.createElement(Trash2, {
-        size: 13
-      }), " \u062D\u0630\u0641")));
+        size: 15
+      }))));
     }
     const o = row.data;
     return docCard(`proc-${o.id}`, 'border-purple-400', kindMeta.processing.badge, kindMeta.processing.label, o.recipient, o.date, o.items, () => setDetailRow({
@@ -19840,9 +19859,9 @@ const App = () => {
     view: view,
     setView: navigateTo
   }), view === 'dashboard' && /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-1 lg:grid-cols-12 gap-6"
+    className: "grid grid-cols-1 xl:grid-cols-12 gap-6"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "lg:col-span-9 flex flex-col gap-5 min-w-0"
+    className: "xl:col-span-8 flex flex-col gap-5 min-w-0"
   }, /*#__PURE__*/React.createElement(InventoryStats, {
     items: items,
     invoices: invoices,
@@ -19980,7 +19999,7 @@ const App = () => {
     lowStockThreshold: appSettings.lowStockThreshold ?? 100,
     warehouses: appSettings.warehouses
   }))))), /*#__PURE__*/React.createElement("div", {
-    className: "lg:col-span-3 h-full"
+    className: "xl:col-span-4 h-full"
   }, /*#__PURE__*/React.createElement(PendingOrders, {
     invoices: invoices,
     onFinalizeShipment: handleFinalizeInvoiceWithShipments,

@@ -1214,8 +1214,8 @@
                         </div>
                         <GroupTabs view={view} setView={navigateTo} />
                         {view === 'dashboard' && (
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                                <div className="lg:col-span-9 flex flex-col gap-5 min-w-0">
+                            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                                <div className="xl:col-span-8 flex flex-col gap-5 min-w-0">
                                     <InventoryStats items={items} invoices={invoices} processingOrders={processingOrders} purchases={purchases} />
 
                                     {/* جستجو + فیلتر انبار + نمای فهرست (چیپ‌های گرد مثل رابط مرجع) */}
@@ -1283,7 +1283,7 @@
                                     </div>
                                     </div>
                                 </div>
-                                <div className="lg:col-span-3 h-full">
+                                <div className="xl:col-span-4 h-full">
                                     <PendingOrders invoices={invoices} onFinalizeShipment={handleFinalizeInvoiceWithShipments} onCancel={handleCancelPending} onEdit={(inv)=>{setEditingInvoice(inv); setView('pos');}} settings={appSettings} inventoryItems={items} purchases={purchases} processingOrders={processingOrders} consignments={consignments} onNavigate={navigateTo} onDeleteConsignment={handleDeleteConsignment} onManageConsignment={(c)=>{ setConsignFocus(c.party || ''); navigateTo('consignments'); }} />
                                 </div>
                             </div>
