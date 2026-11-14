@@ -17,7 +17,7 @@ PWA (manifest / sw.js / آیکن) می‌سازد.
 
 خروجی:
   • <name>-offline.html  → با دو بار کلیک، کاملاً آفلاین در هر مرورگری.
-  • manifest.webmanifest / sw.js / pwa-icon.svg / pwa-icon-512.png
+  • manifest.webmanifest / sw.js / pwa-icon.svg / pwa-icon-192.png / pwa-icon-512.png
       → اگر همین پوشه روی https سرو شود، برنامه به‌صورت PWA قابل نصب است
         (کروم/اج: دکمه‌ی Install) و با service worker آفلاین هم کار می‌کند.
 """
@@ -182,6 +182,7 @@ def write_pwa_sidecars(out_dir, out_name):
                 '<path d="M112 176 256 256 400 176"/><path d="M256 256v160"/></g>'
                 '<circle cx="256" cy="256" r="34" fill="#fde9d9"/></svg>')
     (out_dir / 'pwa-icon.svg').write_text(icon_svg, encoding='utf-8')
+    (out_dir / 'pwa-icon-192.png').write_bytes(make_icon_png(192))
     (out_dir / 'pwa-icon-512.png').write_bytes(make_icon_png(512))
     manifest = {
         'name': 'انبار یار', 'short_name': 'انبار یار',
@@ -190,16 +191,16 @@ def write_pwa_sidecars(out_dir, out_name):
         'display': 'standalone', 'orientation': 'any',
         'background_color': '#f5f8fc', 'theme_color': '#14214f',
         'icons': [
-            {'src': './pwa-icon.svg', 'sizes': '192x192', 'type': 'image/svg+xml', 'purpose': 'any'},
-            {'src': './pwa-icon.svg', 'sizes': '512x512', 'type': 'image/svg+xml', 'purpose': 'any'},
+            {'src': './pwa-icon-192.png', 'sizes': '192x192', 'type': 'image/png', 'purpose': 'any'},
+            {'src': './pwa-icon-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'any'},
+            {'src': './pwa-icon-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'maskable'},
             {'src': './pwa-icon.svg', 'sizes': 'any', 'type': 'image/svg+xml', 'purpose': 'any'},
-            {'src': './pwa-icon-512.png', 'sizes': '512x512', 'type': 'image/png', 'purpose': 'any maskable'},
         ],
     }
     (out_dir / 'manifest.webmanifest').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
     sw = """/* Service worker ساخت خودکار: پوسته را precache می‌کند تا PWA آفلاین کار کند. */
 const CACHE = 'anbaryar-offline-auto';
-const SHELL = ['./', './%s', './manifest.webmanifest', './pwa-icon.svg', './pwa-icon-512.png'];
+const SHELL = ['./', './%s', './manifest.webmanifest', './pwa-icon.svg', './pwa-icon-192.png', './pwa-icon-512.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {

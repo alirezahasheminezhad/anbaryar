@@ -1,7 +1,7 @@
 /* Service worker انبار یار: پوسته‌ی برنامه را precache و کتابخانه‌های CDN را runtime cache می‌کند
    تا نسخه‌ی نصب‌شده (PWA) بدون اینترنت هم اجرا شود. فقط روی https ثبت می‌شود. */
-const CACHE = 'anbaryar-v10.11';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './assets/pwa-icon.svg', './assets/pwa-icon-512.png'];
+const CACHE = 'anbaryar-v10.12';
+const SHELL = ['./', './index.html', './manifest.webmanifest', './assets/pwa-icon.svg', './assets/pwa-icon-192.png', './assets/pwa-icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
