@@ -62,7 +62,7 @@
             return { kind: 'unknown', weightKg: 0 };
         };
 
-        const convertMahakKgToTarget = (kg, item, explicitWeightKg, forcePackage, mahakQty2) => {
+        const convertMahakKgToTarget = (kg, item, explicitWeightKg, forcePackage, mahakQty2, mahakUnit) => {
             const n = Number(kg);
             if (!Number.isFinite(n)) return { ok:false, value:0, reason:'موجودی محک عددی نیست.' };
             const mode = getMahakTargetMode(item, explicitWeightKg, forcePackage);
@@ -85,7 +85,128 @@
             if (Number.isFinite(directQty2) && directQty2 > 0) {
                 return { ok:true, value:directQty2, mode:'package-direct', remainder:0, weightKg:mode.weightKg || 0 };
             }
+            // «معیار محک» برای کالاهایی که واحدِ خودِ محک غیرکیلوگرم است ولی «موجودی ۲» ندارند (مثلاً «عدد»):
+            // همان عددِ ستون «موجودی» عیناً تعداد در همان واحد است. این حالت وقتی پیش می‌آید که کالای متناظر
+            // قبلاً با معیار محک ساخته شده (واحدش همان واحدِ فایل است) و حالا همان فایل دوباره Sync می‌شود;
+            // بدون این fallback، Syncِ دوم برای این ردیف‌ها خطای تبدیل می‌داد و idempotency می‌شکست.
+            const srcUnit = normalizeMahakUnit(mahakUnit);
+            const itemUnit = normalizeMahakUnit(item?.unit);
+            if (srcUnit && itemUnit && srcUnit !== 'کیلوگرم' && srcUnit === itemUnit) {
+                return { ok:true, value:n, mode:'direct', remainder:0, weightKg:0 };
+            }
             return { ok:false, value:0, reason:'واحد کالا کیلو نیست، وزن بسته/کارتن هم تعریف نشده و فایل محک برای این ردیف تعداد مستقیم (موجودی ۲) نداده است.' };
+        };
+
+        // یکسان‌سازی واحدِ فایل محک با واحدهای داخلی («کيلو گرم» → «کیلوگرم» و ...)
+        const normalizeMahakUnit = (u) => {
+            const s = String(u || '').replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/\s+/g,' ').trim();
+            if (!s) return '';
+            if (['کیلو گرم','کیلوگرم','کیلو','kg','کیلوگرم '].includes(s)) return 'کیلوگرم';
+            return s;
+        };
+
+        // «معیار محک»: کالای جدیدی که از فایل محک ساخته می‌شود باید همان واحد و تعدادِ خودِ محک را داشته باشد،
+        // نه کیلوگرمِ حدسی. اولویت: «موجودی ۲»+«واحد ۲» (تعداد دقیق کیسه/کارتنِ خود محک) → واحد اصلی فایل
+        // (مثلاً «عدد» برای کیسه‌ی خالی) → کیلوگرم. قبلاً همه‌ی کالاهای جدید به‌زور کیلوگرم می‌شدند و
+        // پیش‌نمایش بازبینی عددِ کیسه را نشان می‌داد ولی Sync همان را کیلو ثبت می‌کرد.
+        const getMahakStandardTarget = (r) => {
+            const q2 = Number(r.mahakQty2);
+            const u2 = normalizeMahakUnit(r.mahakUnit2);
+            if (Number.isFinite(q2) && q2 > 0 && u2) return { unit:u2, value:q2, mode:'package-direct' };
+            const u = normalizeMahakUnit(r.mahakUnit);
+            const q = Number(r.mahakKg);
+            if (u && u !== 'کیلوگرم' && Number.isFinite(q)) return { unit:u, value:q, mode:'direct' };
+            return { unit:'کیلوگرم', value:Number.isFinite(q) ? q : 0, mode:'kg' };
+        };
+        // پیش‌نمایشِ ردیفی که قرار است خودکار ساخته شود باید دقیقاً همان چیزی باشد که ساخته می‌شود.
+        const mahakStandardConv = (r) => { const std = getMahakStandardTarget(r); return { ok:true, value:std.value, mode:std.mode, remainder:0, weightKg:0, stdUnit:std.unit }; };
+        const mahakQtyUnitLabel = (r) => { const u = normalizeMahakUnit(r.mahakUnit); return u && u !== 'کیلوگرم' ? u : 'kg'; };
+
+        // تشخیص «مشکوک به تکراری» برای هشدار قبل از ساخت کالای جدید: یا نام فشرده (بدون فاصله) یکی است
+        // (زردچوبه / زرد چوبه) یا شباهت کلمه‌ای خیلی بالاست. فقط هشدار است، نه لینک خودکار — چون محک خودش
+        // هم گاهی دو املا را دو کالای جدا می‌داند.
+        const compactMahakName = (v) => normalizeMahakName(v).replace(/\s+/g, '');
+        const findSuspectedDuplicates = (name, items) => {
+            const compact = compactMahakName(name);
+            if (!compact) return [];
+            return items.filter(i => {
+                const n = normalizeMahakName(i.name);
+                if (n === normalizeMahakName(name)) return false; // هم‌نام دقیق = گارد اصلی، نه هشدار
+                return compactMahakName(i.name) === compact || mahakSimilarity(name, i.name) >= 0.8;
+            });
+        };
+
+        // انتخاب/لینک کالا برای ردیف محک. قبلاً دراپ‌داون داخل لیستِ اسکرول‌دار بود و ته صفحه بریده می‌شد؛
+        // حالا با portal مستقیم روی body می‌نشیند، اگر پایین جا نباشد رو به بالا باز می‌شود، با کلیک بیرون
+        // و Escape بسته می‌شود و با کیبورد (بالا/پایین/Enter) هم قابل استفاده است.
+        const MahakLinkPicker = ({ items, settings, selectedId, onSelect, placeholder }) => {
+            const [open, setOpen] = useState(false);
+            const [search, setSearch] = useState('');
+            const [activeIdx, setActiveIdx] = useState(0);
+            const [pos, setPos] = useState(null);
+            const triggerRef = useRef(null);
+            const panelRef = useRef(null);
+            const selected = items.find(i => i.id === selectedId);
+            const q = normalizeMahakName(search);
+            const candidates = items
+                .filter(i => !q || normalizeMahakName([i.name, i.brand, i.tag, i.unit, i.bagWeight ? String(i.bagWeight) : ''].filter(Boolean).join(' ')).includes(q))
+                .sort((a,b) => { if (a.id===selectedId) return -1; if (b.id===selectedId) return 1; return String(a.name||'').localeCompare(String(b.name||''),'fa'); });
+            const shown = candidates.slice(0, 60);
+            const allNames = shown.map(x => x.name);
+            const place = () => {
+                const el = triggerRef.current; if (!el) return;
+                const r = el.getBoundingClientRect();
+                const width = Math.min(520, window.innerWidth - 16);
+                const desiredH = Math.min(360, window.innerHeight * 0.6);
+                const spaceBelow = window.innerHeight - r.bottom - 10;
+                const up = spaceBelow < Math.min(desiredH, 260) && r.top > spaceBelow;
+                const maxH = Math.max(160, Math.min(desiredH, up ? r.top - 14 : spaceBelow));
+                const top = up ? Math.max(8, r.top - maxH - 6) : r.bottom + 6;
+                const left = Math.max(8, Math.min(r.right - width, window.innerWidth - width - 8));
+                setPos({ top, left, width, maxH });
+            };
+            const openPanel = () => { place(); setSearch(''); setActiveIdx(0); setOpen(true); };
+            useEffect(() => {
+                if (!open) return;
+                const onDoc = (e) => { if (panelRef.current?.contains(e.target) || triggerRef.current?.contains(e.target)) return; setOpen(false); };
+                const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); triggerRef.current?.focus(); } };
+                const onMove = () => place();
+                document.addEventListener('mousedown', onDoc);
+                document.addEventListener('keydown', onKey, true);
+                window.addEventListener('resize', onMove);
+                window.addEventListener('scroll', onMove, true);
+                return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey, true); window.removeEventListener('resize', onMove); window.removeEventListener('scroll', onMove, true); };
+            }, [open]);
+            const choose = (it) => { onSelect(it); setOpen(false); setSearch(''); };
+            const onKeyNav = (e) => {
+                if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, shown.length - 1)); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, 0)); }
+                else if (e.key === 'Enter') { e.preventDefault(); if (shown[activeIdx]) choose(shown[activeIdx]); }
+            };
+            useEffect(() => { if (open) document.getElementById(`mahak-link-opt-${activeIdx}`)?.scrollIntoView({ block:'nearest' }); }, [activeIdx, open]);
+            const panel = open && pos && (
+                <div ref={panelRef} role="listbox" style={{ position:'fixed', top:pos.top, left:pos.left, width:pos.width, maxHeight:pos.maxH, zIndex:120 }} className="bg-white border border-slate-200 rounded-xl shadow-2xl p-2 flex flex-col">
+                    <div className="flex items-center gap-2 mb-2 shrink-0">
+                        <Search size={14} className="text-slate-400 shrink-0"/>
+                        <input autoFocus value={search} onChange={e=>{setSearch(e.target.value); setActiveIdx(0);}} onKeyDown={onKeyNav} placeholder="جستجو در نام، برند، تگ، واحد..." className="flex-1 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs outline-none"/>
+                    </div>
+                    <div className="overflow-y-auto space-y-1 flex-1">
+                        {shown.length===0 ? <div className="p-4 text-center text-xs text-slate-400">کالایی با این عبارت پیدا نشد.</div> : shown.map((it,idx)=>{ const { prefix, diff } = splitNameDiff(allNames, it.name); return (
+                            <button key={it.id} id={`mahak-link-opt-${idx}`} type="button" role="option" aria-selected={it.id===selectedId} onClick={()=>choose(it)} className={`w-full text-right p-2 rounded-lg border ${it.id===selectedId?'border-indigo-300 bg-indigo-50':idx===activeIdx?'border-slate-300 bg-slate-50':'border-transparent hover:border-slate-200 hover:bg-slate-50'}`}>
+                                <div className="font-black text-xs text-slate-800">{prefix}{diff && <span className={`mr-1 px-1 rounded border ${stringToBadgeColor(diff)}`}>{diff}</span>}</div>
+                                <div className="mt-1 flex items-center gap-1 flex-wrap"><ItemDistinguishBadges item={it}/>{getWarehouseById(settings?.warehouses || [], it.warehouseId)?.name && <span className="text-[9px] px-1.5 py-0 rounded font-bold border bg-slate-100 text-slate-600 border-slate-200">{getWarehouseById(settings?.warehouses || [], it.warehouseId).name}</span>}</div>
+                            </button>); })}
+                    </div>
+                </div>
+            );
+            return (
+                <div className="relative">
+                    <button ref={triggerRef} type="button" aria-haspopup="listbox" aria-expanded={open} onClick={()=>open?setOpen(false):openPanel()} className="w-full p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold outline-none text-right flex items-center justify-between gap-2">
+                        <span className="truncate">{selected ? selected.name : (placeholder || '— انتخاب / لینک کالا —')}</span><ChevronDown size={13} className="shrink-0 text-slate-400"/>
+                    </button>
+                    {panel && ReactDOM.createPortal(panel, document.body)}
+                </div>
+            );
         };
 
         const MahakImportView = ({ items, settings, onSaveSettings, onApplySync, onBackup, onClose }) => {
@@ -95,8 +216,6 @@
             const [fileName, setFileName] = useState('');
             const [step, setStep] = useState(1);
             const [busy, setBusy] = useState(false);
-            const [openLinkRow, setOpenLinkRow] = useState(null);
-            const [linkSearch, setLinkSearch] = useState('');
             // شناسه مواردی که هنگام ورود به بازبینی خطادار بودند را ثابت نگه می‌داریم؛
             // با اصلاح وزن، ردیف از جلوی چشم کاربر به پایین لیست نمی‌پرد.
             const [pinnedReviewIds, setPinnedReviewIds] = useState([]);
@@ -160,6 +279,7 @@
                             mahakKg:r.quantity,
                             mahakQty2:r.quantity2,
                             mahakUnit2:r.unit2,
+                            mahakUnit:r.unit || '',
                             normalized:norm,
                             itemId:exact?.id || '',
                             targetName:exact?.name || r.mahakName,
@@ -279,18 +399,19 @@ const conversionErrors = rows.filter(r => {
                 if (r.mode === 'existing' && !r.itemId) return false;
                 if (r.mode === 'new') {
                     const pseudo = { unit:r.targetUnit, bagWeight:Number(r.weightKg||0)*1000 };
-                    return !convertMahakKgToTarget(r.mahakKg, pseudo, r.weightKg, r.forcePackage === true, r.mahakQty2).ok;
+                    return !convertMahakKgToTarget(r.mahakKg, pseudo, r.weightKg, r.forcePackage === true, r.mahakQty2, r.mahakUnit).ok;
                 }
                 const item = items.find(i => i.id === r.itemId);
-                return item ? !convertMahakKgToTarget(r.mahakKg, item, r.weightKg, r.forcePackage === true, r.mahakQty2).ok : false;
+                return item ? !convertMahakKgToTarget(r.mahakKg, item, r.weightKg, r.forcePackage === true, r.mahakQty2, r.mahakUnit).ok : false;
             });
             const readyRows = rows.filter(r => {
-                if (r.mode === 'new') return !!r.targetName && !!convertMahakKgToTarget(r.mahakKg, {unit:r.targetUnit, bagWeight:Number(r.weightKg||0)*1000}, r.weightKg, r.forcePackage === true, r.mahakQty2).ok;
+                if (r.mode === 'new') return !!r.targetName && !!convertMahakKgToTarget(r.mahakKg, {unit:r.targetUnit, bagWeight:Number(r.weightKg||0)*1000}, r.weightKg, r.forcePackage === true, r.mahakQty2, r.mahakUnit).ok;
                 const item = items.find(i => i.id === r.itemId);
-                return !!item && !!convertMahakKgToTarget(r.mahakKg, item, r.weightKg, r.forcePackage === true, r.mahakQty2).ok;
+                return !!item && !!convertMahakKgToTarget(r.mahakKg, item, r.weightKg, r.forcePackage === true, r.mahakQty2, r.mahakUnit).ok;
             });
 
-            const defaultMahakWarehouseId = (settings?.warehouses || []).find(w => String(w?.name || '').trim() === 'سوله گرجی علیا')?.id || '';
+            // انبار پیش‌فرض کالاهای جدید محک از تنظیمات می‌آید (نه یک نام هاردکد شده در سورس عمومی).
+            const defaultMahakWarehouseId = settings?.mahakDefaultWarehouseId || (settings?.warehouses || [])[0]?.id || '';
             const chooseSuggestion = (r, item) => updateRow(r.id, { mode:'existing', itemId:item.id, targetName:item.name, targetUnit:item.unit || 'کیسه', weightKg: item.bagWeight ? Number(item.bagWeight)/1000 : r.weightKg, targetWarehouseId:item.warehouseId || r.targetWarehouseId || defaultMahakWarehouseId });
 
             const saveMappingForRow = (r, itemId, weightKg, mode) => {
@@ -326,10 +447,21 @@ const conversionErrors = rows.filter(r => {
                     toast.show(`${pendingBagWeightRows.length} کالا هنوز مشخص نشده که بر مبنای وزن کیسه تبدیل بشن یا کیلوگرم بمونن — از جعبه‌ی آبی بالای لیست، تک‌تک یا با «تأیید همه» جواب بده.`);
                     setStep(2); return;
                 }
+                // گارد ضد تکراری: ردیف «ایجاد جدید» که نامش دقیقاً مال چند کالای موجود است باید دستی تعیین تکلیف شود.
+                const ambiguousNewRows = rows.filter(r => r.mode==='new' && r.targetName && items.filter(i => normalizeMahakName(i.name) === normalizeMahakName(r.targetName)).length > 1);
+                if (ambiguousNewRows.length) {
+                    toast.show(`${ambiguousNewRows.length} ردیف «ایجاد جدید» نامشان با چند کالای موجود یکی است (${ambiguousNewRows.slice(0,3).map(r=>r.targetName).join('، ')}). برای جلوگیری از کالای تکراری، اول کالای درست را لینک کن.`);
+                    setStep(2); return;
+                }
                 let autoCreateUnresolved = false;
                 if (unresolvedNew.length) {
+                    const suspected = unresolvedNew.map(r => ({ r, dups: findSuspectedDuplicates(r.mahakName, items) })).filter(x => x.dups.length);
+                    const unitCounts = {};
+                    unresolvedNew.forEach(r => { const u = getMahakStandardTarget(r).unit; unitCounts[u] = (unitCounts[u]||0)+1; });
+                    const unitSummary = Object.entries(unitCounts).map(([u,n]) => `${n} ${u}`).join('، ');
+                    const dupWarning = suspected.length ? `\n\n⚠ ${suspected.length} مورد نامی بسیار شبیه کالای موجود دارند و ممکن است تکراری باشند:\n${suspected.slice(0,6).map(x => `• ${x.r.mahakName} ≈ ${x.dups[0].name}`).join('\n')}${suspected.length>6?`\n... و ${suspected.length-6} مورد دیگر`:''}\nاگر تکراری‌اند، لغو کن و اول آن‌ها را به کالای موجود لینک کن.` : '';
                     autoCreateUnresolved = await confirmAction(
-                        `${unresolvedNew.length} کالا هنوز تعیین تکلیف نشده‌اند.\n\nآیا این موارد با همان نام محک، به‌عنوان کالای جدید ساخته شوند و موجودی‌شان بر مبنای خودِ کیلوگرم محک ثبت شود؟\n\nبعد از ساخت، لینک هرکدام ذخیره می‌شود تا Syncهای بعدی سریع و خودکار انجام شوند.`,
+                        `${unresolvedNew.length} کالا هنوز تعیین تکلیف نشده‌اند.\n\nبا تأیید تو، این موارد با همان نام و «معیار خودِ محک» ساخته می‌شوند: واحد و تعداد از ستون‌های خود فایل محک برداشته می‌شود (${unitSummary}) — نه تبدیل حدسی به کیلوگرم.\n\nبعد از ساخت، لینک هرکدام ذخیره می‌شود تا Syncهای بعدی سریع و خودکار انجام شوند.${dupWarning}`,
                         { danger:false }
                     );
                     if (!autoCreateUnresolved) { setStep(2); return; }
@@ -353,16 +485,22 @@ const conversionErrors = rows.filter(r => {
                 try {
                     const nextMappings = {...mappings};
                     const prepared = [...readyRows].map(r => {
-                        const existing = r.mode==='existing' ? items.find(i=>i.id===r.itemId) : null;
+                        // گارد ضد تکراری: «ایجاد جدید» با نامی که دقیقاً مال یک کالای موجود است، به‌جای ساختن کپی، به همان کالا لینک می‌شود.
+                        const nameTwin = r.mode==='new' && r.targetName ? items.find(i => normalizeMahakName(i.name) === normalizeMahakName(r.targetName)) : null;
+                        const existing = r.mode==='existing' ? items.find(i=>i.id===r.itemId) : nameTwin;
                         const target = existing || { name:r.targetName, unit:r.targetUnit || 'کیسه', bagWeight:Number(r.weightKg||0)*1000 };
-                        const converted = convertMahakKgToTarget(r.mahakKg, target, r.weightKg, r.forcePackage === true, r.mahakQty2);
+                        const converted = convertMahakKgToTarget(r.mahakKg, target, r.weightKg, r.forcePackage === true, r.mahakQty2, r.mahakUnit);
                         const finalName = existing ? existing.name : r.targetName.trim();
-                        if (!finalName || !converted.ok) throw new Error(`ردیف نامعتبر: ${r.mahakName}`);
-                        nextMappings[r.normalized] = { mahakName:r.mahakName, itemId:existing?.id || null, mode:r.mode, targetName:finalName, targetUnit:r.targetUnit || target.unit || 'کیسه', weightKg:Number(converted.weightKg||r.weightKg||0), useBagWeightMode: r.forcePackage === true, updatedAt:Date.now() };
+                        if (!finalName || !converted.ok) throw new Error(`ردیف «${r.mahakName}»: ${converted.reason || 'نامعتبر'}`);
+                        nextMappings[r.normalized] = { mahakName:r.mahakName, itemId:existing?.id || null, mode:existing?'existing':r.mode, targetName:finalName, targetUnit:r.targetUnit || target.unit || 'کیسه', weightKg:Number(converted.weightKg||r.weightKg||0), useBagWeightMode: r.forcePackage === true, updatedAt:Date.now() };
                         return {...r, finalName, converted, existingItemId:existing?.id || null, targetWarehouseId:r.targetWarehouseId || defaultMahakWarehouseId};
                     });
                     if (autoCreateUnresolved) {
-                        unresolvedNew.forEach(r => prepared.push({...r, mode:'new', finalName:String(r.mahakName||'').trim(), targetUnit:'کیلوگرم', targetWarehouseId:r.targetWarehouseId || defaultMahakWarehouseId, autoCreate:true, existingItemId:null, converted:{ok:true,value:Number(r.mahakKg)||0,mode:'kg',remainder:0,weightKg:1}}));
+                        // معیار محک: واحد/تعدادِ خودِ فایل (موجودی ۲ + واحد ۲، یا واحد اصلی) — نه کیلوگرمِ اجباری.
+                        unresolvedNew.forEach(r => {
+                            const std = getMahakStandardTarget(r);
+                            prepared.push({...r, mode:'new', finalName:String(r.mahakName||'').trim(), targetUnit:std.unit, targetWarehouseId:r.targetWarehouseId || defaultMahakWarehouseId, autoCreate:true, existingItemId:null, converted:{ok:true, value:std.value, mode:std.mode, remainder:0, weightKg:0}});
+                        });
                     }
                     // اقلامی که باید حذف شوند را از نقشه‌ی لینک‌ها هم پاک می‌کنیم تا محکِ بعدی دوباره سراغشان نرود
                     if (removeMode === 'delete') itemsToRemove.forEach(x => {
@@ -381,7 +519,7 @@ const conversionErrors = rows.filter(r => {
                         <div className="p-5 bg-slate-50 border-b flex items-center justify-between gap-3">
                             <div>
                                 <h2 className="font-black text-xl text-slate-800 flex items-center gap-2"><FileSpreadsheet className="text-emerald-600"/> همگام‌سازی موجودی محک</h2>
-                                <p className="text-xs text-slate-500 mt-1">«نام کامل کالا» و «موجودی» (کیلوگرم) خوانده می‌شود؛ اگر ستون‌های «موجودی ۲» و «واحد ۲» هم در فایل باشند، همان تعداد دقیق کیسه/کارتن مستقیماً استفاده می‌شود. قیمت‌ها و ستون‌های مالی نادیده گرفته می‌شوند.</p>
+                                <p className="text-xs text-slate-500 mt-1">«نام کامل کالا»، «موجودی» و «واحد» خوانده می‌شود؛ اگر ستون‌های «موجودی ۲» و «واحد ۲» هم در فایل باشند، همان تعداد دقیق کیسه/کارتن مستقیماً استفاده می‌شود. کالاهای جدید با همان واحد و تعداد خودِ محک ساخته می‌شوند. قیمت‌ها و ستون‌های مالی نادیده گرفته می‌شوند.</p>
                             </div>
                             {onClose && <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-200"><X size={18}/></button>}
                         </div>
@@ -396,15 +534,24 @@ const conversionErrors = rows.filter(r => {
                             <div className="p-8 text-center">
                                 <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4"><Upload size={28}/></div>
                                 <h3 className="font-black text-lg text-slate-800">فایل خروجی محک را انتخاب کنید</h3>
-                                <p className="text-xs text-slate-500 mt-2 mb-6">فایل با ساختار نمونه‌ی فعلی محک قابل خواندن است. «نام کامل کالا» و «موجودی» (کیلوگرم) مبنا هستند؛ اگر فایل ستون «موجودی ۲» (تعداد دقیق کیسه/کارتن) را هم داشته باشد، همان عدد مستقیم محک مبنای تبدیل قرار می‌گیرد — نه حدسِ وزنِ هر کیسه. اگر «محک منبع اصلی است» تیک باشد، کالاهایی که در محک صفر هستند یا در فایل نیستند هم (بعد از نمایش لیست و تأیید تو) صفر می‌شوند. موارد تعیین‌تکلیف‌نشده را در مرحله نهایی می‌توانید یکجا به‌عنوان کالای جدید بسازید.</p>
+                                <p className="text-xs text-slate-500 mt-2 mb-6">فایل با ساختار نمونه‌ی فعلی محک قابل خواندن است. «نام کامل کالا» و «موجودی» مبنا هستند؛ اگر فایل ستون «موجودی ۲» (تعداد دقیق کیسه/کارتن) را هم داشته باشد، همان عدد مستقیم محک مبنای تبدیل قرار می‌گیرد — نه حدسِ وزنِ هر کیسه. کالاهای جدید با «معیار خودِ محک» ساخته می‌شوند: همان واحد و تعدادی که در فایل است (مثلاً ۴۱۳ کیسه، نه ۲۰۶۸۹ کیلوگرم). اگر «محک منبع اصلی است» تیک باشد، کالاهایی که در محک صفر هستند یا در فایل نیستند هم (بعد از نمایش لیست و تأیید تو) صفر می‌شوند. موارد تعیین‌تکلیف‌نشده را در مرحله نهایی می‌توانید یکجا به‌عنوان کالای جدید بسازید.</p>
                                 <label className={`inline-flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-sm cursor-pointer ${busy?'bg-slate-300':'bg-emerald-600 hover:bg-emerald-700'} text-white`}>
                                     <FileSpreadsheet size={18}/> {busy?'در حال خواندن...':'انتخاب فایل محک'}
                                     <input type="file" accept=".xlsx,.xls" className="hidden" disabled={busy} onChange={e=>{const f=e.target.files?.[0]; if(f) readFile(f); e.target.value='';}}/>
                                 </label>
                                 <label className="mt-5 flex items-start gap-2 max-w-md mx-auto text-right bg-amber-50 border border-amber-200 rounded-2xl p-3 cursor-pointer">
                                     <input type="checkbox" checked={mahakIsMaster} onChange={e=>setMahakIsMaster(e.target.checked)} className="mt-1 w-4 h-4 accent-amber-600 shrink-0"/>
-                                    <span className="text-[11px] text-amber-800 leading-5"><b>محک منبع اصلیِ موجودی است.</b> اگر فعال باشد، کالاهایی که در محک صفر هستند یا قبلاً لینک بوده و در این فایل نیستند، موجودی‌شان صفر می‌شود (یا اگر بخواهی حذف می‌شوند). قبل از هر تغییر، لیست کامل نشانت داده می‌شود و می‌توانی تک‌تک تیک را برداری. این انتخاب یادآوری می‌شود.</span>
+                                    <span className="text-[11px] text-amber-800 leading-5"><b>محک منبع اصلیِ موجودی است (معیار محک).</b> اگر فعال باشد، همه‌چیز طبق خودِ محک پیش می‌رود: کالاهای جدید با همان واحد و تعدادِ فایل محک ساخته می‌شوند و کالاهایی که در محک صفر هستند یا قبلاً لینک بوده و در این فایل نیستند، موجودی‌شان صفر می‌شود (یا اگر بخواهی حذف می‌شوند). قبل از هر تغییر، لیست کامل نشانت داده می‌شود و می‌توانی تک‌تک تیک را برداری. این انتخاب یادآوری می‌شود.</span>
                                 </label>
+                                {(settings?.warehouses || []).length > 0 && (
+                                    <div className="mt-3 max-w-md mx-auto flex items-center justify-center gap-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-2xl p-3">
+                                        <span className="font-bold shrink-0">انبار پیش‌فرض کالاهای جدید:</span>
+                                        <select value={defaultMahakWarehouseId} onChange={e=>onSaveSettings && onSaveSettings({...settings, mahakDefaultWarehouseId:e.target.value})} className="flex-1 p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold outline-none">
+                                            <option value="">— بدون انبار —</option>
+                                            {(settings?.warehouses || []).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}
+                                        </select>
+                                    </div>
+                                )}
                                 {settings?.mahakLastSync && <div className="mt-6 text-xs text-slate-400">آخرین Sync: {new Date(settings.mahakLastSync).toLocaleString('fa-IR')}</div>}
                             </div>
                         )}
@@ -412,7 +559,11 @@ const conversionErrors = rows.filter(r => {
                         {step===2 && (
                             <div className="p-5">
                                 {unresolvedBanner}
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+                                <label className="flex items-center gap-2 w-fit text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 cursor-pointer mb-3">
+                                    <input type="checkbox" checked={mahakIsMaster} onChange={e=>setMahakIsMaster(e.target.checked)} className="w-4 h-4 accent-amber-600"/>
+                                    محک منبع اصلی است (معیار محک) — کالاهای صفر/غایب در محک، با تأیید تو صفر یا حذف می‌شوند
+                                </label>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4">
                                     <div className="rounded-xl bg-slate-50 border p-3"><div className="text-[10px] text-slate-400">تعداد ردیف</div><div className="font-black text-lg">{rows.length}</div></div>
                                     <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3"><div className="text-[10px] text-emerald-500">آماده</div><div className="font-black text-lg text-emerald-700">{readyRows.length}</div></div>
                                     <div className="rounded-xl bg-amber-50 border border-amber-100 p-3"><div className="text-[10px] text-amber-500">نیازمند بررسی</div><div className="font-black text-lg text-amber-700">{unresolved.length}</div></div>
@@ -522,53 +673,20 @@ const conversionErrors = rows.filter(r => {
                                     {rows.map(r=>{
                                         const item = items.find(i=>i.id===r.itemId);
                                         const target = r.mode==='new' ? {unit:r.targetUnit, bagWeight:Number(r.weightKg||0)*1000} : item;
-                                        const conv = convertMahakKgToTarget(r.mahakKg, target, r.weightKg, r.forcePackage === true, r.mahakQty2);
+                                        const conv = unresolvedNew.some(u=>u.id===r.id) ? mahakStandardConv(r) : convertMahakKgToTarget(r.mahakKg, target, r.weightKg, r.forcePackage === true, r.mahakQty2, r.mahakUnit);
                                         return <div key={r.id} id={`mahak-row-${r.id}`} className={`rounded-2xl border p-3 ${!conv.ok?'border-red-200 bg-red-50/30':!item && r.mode!=='new'?'border-amber-400 bg-amber-50/40 ring-2 ring-amber-200':'border-slate-200 bg-white'}`}>
                                             <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 items-center">
-                                                <div className="xl:col-span-2 min-w-0"><div className="font-black text-sm text-slate-800 truncate" title={r.mahakName}>{r.mahakName}</div><div className="text-[10px] text-slate-400 mt-1">محک: <b>{formatNumber(r.mahakKg)}</b> kg{Number(r.mahakQty2) > 0 && <> — <b className="text-indigo-600">{formatNumber(r.mahakQty2)}</b> {r.mahakUnit2 || ''} (مستقیم از محک)</>}</div></div>
+                                                <div className="xl:col-span-2 min-w-0"><div className="font-black text-sm text-slate-800 truncate" title={r.mahakName}>{r.mahakName}</div><div className="text-[10px] text-slate-400 mt-1">محک: <b>{formatNumber(r.mahakKg)}</b> {mahakQtyUnitLabel(r)}{Number(r.mahakQty2) > 0 && <> — <b className="text-indigo-600">{formatNumber(r.mahakQty2)}</b> {r.mahakUnit2 || ''} (مستقیم از محک)</>}</div></div>
                                                 <div className="xl:col-span-2">
                                                     <div className="flex gap-1 mb-1"><button onClick={()=>updateRow(r.id,{mode:'existing'})} className={`flex-1 px-2 py-1.5 rounded-lg text-[10px] font-bold border ${r.mode==='existing'?'bg-indigo-600 text-white border-indigo-600':'bg-white text-slate-500 border-slate-200'}`}>کالای فعلی</button><button onClick={()=>updateRow(r.id,{mode:'new',targetName:r.targetName||r.mahakName,targetUnit:r.targetUnit||'کیسه',weightKg:r.weightKg||''})} className={`flex-1 px-2 py-1.5 rounded-lg text-[10px] font-bold border ${r.mode==='new'?'bg-emerald-600 text-white border-emerald-600':'bg-white text-slate-500 border-slate-200'}`}>ایجاد جدید</button></div>
-                                                    {r.mode==='existing' ? (() => {
-                                                        const selected = items.find(i=>i.id===r.itemId);
-                                                        const q = openLinkRow===r.id ? normalizeMahakName(linkSearch) : '';
-                                                        const linkCandidates = items
-                                                            // در بخش لینک‌کردن محک، کل لیست کالاهای انبار قابل جستجو است؛
-                                                            // موجودی صفر نیز نباید باعث مخفی‌شدن کالا شود.
-                                                            .filter(i => !q || normalizeMahakName([
-                                                                i.name, i.brand, i.tag, i.unit,
-                                                                i.bagWeight ? String(i.bagWeight) : ''
-                                                            ].filter(Boolean).join(' ')).includes(q))
-                                                            .sort((a,b) => {
-                                                                if (a.id===r.itemId) return -1;
-                                                                if (b.id===r.itemId) return 1;
-                                                                return String(a.name||'').localeCompare(String(b.name||''),'fa');
-                                                            });
-                                                        const linkAllNames = linkCandidates.slice(0, 60).map(x => x.name);
-                                                        return <div className="relative">
-                                                            <button type="button" onClick={()=>{setOpenLinkRow(openLinkRow===r.id?null:r.id);setLinkSearch('');}} className="w-full p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold outline-none text-right flex items-center justify-between gap-2">
-                                                                <span className="truncate">{selected ? selected.name : '— انتخاب / لینک کالا —'}</span><ChevronDown size={13} className="shrink-0 text-slate-400"/>
-                                                            </button>
-                                                            {openLinkRow===r.id && <div className="absolute z-[80] top-full mt-1 right-0 w-[min(520px,95vw)] bg-white border border-slate-200 rounded-xl shadow-2xl p-2">
-                                                                <div className="flex items-center gap-2 mb-2">
-                                                                    <Search size={14} className="text-slate-400 shrink-0"/>
-                                                                    <input autoFocus value={linkSearch} onChange={e=>setLinkSearch(e.target.value)} placeholder="جستجو در نام، برند، تگ، واحد..." className="flex-1 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs outline-none"/>
-                                                                </div>
-                                                                <div className="max-h-64 overflow-y-auto space-y-1">
-                                                                    {linkCandidates.length===0 ? <div className="p-4 text-center text-xs text-slate-400">کالایی با این عبارت پیدا نشد.</div> : linkCandidates.slice(0, 60).map(it=>{ const { prefix, diff } = splitNameDiff(linkAllNames, it.name); return <button key={it.id} type="button" onClick={()=>{updateRow(r.id,{itemId:it.id,targetName:it.name,targetUnit:it.unit||'کیسه',weightKg:it.bagWeight?Number(it.bagWeight)/1000:r.weightKg});setOpenLinkRow(null);setLinkSearch('');}} className={`w-full text-right p-2 rounded-lg border ${it.id===r.itemId?'border-indigo-300 bg-indigo-50':'border-transparent hover:border-slate-200 hover:bg-slate-50'}`}>
-                                                                        <div className="font-black text-xs text-slate-800">{prefix}{diff && <span className={`mr-1 px-1 rounded border ${stringToBadgeColor(diff)}`}>{diff}</span>}</div>
-                                                                        <div className="mt-1 flex items-center gap-1 flex-wrap"><ItemDistinguishBadges item={it}/>{getWarehouseById(settings?.warehouses || [], it.warehouseId)?.name && <span className="text-[9px] px-1.5 py-0 rounded font-bold border bg-slate-100 text-slate-600 border-slate-200">{getWarehouseById(settings?.warehouses || [], it.warehouseId).name}</span>}</div>
-                                                                    </button>; })}
-                                                                </div>
-                                                            </div>}
-                                                        </div>;
-                                                    })() : <input value={r.targetName} onChange={e=>updateRow(r.id,{targetName:e.target.value})} className="w-full p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold outline-none" placeholder="نام کالای جدید"/>}
+                                                    {r.mode==='existing' ? <MahakLinkPicker items={items} settings={settings} selectedId={r.itemId} onSelect={(it)=>updateRow(r.id,{itemId:it.id,targetName:it.name,targetUnit:it.unit||'کیسه',weightKg:it.bagWeight?Number(it.bagWeight)/1000:r.weightKg})}/> : <input value={r.targetName} onChange={e=>updateRow(r.id,{targetName:e.target.value})} className="w-full p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold outline-none" placeholder="نام کالای جدید"/>}
                                                 </div>
                                                 <div className="xl:col-span-2"><label className="text-[9px] text-slate-400 block mb-1">واحد داخلی</label><select value={r.targetUnit} onChange={e=>updateRow(r.id,{targetUnit:e.target.value})} className="w-full p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold"><option value="کیسه">کیسه</option><option value="کارتن">کارتن</option><option value="بسته">بسته</option><option value="عدد">عدد</option><option value="کیلوگرم">کیلوگرم</option><option value="کیلو">کیلو</option></select></div>
                                                 <div className="xl:col-span-2"><label className="text-[9px] text-slate-400 block mb-1">وزن هر بسته/کارتن (kg)</label><input type="number" min="0" step="any" disabled={conv.mode==='package-direct'} value={r.weightKg} onChange={e=>updateRow(r.id,{weightKg:e.target.value})} className="w-full p-2 rounded-lg bg-white border border-slate-200 text-xs font-black text-center disabled:bg-slate-100 disabled:text-slate-400" placeholder="مثلاً 5"/>
                                                     {conv.mode==='package-direct' && <div className="text-[9px] text-indigo-600 font-bold mt-1">عدد مستقیم محک استفاده می‌شود؛ نیازی به وزن حدسی نیست</div>}
                                                     {conv.mode!=='package-direct' && item && Number(item.bagWeight) > 0 && Math.abs(Number(r.weightKg||0) - Number(item.bagWeight)/1000) > 1e-6 && <div className="text-[9px] text-amber-700 font-bold mt-1">⚠ با وزن ثبت‌شده‌ی خود کالا ({formatNumber(Number(item.bagWeight)/1000)} kg) فرق دارد</div>}
                                                 </div>
-                                                <div className="xl:col-span-2"><div className={`rounded-xl p-2 border ${conv.ok?'bg-slate-50 border-slate-200':'bg-red-50 border-red-200'}`}><div className="text-[9px] text-slate-400">نتیجه تبدیل{conv.mode==='package-direct' && <span className="text-indigo-500"> (مستقیم از محک)</span>}</div>{conv.ok?<><div className="font-black text-indigo-700 text-base">{formatNumber(conv.value)} {r.targetUnit}</div>{conv.remainder>0&&<div className="text-[9px] text-amber-700 mt-1">مانده: {formatNumber(conv.remainder)} kg</div>}</>:<div className="text-[9px] font-bold text-red-600 leading-5">{conv.reason}</div>}</div></div>
+                                                <div className="xl:col-span-2"><div className={`rounded-xl p-2 border ${conv.ok?'bg-slate-50 border-slate-200':'bg-red-50 border-red-200'}`}><div className="text-[9px] text-slate-400">نتیجه تبدیل{conv.mode==='package-direct' && <span className="text-indigo-500"> (مستقیم از محک)</span>}{conv.mode==='direct' && <span className="text-indigo-500"> (واحد خود محک)</span>}</div>{conv.ok?<><div className="font-black text-indigo-700 text-base">{formatNumber(conv.value)} {conv.stdUnit || r.targetUnit}</div>{conv.remainder>0&&<div className="text-[9px] text-amber-700 mt-1">مانده: {formatNumber(conv.remainder)} kg</div>}</>:<div className="text-[9px] font-bold text-red-600 leading-5">{conv.reason}</div>}</div></div>
                                                 <div className="xl:col-span-2 text-left">
                                                     {r.mode==='existing' && !r.itemId && r.suggestionCandidates?.length>0 && <div className="mb-1 text-[9px] text-slate-400">پیشنهاد نزدیک — با جزئیات:</div>}
                                                     {r.mode==='existing' && !r.itemId && (r.suggestionCandidates||[]).map(sg=><button key={sg.item.id} onClick={()=>chooseSuggestion(r,sg.item)} className="block w-full text-right text-[9px] px-2 py-1.5 rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 mb-1" title={`${sg.item.name} | شباهت ${Math.round(sg.score*100)}%`}>
@@ -599,7 +717,31 @@ const conversionErrors = rows.filter(r => {
                                     <div className="bg-amber-50 rounded-2xl border border-amber-100 p-4"><div className="text-[10px] text-amber-500">تعیین‌تکلیف‌نشده</div><div className="text-sm font-black text-amber-700 mt-1">{unresolved.length}</div></div>
                                      <div className="bg-emerald-50 rounded-2xl border border-emerald-100 p-4"><div className="text-[10px] text-emerald-500">منبع موجودی</div><div className="text-sm font-black text-emerald-700 mt-1">محک</div></div>
                                 </div>
-                                <div className="space-y-2">{[...pinnedRows, ...normalRows].map((r,reviewIndex)=>{const item=r.mode==='existing'?items.find(i=>i.id===r.itemId):null;const target=r.mode==='new'?{unit:r.targetUnit,bagWeight:Number(r.weightKg||0)*1000}:item;const conv=convertMahakKgToTarget(r.mahakKg,target,r.weightKg,r.forcePackage===true,r.mahakQty2);const isConversionError=!conv.ok;return <React.Fragment key={r.id}>{reviewIndex===0 && pinnedRows.length>0 && <div className="sticky top-0 z-10 bg-red-600 text-white rounded-xl px-4 py-3 text-xs font-black shadow-lg">⚠ مواردی که هنگام ورود به بازبینی نیاز به اصلاح داشتند — همین‌جا بمانید و بعد تأیید نهایی بزنید ({pinnedRows.length} مورد)</div>}{reviewIndex===pinnedRows.length && pinnedRows.length>0 && <div className="mt-5 pt-4 border-t-2 border-slate-200 bg-slate-50 rounded-xl px-4 py-3 text-xs font-black text-slate-700">✓ سایر {normalRows.length} ردیف بازبینی نهایی</div>}<div key={r.id} id={`mahak-row-${r.id}`} className={`rounded-2xl border p-3 ${conv.ok?(unresolved.some(u=>u.id===r.id)?'border-amber-400 bg-amber-50/40 ring-2 ring-amber-200':'border-slate-200 bg-white'):'border-red-300 bg-red-50'}`}><div className="grid grid-cols-1 lg:grid-cols-7 gap-2 items-center"><div className="lg:col-span-2"><div className="font-black text-sm">{r.mahakName}</div><div className="text-[10px] text-slate-500">محک: {formatNumber(r.mahakKg)} kg</div>{r.isAmbiguous && <div className="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-300 rounded px-1.5 py-0.5 mt-1 inline-block">⚠ چند کالای هم‌نام در انبار پیدا شد — باید دستی انتخاب کنی، وگرنه دوباره تکراری ساخته می‌شود</div>}</div><div><label className="text-[9px] text-slate-400 block mb-1">روش</label><div className="flex gap-1"><button onClick={()=>updateRow(r.id,{mode:'existing'})} className={`flex-1 px-2 py-2 rounded-lg text-[10px] font-bold border ${r.mode==='existing'?'bg-indigo-600 text-white':'bg-white'}`}>کالای فعلی</button><button onClick={()=>updateRow(r.id,{mode:'new',targetName:r.targetName||r.mahakName,targetWarehouseId:r.targetWarehouseId||defaultMahakWarehouseId})} className={`flex-1 px-2 py-2 rounded-lg text-[10px] font-bold border ${r.mode==='new'?'bg-emerald-600 text-white':'bg-white'}`}>جدید</button></div></div><div>{r.mode==='existing'?(() => { const selected=items.find(i=>i.id===r.itemId); const q=openLinkRow===r.id?normalizeMahakName(linkSearch):''; const linkCandidates=items.filter(i=>!q||normalizeMahakName([i.name,i.brand,i.tag,i.unit,i.bagWeight?String(i.bagWeight):''].filter(Boolean).join(' ')).includes(q)).sort((a,b)=>{if(a.id===r.itemId)return -1;if(b.id===r.itemId)return 1;return String(a.name||'').localeCompare(String(b.name||''),'fa');}); const shownCandidates=linkCandidates.slice(0,40); const allNames=shownCandidates.map(x=>x.name); return <div className="relative"><button type="button" onClick={()=>{setOpenLinkRow(openLinkRow===r.id?null:r.id);setLinkSearch('');}} className="w-full p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold outline-none text-right flex items-center justify-between gap-2"><span className="truncate">{selected?selected.name:'— انتخاب کالا —'}</span><ChevronDown size={13} className="shrink-0 text-slate-400"/></button>{openLinkRow===r.id && <div className="absolute z-[80] top-full mt-1 right-0 w-[min(420px,90vw)] bg-white border border-slate-200 rounded-xl shadow-2xl p-2"><div className="flex items-center gap-2 mb-2"><Search size={14} className="text-slate-400 shrink-0"/><input autoFocus value={linkSearch} onChange={e=>setLinkSearch(e.target.value)} placeholder="جستجو در نام، برند، تگ..." className="flex-1 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs outline-none"/></div><div className="max-h-56 overflow-y-auto space-y-1">{shownCandidates.length===0?<div className="p-4 text-center text-xs text-slate-400">کالایی پیدا نشد.</div>:shownCandidates.map(it=>{const {prefix,diff}=splitNameDiff(allNames,it.name);return <button key={it.id} type="button" onClick={()=>{updateRow(r.id,{itemId:it.id,targetName:it.name,targetUnit:it.unit||'کیسه',weightKg:it.bagWeight?Number(it.bagWeight)/1000:r.weightKg});setOpenLinkRow(null);setLinkSearch('');}} className={`w-full text-right p-2 rounded-lg border ${it.id===r.itemId?'border-indigo-300 bg-indigo-50':'border-transparent hover:border-slate-200 hover:bg-slate-50'}`}><div className="font-black text-xs text-slate-800">{prefix}{diff && <span className={`mr-1 px-1 rounded border ${stringToBadgeColor(diff)}`}>{diff}</span>}</div><div className="mt-1"><ItemDistinguishBadges item={it}/></div></button>;})}</div></div>}</div>; })():<input value={r.targetName} onChange={e=>updateRow(r.id,{targetName:e.target.value})} className="w-full p-2 rounded-lg border text-xs" placeholder="نام کالای جدید"/>}</div>{r.mode==='new' && <div><select value={r.targetWarehouseId || defaultMahakWarehouseId || ''} onChange={e=>updateRow(r.id,{targetWarehouseId:e.target.value})} className="w-full p-2 rounded-lg border text-xs"><option value="">— بدون انبار —</option>{(settings?.warehouses || []).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select><div className="text-[8px] text-slate-400 mt-1">انبار کالای جدید</div></div>}<div><select value={r.targetUnit} onChange={e=>updateRow(r.id,{targetUnit:e.target.value,weightKg:(e.target.value==='کیلوگرم'||e.target.value==='کیلو')?'':r.weightKg})} className="w-full p-2 rounded-lg border text-xs"><option value="کیسه">کیسه</option><option value="کارتن">کارتن</option><option value="بسته">بسته</option><option value="عدد">عدد</option><option value="کیلوگرم">کیلوگرم</option><option value="کیلو">کیلو</option></select></div><div><input type="number" min="0" step="any" disabled={r.targetUnit==='کیلوگرم'||r.targetUnit==='کیلو'} value={r.weightKg} onChange={e=>updateRow(r.id,{weightKg:e.target.value})} className="w-full p-2 rounded-lg border text-xs text-center disabled:bg-slate-100" placeholder={r.targetUnit==='کیلوگرم'||r.targetUnit==='کیلو'?'نیاز نیست':'وزن هر بسته (kg)'}/></div><div className={`p-2 rounded-lg text-center text-xs font-black ${conv.ok?'bg-emerald-50 text-emerald-700':'bg-red-100 text-red-700'}`}>{conv.ok?`${formatNumber(conv.value)} ${r.targetUnit}`:conv.reason}</div></div></div></React.Fragment>})}</div>
+                                <div className="space-y-2">{[...pinnedRows, ...normalRows].map((r,reviewIndex)=>{
+                                    const item=r.mode==='existing'?items.find(i=>i.id===r.itemId):null;
+                                    const target=r.mode==='new'?{unit:r.targetUnit,bagWeight:Number(r.weightKg||0)*1000}:item;
+                                    // ردیفی که قرار است خودکار ساخته شود، پیش‌نمایشش باید دقیقاً همان «معیار محک» باشد که واقعاً ساخته می‌شود.
+                                    const conv=unresolvedNew.some(u=>u.id===r.id)?mahakStandardConv(r):convertMahakKgToTarget(r.mahakKg,target,r.weightKg,r.forcePackage===true,r.mahakQty2,r.mahakUnit);
+                                    return <React.Fragment key={r.id}>
+                                        {reviewIndex===0 && pinnedRows.length>0 && <div className="sticky top-0 z-10 bg-red-600 text-white rounded-xl px-4 py-3 text-xs font-black shadow-lg">⚠ مواردی که هنگام ورود به بازبینی نیاز به اصلاح داشتند — همین‌جا بمانید و بعد تأیید نهایی بزنید ({pinnedRows.length} مورد)</div>}
+                                        {reviewIndex===pinnedRows.length && pinnedRows.length>0 && <div className="mt-5 pt-4 border-t-2 border-slate-200 bg-slate-50 rounded-xl px-4 py-3 text-xs font-black text-slate-700">✓ سایر {normalRows.length} ردیف بازبینی نهایی</div>}
+                                        <div id={`mahak-row-${r.id}`} className={`rounded-2xl border p-3 ${conv.ok?(unresolved.some(u=>u.id===r.id)?'border-amber-400 bg-amber-50/40 ring-2 ring-amber-200':'border-slate-200 bg-white'):'border-red-300 bg-red-50'}`}>
+                                            <div className="grid grid-cols-1 lg:grid-cols-7 gap-2 items-center">
+                                                <div className="lg:col-span-2">
+                                                    <div className="font-black text-sm">{r.mahakName}</div>
+                                                    <div className="text-[10px] text-slate-500">محک: {formatNumber(r.mahakKg)} {mahakQtyUnitLabel(r)}{Number(r.mahakQty2)>0 && <> — <b className="text-indigo-600">{formatNumber(r.mahakQty2)}</b> {r.mahakUnit2||''} (مستقیم)</>}</div>
+                                                    {r.isAmbiguous && <div className="text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-300 rounded px-1.5 py-0.5 mt-1 inline-block">⚠ چند کالای هم‌نام در انبار پیدا شد — باید دستی انتخاب کنی، وگرنه دوباره تکراری ساخته می‌شود</div>}
+                                                    {conv.stdUnit && <div className="text-[9px] font-bold text-indigo-600 mt-1">ساخت خودکار با معیار محک: {formatNumber(conv.value)} {conv.stdUnit}</div>}
+                                                </div>
+                                                <div><label className="text-[9px] text-slate-400 block mb-1">روش</label><div className="flex gap-1"><button onClick={()=>updateRow(r.id,{mode:'existing'})} className={`flex-1 px-2 py-2 rounded-lg text-[10px] font-bold border ${r.mode==='existing'?'bg-indigo-600 text-white':'bg-white'}`}>کالای فعلی</button><button onClick={()=>updateRow(r.id,{mode:'new',targetName:r.targetName||r.mahakName,targetWarehouseId:r.targetWarehouseId||defaultMahakWarehouseId})} className={`flex-1 px-2 py-2 rounded-lg text-[10px] font-bold border ${r.mode==='new'?'bg-emerald-600 text-white':'bg-white'}`}>جدید</button></div></div>
+                                                <div>{r.mode==='existing'?<MahakLinkPicker items={items} settings={settings} selectedId={r.itemId} placeholder="— انتخاب کالا —" onSelect={(it)=>updateRow(r.id,{itemId:it.id,targetName:it.name,targetUnit:it.unit||'کیسه',weightKg:it.bagWeight?Number(it.bagWeight)/1000:r.weightKg})}/>:<input value={r.targetName} onChange={e=>updateRow(r.id,{targetName:e.target.value})} className="w-full p-2 rounded-lg border text-xs" placeholder="نام کالای جدید"/>}</div>
+                                                {r.mode==='new' && <div><select value={r.targetWarehouseId || defaultMahakWarehouseId || ''} onChange={e=>updateRow(r.id,{targetWarehouseId:e.target.value})} className="w-full p-2 rounded-lg border text-xs"><option value="">— بدون انبار —</option>{(settings?.warehouses || []).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select><div className="text-[8px] text-slate-400 mt-1">انبار کالای جدید</div></div>}
+                                                <div><select value={r.targetUnit} onChange={e=>updateRow(r.id,{targetUnit:e.target.value,weightKg:(e.target.value==='کیلوگرم'||e.target.value==='کیلو')?'':r.weightKg})} className="w-full p-2 rounded-lg border text-xs"><option value="کیسه">کیسه</option><option value="کارتن">کارتن</option><option value="بسته">بسته</option><option value="عدد">عدد</option><option value="کیلوگرم">کیلوگرم</option><option value="کیلو">کیلو</option></select></div>
+                                                <div><input type="number" min="0" step="any" disabled={r.targetUnit==='کیلوگرم'||r.targetUnit==='کیلو'} value={r.weightKg} onChange={e=>updateRow(r.id,{weightKg:e.target.value})} className="w-full p-2 rounded-lg border text-xs text-center disabled:bg-slate-100" placeholder={r.targetUnit==='کیلوگرم'||r.targetUnit==='کیلو'?'نیاز نیست':'وزن هر بسته (kg)'}/></div>
+                                                <div className={`p-2 rounded-lg text-center text-xs font-black ${conv.ok?'bg-emerald-50 text-emerald-700':'bg-red-100 text-red-700'}`}>{conv.ok?`${formatNumber(conv.value)} ${conv.stdUnit||r.targetUnit}`:conv.reason}</div>
+                                            </div>
+                                        </div>
+                                    </React.Fragment>;})}</div>
                                 <div className="flex justify-between items-center mt-5"><button onClick={()=>setStep(2)} className="px-4 py-2 rounded-xl border text-xs font-bold">بازگشت به تطبیق</button><button disabled={busy || conversionErrors.length>0} onClick={applySync} title={conversionErrors.length>0?'موارد مشکل‌دار در ابتدای همین صفحه جداگانه نمایش داده شده‌اند. همان‌جا اصلاحشان کنید.':''} className="px-5 py-3 rounded-xl bg-emerald-600 text-white text-xs font-black disabled:opacity-50">{busy?'در حال اعمال...':conversionErrors.length>0 ? `نیاز به اصلاح ${conversionErrors.length} مورد` : unresolved.length ? `اعمال Sync + تعیین تکلیف ${unresolved.length} مورد` : 'ساخت بکاپ و اعمال همگام‌سازی'}</button></div>
                             </div>
                             );
@@ -629,11 +771,12 @@ const conversionErrors = rows.filter(r => {
 
                     // ابتدا هدرها را به‌صورت ماتریسی پیدا می‌کنیم تا وجود ستون‌های خالی/اضافی یا فاصله‌های انتهای هدر مشکلی ایجاد نکند.
                     const matrix = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'', raw:true });
-                    let headerIndex = -1, nameCol = -1, qtyCol = -1, qty2Col = -1, unit2Col = -1;
+                    let headerIndex = -1, nameCol = -1, qtyCol = -1, qty2Col = -1, unit2Col = -1, unitCol = -1;
                     const wantedName = normalizeMahakName('نام کامل کالا');
                     const wantedQty  = normalizeMahakName('موجودی');
                     const wantedQty2 = normalizeMahakName('موجودی 2');
                     const wantedUnit2 = normalizeMahakName('واحد 2');
+                    const wantedUnit = normalizeMahakName('واحد');
                     for (let r = 0; r < Math.min(matrix.length, 20); r++) {
                         const row = Array.isArray(matrix[r]) ? matrix[r] : [];
                         const normalized = row.map(v => normalizeMahakName(v));
@@ -643,6 +786,7 @@ const conversionErrors = rows.filter(r => {
                             headerIndex = r; nameCol = n; qtyCol = q;
                             qty2Col = normalized.findIndex(v => v === wantedQty2);
                             unit2Col = normalized.findIndex(v => v === wantedUnit2);
+                            unitCol = normalized.findIndex(v => v === wantedUnit);
                             break;
                         }
                     }
@@ -669,7 +813,8 @@ const conversionErrors = rows.filter(r => {
                         if (!rawName || q === null) continue;
                         const q2 = qty2Col >= 0 ? parseNum(row[qty2Col]) : null;
                         const unit2 = unit2Col >= 0 ? cleanName(row[unit2Col]) : '';
-                        allRows.push({mahakName:rawName, quantity:q, quantity2:q2, unit2});
+                        const unit = unitCol >= 0 ? cleanName(row[unitCol]) : '';
+                        allRows.push({mahakName:rawName, quantity:q, quantity2:q2, unit2, unit});
                     }
                     // اگر یک نام دو بار در فایل آمده باشد، جمعشان ثبت می‌شود (نه اینکه ردیف آخر بقیه را پاک کند).
                     const mergedMap = new Map();
@@ -679,6 +824,8 @@ const conversionErrors = rows.filter(r => {
                         if (!e) { mergedMap.set(k, {...r}); return; }
                         e.quantity += r.quantity;
                         if (e.quantity2 !== null || r.quantity2 !== null) e.quantity2 = (e.quantity2 || 0) + (r.quantity2 || 0);
+                        if (!e.unit && r.unit) e.unit = r.unit;
+                        if (!e.unit2 && r.unit2) e.unit2 = r.unit2;
                     });
                     const uniqRows = [...mergedMap.values()];
                     const nonPositiveRows = uniqRows.filter(r => r.quantity <= 0);

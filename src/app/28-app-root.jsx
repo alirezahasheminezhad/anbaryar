@@ -962,20 +962,31 @@
                             logTransaction(old, 'IMPORT', delta, convertedQty, undefined, undefined, `همگام‌سازی محک — ${r.mahakName}`);
                             next[idx] = {...old, quantity:convertedQty, ...(r.saveBagWeight && r.converted.weightKg > 0 ? { bagWeight: r.converted.weightKg * 1000 } : {}), lastUpdated:Date.now()};
                         } else {
-                            const kgFallback = r.autoCreate === true;
-                            const defaultMahakWarehouseId = (appSettings?.warehouses || []).find(w => String(w?.name || '').trim() === 'سوله گرجی علیا')?.id || '';
+                            // گارد نهایی ضد تکراری: اگر کالایی با همین نام (نرمال‌شده) از قبل هست — حتی اگر در همین Sync
+                            // ساخته شده باشد — به‌جای ساختن کپی، موجودی همان کالا جایگزین و لینک به آن ذخیره می‌شود.
+                            const normName = normalizeMahakName(r.finalName);
+                            const twinIdx = next.findIndex(i => normalizeMahakName(i.name) === normName);
+                            if (twinIdx > -1) {
+                                const old = next[twinIdx];
+                                const delta = convertedQty - (Number(old.quantity) || 0);
+                                logTransaction(old, 'IMPORT', delta, convertedQty, undefined, undefined, `همگام‌سازی محک — ${r.mahakName} (لینک به کالای هم‌نام)`);
+                                next[twinIdx] = {...old, quantity:convertedQty, lastUpdated:Date.now()};
+                                finalMappings[r.normalized] = { mahakName:r.mahakName, itemId:old.id, mode:'existing', targetName:old.name, targetUnit:old.unit || r.targetUnit || 'کیسه', weightKg:old.bagWeight ? Number(old.bagWeight)/1000 : 0, updatedAt:Date.now() };
+                                return;
+                            }
+                            const defaultMahakWarehouseId = appSettings?.mahakDefaultWarehouseId || (appSettings?.warehouses || [])[0]?.id || '';
                             const newItem = {
                                 id: generateId(), name:r.finalName, brand:'', tag:'عمومی',
                                 warehouseId: r.targetWarehouseId || defaultMahakWarehouseId,
-                                quantity:convertedQty, unit:kgFallback ? 'کیلوگرم' : (r.targetUnit || 'کیسه'),
-                                bagWeight: kgFallback ? null : (r.converted.weightKg > 0 ? r.converted.weightKg * 1000 : null),
+                                quantity:convertedQty, unit:r.targetUnit || 'کیلوگرم',
+                                bagWeight: r.converted.weightKg > 0 ? r.converted.weightKg * 1000 : null,
                                 lastUpdated:Date.now()
                             };
                             logTransaction(newItem, 'IMPORT', convertedQty, convertedQty, undefined, undefined, `همگام‌سازی محک — کالای جدید: ${r.mahakName}`);
                             next.unshift(newItem);
                             finalMappings[r.normalized] = {
                                 mahakName:r.mahakName, itemId:newItem.id, mode:'existing', targetName:newItem.name,
-                                targetUnit:newItem.unit, weightKg:kgFallback ? 0 : (newItem.bagWeight ? newItem.bagWeight/1000 : 0), updatedAt:Date.now()
+                                targetUnit:newItem.unit, weightKg:newItem.bagWeight ? newItem.bagWeight/1000 : 0, updatedAt:Date.now()
                             };
                         }
                     });

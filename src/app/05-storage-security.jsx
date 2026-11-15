@@ -9,7 +9,7 @@
         const IDB_DATA_KEY = 'secure-data';
         const IDB_FALLBACK_KEY = 'plain-data-fallback';
         const APP_SCHEMA_VERSION = 11;
-        const APP_BUILD = '10.13-pending-outputs-ui';
+        const APP_BUILD = '10.14-mahak-standard-units-dedup';
 
         // ------------------------------------------------------------------
         // امنیت و ذخیره‌سازی محلی، IndexedDB
@@ -116,7 +116,7 @@
 
         const saveSettings = (settings) => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch(e) {} };
         const loadSettings = () => {
-            const defaults = { loadingCostPerTon: 200000, loadingWeightIncrementKg: 1000, loadingWeightRoundUpThreshold: 0.9, loadingMinWeightEnabled: false, loadingMinWeightKg: 1000, lowStockThreshold: 100, standardNotices: [], warehouses: [], criticalMutes: {}, criticalGroups: [], autoLockMinutes: 30, mahakMappings: {}, mahakLastSync: null,
+            const defaults = { loadingCostPerTon: 200000, loadingWeightIncrementKg: 1000, loadingWeightRoundUpThreshold: 0.9, loadingMinWeightEnabled: false, loadingMinWeightKg: 1000, lowStockThreshold: 100, standardNotices: [], warehouses: [], criticalMutes: {}, criticalGroups: [], autoLockMinutes: 30, mahakMappings: {}, mahakLastSync: null, mahakDefaultWarehouseId: '',
                 // موجودی کیسه‌ی مادر (خالی) به تفکیک رنگ/محصول — خودِ انبار اصلی این را به حساب نمی‌آورد؛
                 // صرفاً برای اینکه بشود دید چند کیسه‌ی مادر خالی برای هر محصول داری و هنگام تأیید ارسال
                 // هشدار کسری بدهد. خرید = افزایش qty، مصرف هنگام تأیید ارسال = کاهش qty.

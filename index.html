@@ -2614,7 +2614,7 @@ const IDB_STORE = 'app';
 const IDB_DATA_KEY = 'secure-data';
 const IDB_FALLBACK_KEY = 'plain-data-fallback';
 const APP_SCHEMA_VERSION = 11;
-const APP_BUILD = '10.13-pending-outputs-ui';
+const APP_BUILD = '10.14-mahak-standard-units-dedup';
 
 // ------------------------------------------------------------------
 // امنیت و ذخیره‌سازی محلی، IndexedDB
@@ -2848,6 +2848,7 @@ const loadSettings = () => {
     autoLockMinutes: 30,
     mahakMappings: {},
     mahakLastSync: null,
+    mahakDefaultWarehouseId: '',
     // موجودی کیسه‌ی مادر (خالی) به تفکیک رنگ/محصول — خودِ انبار اصلی این را به حساب نمی‌آورد؛
     // صرفاً برای اینکه بشود دید چند کیسه‌ی مادر خالی برای هر محصول داری و هنگام تأیید ارسال
     // هشدار کسری بدهد. خرید = افزایش qty، مصرف هنگام تأیید ارسال = کاهش qty.
@@ -3478,7 +3479,7 @@ const getMahakTargetMode = (item, explicitWeightKg, forcePackage) => {
     weightKg: 0
   };
 };
-const convertMahakKgToTarget = (kg, item, explicitWeightKg, forcePackage, mahakQty2) => {
+const convertMahakKgToTarget = (kg, item, explicitWeightKg, forcePackage, mahakQty2, mahakUnit) => {
   const n = Number(kg);
   if (!Number.isFinite(n)) return {
     ok: false,
@@ -3523,11 +3524,259 @@ const convertMahakKgToTarget = (kg, item, explicitWeightKg, forcePackage, mahakQ
       weightKg: mode.weightKg || 0
     };
   }
+  // «معیار محک» برای کالاهایی که واحدِ خودِ محک غیرکیلوگرم است ولی «موجودی ۲» ندارند (مثلاً «عدد»):
+  // همان عددِ ستون «موجودی» عیناً تعداد در همان واحد است. این حالت وقتی پیش می‌آید که کالای متناظر
+  // قبلاً با معیار محک ساخته شده (واحدش همان واحدِ فایل است) و حالا همان فایل دوباره Sync می‌شود;
+  // بدون این fallback، Syncِ دوم برای این ردیف‌ها خطای تبدیل می‌داد و idempotency می‌شکست.
+  const srcUnit = normalizeMahakUnit(mahakUnit);
+  const itemUnit = normalizeMahakUnit(item?.unit);
+  if (srcUnit && itemUnit && srcUnit !== 'کیلوگرم' && srcUnit === itemUnit) {
+    return {
+      ok: true,
+      value: n,
+      mode: 'direct',
+      remainder: 0,
+      weightKg: 0
+    };
+  }
   return {
     ok: false,
     value: 0,
     reason: 'واحد کالا کیلو نیست، وزن بسته/کارتن هم تعریف نشده و فایل محک برای این ردیف تعداد مستقیم (موجودی ۲) نداده است.'
   };
+};
+
+// یکسان‌سازی واحدِ فایل محک با واحدهای داخلی («کيلو گرم» → «کیلوگرم» و ...)
+const normalizeMahakUnit = u => {
+  const s = String(u || '').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim();
+  if (!s) return '';
+  if (['کیلو گرم', 'کیلوگرم', 'کیلو', 'kg', 'کیلوگرم '].includes(s)) return 'کیلوگرم';
+  return s;
+};
+
+// «معیار محک»: کالای جدیدی که از فایل محک ساخته می‌شود باید همان واحد و تعدادِ خودِ محک را داشته باشد،
+// نه کیلوگرمِ حدسی. اولویت: «موجودی ۲»+«واحد ۲» (تعداد دقیق کیسه/کارتنِ خود محک) → واحد اصلی فایل
+// (مثلاً «عدد» برای کیسه‌ی خالی) → کیلوگرم. قبلاً همه‌ی کالاهای جدید به‌زور کیلوگرم می‌شدند و
+// پیش‌نمایش بازبینی عددِ کیسه را نشان می‌داد ولی Sync همان را کیلو ثبت می‌کرد.
+const getMahakStandardTarget = r => {
+  const q2 = Number(r.mahakQty2);
+  const u2 = normalizeMahakUnit(r.mahakUnit2);
+  if (Number.isFinite(q2) && q2 > 0 && u2) return {
+    unit: u2,
+    value: q2,
+    mode: 'package-direct'
+  };
+  const u = normalizeMahakUnit(r.mahakUnit);
+  const q = Number(r.mahakKg);
+  if (u && u !== 'کیلوگرم' && Number.isFinite(q)) return {
+    unit: u,
+    value: q,
+    mode: 'direct'
+  };
+  return {
+    unit: 'کیلوگرم',
+    value: Number.isFinite(q) ? q : 0,
+    mode: 'kg'
+  };
+};
+// پیش‌نمایشِ ردیفی که قرار است خودکار ساخته شود باید دقیقاً همان چیزی باشد که ساخته می‌شود.
+const mahakStandardConv = r => {
+  const std = getMahakStandardTarget(r);
+  return {
+    ok: true,
+    value: std.value,
+    mode: std.mode,
+    remainder: 0,
+    weightKg: 0,
+    stdUnit: std.unit
+  };
+};
+const mahakQtyUnitLabel = r => {
+  const u = normalizeMahakUnit(r.mahakUnit);
+  return u && u !== 'کیلوگرم' ? u : 'kg';
+};
+
+// تشخیص «مشکوک به تکراری» برای هشدار قبل از ساخت کالای جدید: یا نام فشرده (بدون فاصله) یکی است
+// (زردچوبه / زرد چوبه) یا شباهت کلمه‌ای خیلی بالاست. فقط هشدار است، نه لینک خودکار — چون محک خودش
+// هم گاهی دو املا را دو کالای جدا می‌داند.
+const compactMahakName = v => normalizeMahakName(v).replace(/\s+/g, '');
+const findSuspectedDuplicates = (name, items) => {
+  const compact = compactMahakName(name);
+  if (!compact) return [];
+  return items.filter(i => {
+    const n = normalizeMahakName(i.name);
+    if (n === normalizeMahakName(name)) return false; // هم‌نام دقیق = گارد اصلی، نه هشدار
+    return compactMahakName(i.name) === compact || mahakSimilarity(name, i.name) >= 0.8;
+  });
+};
+
+// انتخاب/لینک کالا برای ردیف محک. قبلاً دراپ‌داون داخل لیستِ اسکرول‌دار بود و ته صفحه بریده می‌شد؛
+// حالا با portal مستقیم روی body می‌نشیند، اگر پایین جا نباشد رو به بالا باز می‌شود، با کلیک بیرون
+// و Escape بسته می‌شود و با کیبورد (بالا/پایین/Enter) هم قابل استفاده است.
+const MahakLinkPicker = ({
+  items,
+  settings,
+  selectedId,
+  onSelect,
+  placeholder
+}) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [pos, setPos] = useState(null);
+  const triggerRef = useRef(null);
+  const panelRef = useRef(null);
+  const selected = items.find(i => i.id === selectedId);
+  const q = normalizeMahakName(search);
+  const candidates = items.filter(i => !q || normalizeMahakName([i.name, i.brand, i.tag, i.unit, i.bagWeight ? String(i.bagWeight) : ''].filter(Boolean).join(' ')).includes(q)).sort((a, b) => {
+    if (a.id === selectedId) return -1;
+    if (b.id === selectedId) return 1;
+    return String(a.name || '').localeCompare(String(b.name || ''), 'fa');
+  });
+  const shown = candidates.slice(0, 60);
+  const allNames = shown.map(x => x.name);
+  const place = () => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const width = Math.min(520, window.innerWidth - 16);
+    const desiredH = Math.min(360, window.innerHeight * 0.6);
+    const spaceBelow = window.innerHeight - r.bottom - 10;
+    const up = spaceBelow < Math.min(desiredH, 260) && r.top > spaceBelow;
+    const maxH = Math.max(160, Math.min(desiredH, up ? r.top - 14 : spaceBelow));
+    const top = up ? Math.max(8, r.top - maxH - 6) : r.bottom + 6;
+    const left = Math.max(8, Math.min(r.right - width, window.innerWidth - width - 8));
+    setPos({
+      top,
+      left,
+      width,
+      maxH
+    });
+  };
+  const openPanel = () => {
+    place();
+    setSearch('');
+    setActiveIdx(0);
+    setOpen(true);
+  };
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = e => {
+      if (panelRef.current?.contains(e.target) || triggerRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onKey = e => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    const onMove = () => place();
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey, true);
+    window.addEventListener('resize', onMove);
+    window.addEventListener('scroll', onMove, true);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('resize', onMove);
+      window.removeEventListener('scroll', onMove, true);
+    };
+  }, [open]);
+  const choose = it => {
+    onSelect(it);
+    setOpen(false);
+    setSearch('');
+  };
+  const onKeyNav = e => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIdx(i => Math.min(i + 1, shown.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIdx(i => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (shown[activeIdx]) choose(shown[activeIdx]);
+    }
+  };
+  useEffect(() => {
+    if (open) document.getElementById(`mahak-link-opt-${activeIdx}`)?.scrollIntoView({
+      block: 'nearest'
+    });
+  }, [activeIdx, open]);
+  const panel = open && pos && /*#__PURE__*/React.createElement("div", {
+    ref: panelRef,
+    role: "listbox",
+    style: {
+      position: 'fixed',
+      top: pos.top,
+      left: pos.left,
+      width: pos.width,
+      maxHeight: pos.maxH,
+      zIndex: 120
+    },
+    className: "bg-white border border-slate-200 rounded-xl shadow-2xl p-2 flex flex-col"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 mb-2 shrink-0"
+  }, /*#__PURE__*/React.createElement(Search, {
+    size: 14,
+    className: "text-slate-400 shrink-0"
+  }), /*#__PURE__*/React.createElement("input", {
+    autoFocus: true,
+    value: search,
+    onChange: e => {
+      setSearch(e.target.value);
+      setActiveIdx(0);
+    },
+    onKeyDown: onKeyNav,
+    placeholder: "\u062C\u0633\u062A\u062C\u0648 \u062F\u0631 \u0646\u0627\u0645\u060C \u0628\u0631\u0646\u062F\u060C \u062A\u06AF\u060C \u0648\u0627\u062D\u062F...",
+    className: "flex-1 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs outline-none"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "overflow-y-auto space-y-1 flex-1"
+  }, shown.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "p-4 text-center text-xs text-slate-400"
+  }, "\u06A9\u0627\u0644\u0627\u06CC\u06CC \u0628\u0627 \u0627\u06CC\u0646 \u0639\u0628\u0627\u0631\u062A \u067E\u06CC\u062F\u0627 \u0646\u0634\u062F.") : shown.map((it, idx) => {
+    const {
+      prefix,
+      diff
+    } = splitNameDiff(allNames, it.name);
+    return /*#__PURE__*/React.createElement("button", {
+      key: it.id,
+      id: `mahak-link-opt-${idx}`,
+      type: "button",
+      role: "option",
+      "aria-selected": it.id === selectedId,
+      onClick: () => choose(it),
+      className: `w-full text-right p-2 rounded-lg border ${it.id === selectedId ? 'border-indigo-300 bg-indigo-50' : idx === activeIdx ? 'border-slate-300 bg-slate-50' : 'border-transparent hover:border-slate-200 hover:bg-slate-50'}`
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "font-black text-xs text-slate-800"
+    }, prefix, diff && /*#__PURE__*/React.createElement("span", {
+      className: `mr-1 px-1 rounded border ${stringToBadgeColor(diff)}`
+    }, diff)), /*#__PURE__*/React.createElement("div", {
+      className: "mt-1 flex items-center gap-1 flex-wrap"
+    }, /*#__PURE__*/React.createElement(ItemDistinguishBadges, {
+      item: it
+    }), getWarehouseById(settings?.warehouses || [], it.warehouseId)?.name && /*#__PURE__*/React.createElement("span", {
+      className: "text-[9px] px-1.5 py-0 rounded font-bold border bg-slate-100 text-slate-600 border-slate-200"
+    }, getWarehouseById(settings?.warehouses || [], it.warehouseId).name)));
+  })));
+  return /*#__PURE__*/React.createElement("div", {
+    className: "relative"
+  }, /*#__PURE__*/React.createElement("button", {
+    ref: triggerRef,
+    type: "button",
+    "aria-haspopup": "listbox",
+    "aria-expanded": open,
+    onClick: () => open ? setOpen(false) : openPanel(),
+    className: "w-full p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold outline-none text-right flex items-center justify-between gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "truncate"
+  }, selected ? selected.name : placeholder || '— انتخاب / لینک کالا —'), /*#__PURE__*/React.createElement(ChevronDown, {
+    size: 13,
+    className: "shrink-0 text-slate-400"
+  })), panel && ReactDOM.createPortal(panel, document.body));
 };
 const MahakImportView = ({
   items,
@@ -3543,8 +3792,6 @@ const MahakImportView = ({
   const [fileName, setFileName] = useState('');
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
-  const [openLinkRow, setOpenLinkRow] = useState(null);
-  const [linkSearch, setLinkSearch] = useState('');
   // شناسه مواردی که هنگام ورود به بازبینی خطادار بودند را ثابت نگه می‌داریم؛
   // با اصلاح وزن، ردیف از جلوی چشم کاربر به پایین لیست نمی‌پرد.
   const [pinnedReviewIds, setPinnedReviewIds] = useState([]);
@@ -3618,6 +3865,7 @@ const MahakImportView = ({
           mahakKg: r.quantity,
           mahakQty2: r.quantity2,
           mahakUnit2: r.unit2,
+          mahakUnit: r.unit || '',
           normalized: norm,
           itemId: exact?.id || '',
           targetName: exact?.name || r.mahakName,
@@ -3780,20 +4028,22 @@ const MahakImportView = ({
         unit: r.targetUnit,
         bagWeight: Number(r.weightKg || 0) * 1000
       };
-      return !convertMahakKgToTarget(r.mahakKg, pseudo, r.weightKg, r.forcePackage === true, r.mahakQty2).ok;
+      return !convertMahakKgToTarget(r.mahakKg, pseudo, r.weightKg, r.forcePackage === true, r.mahakQty2, r.mahakUnit).ok;
     }
     const item = items.find(i => i.id === r.itemId);
-    return item ? !convertMahakKgToTarget(r.mahakKg, item, r.weightKg, r.forcePackage === true, r.mahakQty2).ok : false;
+    return item ? !convertMahakKgToTarget(r.mahakKg, item, r.weightKg, r.forcePackage === true, r.mahakQty2, r.mahakUnit).ok : false;
   });
   const readyRows = rows.filter(r => {
     if (r.mode === 'new') return !!r.targetName && !!convertMahakKgToTarget(r.mahakKg, {
       unit: r.targetUnit,
       bagWeight: Number(r.weightKg || 0) * 1000
-    }, r.weightKg, r.forcePackage === true, r.mahakQty2).ok;
+    }, r.weightKg, r.forcePackage === true, r.mahakQty2, r.mahakUnit).ok;
     const item = items.find(i => i.id === r.itemId);
-    return !!item && !!convertMahakKgToTarget(r.mahakKg, item, r.weightKg, r.forcePackage === true, r.mahakQty2).ok;
+    return !!item && !!convertMahakKgToTarget(r.mahakKg, item, r.weightKg, r.forcePackage === true, r.mahakQty2, r.mahakUnit).ok;
   });
-  const defaultMahakWarehouseId = (settings?.warehouses || []).find(w => String(w?.name || '').trim() === 'سوله گرجی علیا')?.id || '';
+
+  // انبار پیش‌فرض کالاهای جدید محک از تنظیمات می‌آید (نه یک نام هاردکد شده در سورس عمومی).
+  const defaultMahakWarehouseId = settings?.mahakDefaultWarehouseId || (settings?.warehouses || [])[0]?.id || '';
   const chooseSuggestion = (r, item) => updateRow(r.id, {
     mode: 'existing',
     itemId: item.id,
@@ -3841,9 +4091,27 @@ const MahakImportView = ({
       setStep(2);
       return;
     }
+    // گارد ضد تکراری: ردیف «ایجاد جدید» که نامش دقیقاً مال چند کالای موجود است باید دستی تعیین تکلیف شود.
+    const ambiguousNewRows = rows.filter(r => r.mode === 'new' && r.targetName && items.filter(i => normalizeMahakName(i.name) === normalizeMahakName(r.targetName)).length > 1);
+    if (ambiguousNewRows.length) {
+      toast.show(`${ambiguousNewRows.length} ردیف «ایجاد جدید» نامشان با چند کالای موجود یکی است (${ambiguousNewRows.slice(0, 3).map(r => r.targetName).join('، ')}). برای جلوگیری از کالای تکراری، اول کالای درست را لینک کن.`);
+      setStep(2);
+      return;
+    }
     let autoCreateUnresolved = false;
     if (unresolvedNew.length) {
-      autoCreateUnresolved = await confirmAction(`${unresolvedNew.length} کالا هنوز تعیین تکلیف نشده‌اند.\n\nآیا این موارد با همان نام محک، به‌عنوان کالای جدید ساخته شوند و موجودی‌شان بر مبنای خودِ کیلوگرم محک ثبت شود؟\n\nبعد از ساخت، لینک هرکدام ذخیره می‌شود تا Syncهای بعدی سریع و خودکار انجام شوند.`, {
+      const suspected = unresolvedNew.map(r => ({
+        r,
+        dups: findSuspectedDuplicates(r.mahakName, items)
+      })).filter(x => x.dups.length);
+      const unitCounts = {};
+      unresolvedNew.forEach(r => {
+        const u = getMahakStandardTarget(r).unit;
+        unitCounts[u] = (unitCounts[u] || 0) + 1;
+      });
+      const unitSummary = Object.entries(unitCounts).map(([u, n]) => `${n} ${u}`).join('، ');
+      const dupWarning = suspected.length ? `\n\n⚠ ${suspected.length} مورد نامی بسیار شبیه کالای موجود دارند و ممکن است تکراری باشند:\n${suspected.slice(0, 6).map(x => `• ${x.r.mahakName} ≈ ${x.dups[0].name}`).join('\n')}${suspected.length > 6 ? `\n... و ${suspected.length - 6} مورد دیگر` : ''}\nاگر تکراری‌اند، لغو کن و اول آن‌ها را به کالای موجود لینک کن.` : '';
+      autoCreateUnresolved = await confirmAction(`${unresolvedNew.length} کالا هنوز تعیین تکلیف نشده‌اند.\n\nبا تأیید تو، این موارد با همان نام و «معیار خودِ محک» ساخته می‌شوند: واحد و تعداد از ستون‌های خود فایل محک برداشته می‌شود (${unitSummary}) — نه تبدیل حدسی به کیلوگرم.\n\nبعد از ساخت، لینک هرکدام ذخیره می‌شود تا Syncهای بعدی سریع و خودکار انجام شوند.${dupWarning}`, {
         danger: false
       });
       if (!autoCreateUnresolved) {
@@ -3872,19 +4140,21 @@ const MahakImportView = ({
         ...mappings
       };
       const prepared = [...readyRows].map(r => {
-        const existing = r.mode === 'existing' ? items.find(i => i.id === r.itemId) : null;
+        // گارد ضد تکراری: «ایجاد جدید» با نامی که دقیقاً مال یک کالای موجود است، به‌جای ساختن کپی، به همان کالا لینک می‌شود.
+        const nameTwin = r.mode === 'new' && r.targetName ? items.find(i => normalizeMahakName(i.name) === normalizeMahakName(r.targetName)) : null;
+        const existing = r.mode === 'existing' ? items.find(i => i.id === r.itemId) : nameTwin;
         const target = existing || {
           name: r.targetName,
           unit: r.targetUnit || 'کیسه',
           bagWeight: Number(r.weightKg || 0) * 1000
         };
-        const converted = convertMahakKgToTarget(r.mahakKg, target, r.weightKg, r.forcePackage === true, r.mahakQty2);
+        const converted = convertMahakKgToTarget(r.mahakKg, target, r.weightKg, r.forcePackage === true, r.mahakQty2, r.mahakUnit);
         const finalName = existing ? existing.name : r.targetName.trim();
-        if (!finalName || !converted.ok) throw new Error(`ردیف نامعتبر: ${r.mahakName}`);
+        if (!finalName || !converted.ok) throw new Error(`ردیف «${r.mahakName}»: ${converted.reason || 'نامعتبر'}`);
         nextMappings[r.normalized] = {
           mahakName: r.mahakName,
           itemId: existing?.id || null,
-          mode: r.mode,
+          mode: existing ? 'existing' : r.mode,
           targetName: finalName,
           targetUnit: r.targetUnit || target.unit || 'کیسه',
           weightKg: Number(converted.weightKg || r.weightKg || 0),
@@ -3900,22 +4170,26 @@ const MahakImportView = ({
         };
       });
       if (autoCreateUnresolved) {
-        unresolvedNew.forEach(r => prepared.push({
-          ...r,
-          mode: 'new',
-          finalName: String(r.mahakName || '').trim(),
-          targetUnit: 'کیلوگرم',
-          targetWarehouseId: r.targetWarehouseId || defaultMahakWarehouseId,
-          autoCreate: true,
-          existingItemId: null,
-          converted: {
-            ok: true,
-            value: Number(r.mahakKg) || 0,
-            mode: 'kg',
-            remainder: 0,
-            weightKg: 1
-          }
-        }));
+        // معیار محک: واحد/تعدادِ خودِ فایل (موجودی ۲ + واحد ۲، یا واحد اصلی) — نه کیلوگرمِ اجباری.
+        unresolvedNew.forEach(r => {
+          const std = getMahakStandardTarget(r);
+          prepared.push({
+            ...r,
+            mode: 'new',
+            finalName: String(r.mahakName || '').trim(),
+            targetUnit: std.unit,
+            targetWarehouseId: r.targetWarehouseId || defaultMahakWarehouseId,
+            autoCreate: true,
+            existingItemId: null,
+            converted: {
+              ok: true,
+              value: std.value,
+              mode: std.mode,
+              remainder: 0,
+              weightKg: 0
+            }
+          });
+        });
       }
       // اقلامی که باید حذف شوند را از نقشه‌ی لینک‌ها هم پاک می‌کنیم تا محکِ بعدی دوباره سراغشان نرود
       if (removeMode === 'delete') itemsToRemove.forEach(x => {
@@ -3951,7 +4225,7 @@ const MahakImportView = ({
     className: "text-emerald-600"
   }), " \u0647\u0645\u06AF\u0627\u0645\u200C\u0633\u0627\u0632\u06CC \u0645\u0648\u062C\u0648\u062F\u06CC \u0645\u062D\u06A9"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-500 mt-1"
-  }, "\xAB\u0646\u0627\u0645 \u06A9\u0627\u0645\u0644 \u06A9\u0627\u0644\u0627\xBB \u0648 \xAB\u0645\u0648\u062C\u0648\u062F\u06CC\xBB (\u06A9\u06CC\u0644\u0648\u06AF\u0631\u0645) \u062E\u0648\u0627\u0646\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F\u061B \u0627\u06AF\u0631 \u0633\u062A\u0648\u0646\u200C\u0647\u0627\u06CC \xAB\u0645\u0648\u062C\u0648\u062F\u06CC \u06F2\xBB \u0648 \xAB\u0648\u0627\u062D\u062F \u06F2\xBB \u0647\u0645 \u062F\u0631 \u0641\u0627\u06CC\u0644 \u0628\u0627\u0634\u0646\u062F\u060C \u0647\u0645\u0627\u0646 \u062A\u0639\u062F\u0627\u062F \u062F\u0642\u06CC\u0642 \u06A9\u06CC\u0633\u0647/\u06A9\u0627\u0631\u062A\u0646 \u0645\u0633\u062A\u0642\u06CC\u0645\u0627\u064B \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F. \u0642\u06CC\u0645\u062A\u200C\u0647\u0627 \u0648 \u0633\u062A\u0648\u0646\u200C\u0647\u0627\u06CC \u0645\u0627\u0644\u06CC \u0646\u0627\u062F\u06CC\u062F\u0647 \u06AF\u0631\u0641\u062A\u0647 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F.")), onClose && /*#__PURE__*/React.createElement("button", {
+  }, "\xAB\u0646\u0627\u0645 \u06A9\u0627\u0645\u0644 \u06A9\u0627\u0644\u0627\xBB\u060C \xAB\u0645\u0648\u062C\u0648\u062F\u06CC\xBB \u0648 \xAB\u0648\u0627\u062D\u062F\xBB \u062E\u0648\u0627\u0646\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F\u061B \u0627\u06AF\u0631 \u0633\u062A\u0648\u0646\u200C\u0647\u0627\u06CC \xAB\u0645\u0648\u062C\u0648\u062F\u06CC \u06F2\xBB \u0648 \xAB\u0648\u0627\u062D\u062F \u06F2\xBB \u0647\u0645 \u062F\u0631 \u0641\u0627\u06CC\u0644 \u0628\u0627\u0634\u0646\u062F\u060C \u0647\u0645\u0627\u0646 \u062A\u0639\u062F\u0627\u062F \u062F\u0642\u06CC\u0642 \u06A9\u06CC\u0633\u0647/\u06A9\u0627\u0631\u062A\u0646 \u0645\u0633\u062A\u0642\u06CC\u0645\u0627\u064B \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F. \u06A9\u0627\u0644\u0627\u0647\u0627\u06CC \u062C\u062F\u06CC\u062F \u0628\u0627 \u0647\u0645\u0627\u0646 \u0648\u0627\u062D\u062F \u0648 \u062A\u0639\u062F\u0627\u062F \u062E\u0648\u062F\u0650 \u0645\u062D\u06A9 \u0633\u0627\u062E\u062A\u0647 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F. \u0642\u06CC\u0645\u062A\u200C\u0647\u0627 \u0648 \u0633\u062A\u0648\u0646\u200C\u0647\u0627\u06CC \u0645\u0627\u0644\u06CC \u0646\u0627\u062F\u06CC\u062F\u0647 \u06AF\u0631\u0641\u062A\u0647 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F.")), onClose && /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
     className: "p-2 rounded-xl hover:bg-slate-200"
   }, /*#__PURE__*/React.createElement(X, {
@@ -3973,7 +4247,7 @@ const MahakImportView = ({
     className: "font-black text-lg text-slate-800"
   }, "\u0641\u0627\u06CC\u0644 \u062E\u0631\u0648\u062C\u06CC \u0645\u062D\u06A9 \u0631\u0627 \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0646\u06CC\u062F"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-500 mt-2 mb-6"
-  }, "\u0641\u0627\u06CC\u0644 \u0628\u0627 \u0633\u0627\u062E\u062A\u0627\u0631 \u0646\u0645\u0648\u0646\u0647\u200C\u06CC \u0641\u0639\u0644\u06CC \u0645\u062D\u06A9 \u0642\u0627\u0628\u0644 \u062E\u0648\u0627\u0646\u062F\u0646 \u0627\u0633\u062A. \xAB\u0646\u0627\u0645 \u06A9\u0627\u0645\u0644 \u06A9\u0627\u0644\u0627\xBB \u0648 \xAB\u0645\u0648\u062C\u0648\u062F\u06CC\xBB (\u06A9\u06CC\u0644\u0648\u06AF\u0631\u0645) \u0645\u0628\u0646\u0627 \u0647\u0633\u062A\u0646\u062F\u061B \u0627\u06AF\u0631 \u0641\u0627\u06CC\u0644 \u0633\u062A\u0648\u0646 \xAB\u0645\u0648\u062C\u0648\u062F\u06CC \u06F2\xBB (\u062A\u0639\u062F\u0627\u062F \u062F\u0642\u06CC\u0642 \u06A9\u06CC\u0633\u0647/\u06A9\u0627\u0631\u062A\u0646) \u0631\u0627 \u0647\u0645 \u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F\u060C \u0647\u0645\u0627\u0646 \u0639\u062F\u062F \u0645\u0633\u062A\u0642\u06CC\u0645 \u0645\u062D\u06A9 \u0645\u0628\u0646\u0627\u06CC \u062A\u0628\u062F\u06CC\u0644 \u0642\u0631\u0627\u0631 \u0645\u06CC\u200C\u06AF\u06CC\u0631\u062F \u2014 \u0646\u0647 \u062D\u062F\u0633\u0650 \u0648\u0632\u0646\u0650 \u0647\u0631 \u06A9\u06CC\u0633\u0647. \u0627\u06AF\u0631 \xAB\u0645\u062D\u06A9 \u0645\u0646\u0628\u0639 \u0627\u0635\u0644\u06CC \u0627\u0633\u062A\xBB \u062A\u06CC\u06A9 \u0628\u0627\u0634\u062F\u060C \u06A9\u0627\u0644\u0627\u0647\u0627\u06CC\u06CC \u06A9\u0647 \u062F\u0631 \u0645\u062D\u06A9 \u0635\u0641\u0631 \u0647\u0633\u062A\u0646\u062F \u06CC\u0627 \u062F\u0631 \u0641\u0627\u06CC\u0644 \u0646\u06CC\u0633\u062A\u0646\u062F \u0647\u0645 (\u0628\u0639\u062F \u0627\u0632 \u0646\u0645\u0627\u06CC\u0634 \u0644\u06CC\u0633\u062A \u0648 \u062A\u0623\u06CC\u06CC\u062F \u062A\u0648) \u0635\u0641\u0631 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F. \u0645\u0648\u0627\u0631\u062F \u062A\u0639\u06CC\u06CC\u0646\u200C\u062A\u06A9\u0644\u06CC\u0641\u200C\u0646\u0634\u062F\u0647 \u0631\u0627 \u062F\u0631 \u0645\u0631\u062D\u0644\u0647 \u0646\u0647\u0627\u06CC\u06CC \u0645\u06CC\u200C\u062A\u0648\u0627\u0646\u06CC\u062F \u06CC\u06A9\u062C\u0627 \u0628\u0647\u200C\u0639\u0646\u0648\u0627\u0646 \u06A9\u0627\u0644\u0627\u06CC \u062C\u062F\u06CC\u062F \u0628\u0633\u0627\u0632\u06CC\u062F."), /*#__PURE__*/React.createElement("label", {
+  }, "\u0641\u0627\u06CC\u0644 \u0628\u0627 \u0633\u0627\u062E\u062A\u0627\u0631 \u0646\u0645\u0648\u0646\u0647\u200C\u06CC \u0641\u0639\u0644\u06CC \u0645\u062D\u06A9 \u0642\u0627\u0628\u0644 \u062E\u0648\u0627\u0646\u062F\u0646 \u0627\u0633\u062A. \xAB\u0646\u0627\u0645 \u06A9\u0627\u0645\u0644 \u06A9\u0627\u0644\u0627\xBB \u0648 \xAB\u0645\u0648\u062C\u0648\u062F\u06CC\xBB \u0645\u0628\u0646\u0627 \u0647\u0633\u062A\u0646\u062F\u061B \u0627\u06AF\u0631 \u0641\u0627\u06CC\u0644 \u0633\u062A\u0648\u0646 \xAB\u0645\u0648\u062C\u0648\u062F\u06CC \u06F2\xBB (\u062A\u0639\u062F\u0627\u062F \u062F\u0642\u06CC\u0642 \u06A9\u06CC\u0633\u0647/\u06A9\u0627\u0631\u062A\u0646) \u0631\u0627 \u0647\u0645 \u062F\u0627\u0634\u062A\u0647 \u0628\u0627\u0634\u062F\u060C \u0647\u0645\u0627\u0646 \u0639\u062F\u062F \u0645\u0633\u062A\u0642\u06CC\u0645 \u0645\u062D\u06A9 \u0645\u0628\u0646\u0627\u06CC \u062A\u0628\u062F\u06CC\u0644 \u0642\u0631\u0627\u0631 \u0645\u06CC\u200C\u06AF\u06CC\u0631\u062F \u2014 \u0646\u0647 \u062D\u062F\u0633\u0650 \u0648\u0632\u0646\u0650 \u0647\u0631 \u06A9\u06CC\u0633\u0647. \u06A9\u0627\u0644\u0627\u0647\u0627\u06CC \u062C\u062F\u06CC\u062F \u0628\u0627 \xAB\u0645\u0639\u06CC\u0627\u0631 \u062E\u0648\u062F\u0650 \u0645\u062D\u06A9\xBB \u0633\u0627\u062E\u062A\u0647 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F: \u0647\u0645\u0627\u0646 \u0648\u0627\u062D\u062F \u0648 \u062A\u0639\u062F\u0627\u062F\u06CC \u06A9\u0647 \u062F\u0631 \u0641\u0627\u06CC\u0644 \u0627\u0633\u062A (\u0645\u062B\u0644\u0627\u064B \u06F4\u06F1\u06F3 \u06A9\u06CC\u0633\u0647\u060C \u0646\u0647 \u06F2\u06F0\u06F6\u06F8\u06F9 \u06A9\u06CC\u0644\u0648\u06AF\u0631\u0645). \u0627\u06AF\u0631 \xAB\u0645\u062D\u06A9 \u0645\u0646\u0628\u0639 \u0627\u0635\u0644\u06CC \u0627\u0633\u062A\xBB \u062A\u06CC\u06A9 \u0628\u0627\u0634\u062F\u060C \u06A9\u0627\u0644\u0627\u0647\u0627\u06CC\u06CC \u06A9\u0647 \u062F\u0631 \u0645\u062D\u06A9 \u0635\u0641\u0631 \u0647\u0633\u062A\u0646\u062F \u06CC\u0627 \u062F\u0631 \u0641\u0627\u06CC\u0644 \u0646\u06CC\u0633\u062A\u0646\u062F \u0647\u0645 (\u0628\u0639\u062F \u0627\u0632 \u0646\u0645\u0627\u06CC\u0634 \u0644\u06CC\u0633\u062A \u0648 \u062A\u0623\u06CC\u06CC\u062F \u062A\u0648) \u0635\u0641\u0631 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F. \u0645\u0648\u0627\u0631\u062F \u062A\u0639\u06CC\u06CC\u0646\u200C\u062A\u06A9\u0644\u06CC\u0641\u200C\u0646\u0634\u062F\u0647 \u0631\u0627 \u062F\u0631 \u0645\u0631\u062D\u0644\u0647 \u0646\u0647\u0627\u06CC\u06CC \u0645\u06CC\u200C\u062A\u0648\u0627\u0646\u06CC\u062F \u06CC\u06A9\u062C\u0627 \u0628\u0647\u200C\u0639\u0646\u0648\u0627\u0646 \u06A9\u0627\u0644\u0627\u06CC \u062C\u062F\u06CC\u062F \u0628\u0633\u0627\u0632\u06CC\u062F."), /*#__PURE__*/React.createElement("label", {
     className: `inline-flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-sm cursor-pointer ${busy ? 'bg-slate-300' : 'bg-emerald-600 hover:bg-emerald-700'} text-white`
   }, /*#__PURE__*/React.createElement(FileSpreadsheet, {
     size: 18
@@ -3996,12 +4270,35 @@ const MahakImportView = ({
     className: "mt-1 w-4 h-4 accent-amber-600 shrink-0"
   }), /*#__PURE__*/React.createElement("span", {
     className: "text-[11px] text-amber-800 leading-5"
-  }, /*#__PURE__*/React.createElement("b", null, "\u0645\u062D\u06A9 \u0645\u0646\u0628\u0639 \u0627\u0635\u0644\u06CC\u0650 \u0645\u0648\u062C\u0648\u062F\u06CC \u0627\u0633\u062A."), " \u0627\u06AF\u0631 \u0641\u0639\u0627\u0644 \u0628\u0627\u0634\u062F\u060C \u06A9\u0627\u0644\u0627\u0647\u0627\u06CC\u06CC \u06A9\u0647 \u062F\u0631 \u0645\u062D\u06A9 \u0635\u0641\u0631 \u0647\u0633\u062A\u0646\u062F \u06CC\u0627 \u0642\u0628\u0644\u0627\u064B \u0644\u06CC\u0646\u06A9 \u0628\u0648\u062F\u0647 \u0648 \u062F\u0631 \u0627\u06CC\u0646 \u0641\u0627\u06CC\u0644 \u0646\u06CC\u0633\u062A\u0646\u062F\u060C \u0645\u0648\u062C\u0648\u062F\u06CC\u200C\u0634\u0627\u0646 \u0635\u0641\u0631 \u0645\u06CC\u200C\u0634\u0648\u062F (\u06CC\u0627 \u0627\u06AF\u0631 \u0628\u062E\u0648\u0627\u0647\u06CC \u062D\u0630\u0641 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F). \u0642\u0628\u0644 \u0627\u0632 \u0647\u0631 \u062A\u063A\u06CC\u06CC\u0631\u060C \u0644\u06CC\u0633\u062A \u06A9\u0627\u0645\u0644 \u0646\u0634\u0627\u0646\u062A \u062F\u0627\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F \u0648 \u0645\u06CC\u200C\u062A\u0648\u0627\u0646\u06CC \u062A\u06A9\u200C\u062A\u06A9 \u062A\u06CC\u06A9 \u0631\u0627 \u0628\u0631\u062F\u0627\u0631\u06CC. \u0627\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628 \u06CC\u0627\u062F\u0622\u0648\u0631\u06CC \u0645\u06CC\u200C\u0634\u0648\u062F.")), settings?.mahakLastSync && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("b", null, "\u0645\u062D\u06A9 \u0645\u0646\u0628\u0639 \u0627\u0635\u0644\u06CC\u0650 \u0645\u0648\u062C\u0648\u062F\u06CC \u0627\u0633\u062A (\u0645\u0639\u06CC\u0627\u0631 \u0645\u062D\u06A9)."), " \u0627\u06AF\u0631 \u0641\u0639\u0627\u0644 \u0628\u0627\u0634\u062F\u060C \u0647\u0645\u0647\u200C\u0686\u06CC\u0632 \u0637\u0628\u0642 \u062E\u0648\u062F\u0650 \u0645\u062D\u06A9 \u067E\u06CC\u0634 \u0645\u06CC\u200C\u0631\u0648\u062F: \u06A9\u0627\u0644\u0627\u0647\u0627\u06CC \u062C\u062F\u06CC\u062F \u0628\u0627 \u0647\u0645\u0627\u0646 \u0648\u0627\u062D\u062F \u0648 \u062A\u0639\u062F\u0627\u062F\u0650 \u0641\u0627\u06CC\u0644 \u0645\u062D\u06A9 \u0633\u0627\u062E\u062A\u0647 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F \u0648 \u06A9\u0627\u0644\u0627\u0647\u0627\u06CC\u06CC \u06A9\u0647 \u062F\u0631 \u0645\u062D\u06A9 \u0635\u0641\u0631 \u0647\u0633\u062A\u0646\u062F \u06CC\u0627 \u0642\u0628\u0644\u0627\u064B \u0644\u06CC\u0646\u06A9 \u0628\u0648\u062F\u0647 \u0648 \u062F\u0631 \u0627\u06CC\u0646 \u0641\u0627\u06CC\u0644 \u0646\u06CC\u0633\u062A\u0646\u062F\u060C \u0645\u0648\u062C\u0648\u062F\u06CC\u200C\u0634\u0627\u0646 \u0635\u0641\u0631 \u0645\u06CC\u200C\u0634\u0648\u062F (\u06CC\u0627 \u0627\u06AF\u0631 \u0628\u062E\u0648\u0627\u0647\u06CC \u062D\u0630\u0641 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F). \u0642\u0628\u0644 \u0627\u0632 \u0647\u0631 \u062A\u063A\u06CC\u06CC\u0631\u060C \u0644\u06CC\u0633\u062A \u06A9\u0627\u0645\u0644 \u0646\u0634\u0627\u0646\u062A \u062F\u0627\u062F\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F \u0648 \u0645\u06CC\u200C\u062A\u0648\u0627\u0646\u06CC \u062A\u06A9\u200C\u062A\u06A9 \u062A\u06CC\u06A9 \u0631\u0627 \u0628\u0631\u062F\u0627\u0631\u06CC. \u0627\u06CC\u0646 \u0627\u0646\u062A\u062E\u0627\u0628 \u06CC\u0627\u062F\u0622\u0648\u0631\u06CC \u0645\u06CC\u200C\u0634\u0648\u062F.")), (settings?.warehouses || []).length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "mt-3 max-w-md mx-auto flex items-center justify-center gap-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-2xl p-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-bold shrink-0"
+  }, "\u0627\u0646\u0628\u0627\u0631 \u067E\u06CC\u0634\u200C\u0641\u0631\u0636 \u06A9\u0627\u0644\u0627\u0647\u0627\u06CC \u062C\u062F\u06CC\u062F:"), /*#__PURE__*/React.createElement("select", {
+    value: defaultMahakWarehouseId,
+    onChange: e => onSaveSettings && onSaveSettings({
+      ...settings,
+      mahakDefaultWarehouseId: e.target.value
+    }),
+    className: "flex-1 p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold outline-none"
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 \u0628\u062F\u0648\u0646 \u0627\u0646\u0628\u0627\u0631 \u2014"), (settings?.warehouses || []).map(w => /*#__PURE__*/React.createElement("option", {
+    key: w.id,
+    value: w.id
+  }, w.name)))), settings?.mahakLastSync && /*#__PURE__*/React.createElement("div", {
     className: "mt-6 text-xs text-slate-400"
   }, "\u0622\u062E\u0631\u06CC\u0646 Sync: ", new Date(settings.mahakLastSync).toLocaleString('fa-IR'))), step === 2 && /*#__PURE__*/React.createElement("div", {
     className: "p-5"
-  }, unresolvedBanner, /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-2 md:grid-cols-5 gap-2 mb-4"
+  }, unresolvedBanner, /*#__PURE__*/React.createElement("label", {
+    className: "flex items-center gap-2 w-fit text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 cursor-pointer mb-3"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: mahakIsMaster,
+    onChange: e => setMahakIsMaster(e.target.checked),
+    className: "w-4 h-4 accent-amber-600"
+  }), "\u0645\u062D\u06A9 \u0645\u0646\u0628\u0639 \u0627\u0635\u0644\u06CC \u0627\u0633\u062A (\u0645\u0639\u06CC\u0627\u0631 \u0645\u062D\u06A9) \u2014 \u06A9\u0627\u0644\u0627\u0647\u0627\u06CC \u0635\u0641\u0631/\u063A\u0627\u06CC\u0628 \u062F\u0631 \u0645\u062D\u06A9\u060C \u0628\u0627 \u062A\u0623\u06CC\u06CC\u062F \u062A\u0648 \u0635\u0641\u0631 \u06CC\u0627 \u062D\u0630\u0641 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F"), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "rounded-xl bg-slate-50 border p-3"
   }, /*#__PURE__*/React.createElement("div", {
@@ -4256,7 +4553,7 @@ const MahakImportView = ({
       unit: r.targetUnit,
       bagWeight: Number(r.weightKg || 0) * 1000
     } : item;
-    const conv = convertMahakKgToTarget(r.mahakKg, target, r.weightKg, r.forcePackage === true, r.mahakQty2);
+    const conv = unresolvedNew.some(u => u.id === r.id) ? mahakStandardConv(r) : convertMahakKgToTarget(r.mahakKg, target, r.weightKg, r.forcePackage === true, r.mahakQty2, r.mahakUnit);
     return /*#__PURE__*/React.createElement("div", {
       key: r.id,
       id: `mahak-row-${r.id}`,
@@ -4270,7 +4567,7 @@ const MahakImportView = ({
       title: r.mahakName
     }, r.mahakName), /*#__PURE__*/React.createElement("div", {
       className: "text-[10px] text-slate-400 mt-1"
-    }, "\u0645\u062D\u06A9: ", /*#__PURE__*/React.createElement("b", null, formatNumber(r.mahakKg)), " kg", Number(r.mahakQty2) > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, " \u2014 ", /*#__PURE__*/React.createElement("b", {
+    }, "\u0645\u062D\u06A9: ", /*#__PURE__*/React.createElement("b", null, formatNumber(r.mahakKg)), " ", mahakQtyUnitLabel(r), Number(r.mahakQty2) > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, " \u2014 ", /*#__PURE__*/React.createElement("b", {
       className: "text-indigo-600"
     }, formatNumber(r.mahakQty2)), " ", r.mahakUnit2 || '', " (\u0645\u0633\u062A\u0642\u06CC\u0645 \u0627\u0632 \u0645\u062D\u06A9)"))), /*#__PURE__*/React.createElement("div", {
       className: "xl:col-span-2"
@@ -4289,81 +4586,17 @@ const MahakImportView = ({
         weightKg: r.weightKg || ''
       }),
       className: `flex-1 px-2 py-1.5 rounded-lg text-[10px] font-bold border ${r.mode === 'new' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500 border-slate-200'}`
-    }, "\u0627\u06CC\u062C\u0627\u062F \u062C\u062F\u06CC\u062F")), r.mode === 'existing' ? (() => {
-      const selected = items.find(i => i.id === r.itemId);
-      const q = openLinkRow === r.id ? normalizeMahakName(linkSearch) : '';
-      const linkCandidates = items
-      // در بخش لینک‌کردن محک، کل لیست کالاهای انبار قابل جستجو است؛
-      // موجودی صفر نیز نباید باعث مخفی‌شدن کالا شود.
-      .filter(i => !q || normalizeMahakName([i.name, i.brand, i.tag, i.unit, i.bagWeight ? String(i.bagWeight) : ''].filter(Boolean).join(' ')).includes(q)).sort((a, b) => {
-        if (a.id === r.itemId) return -1;
-        if (b.id === r.itemId) return 1;
-        return String(a.name || '').localeCompare(String(b.name || ''), 'fa');
-      });
-      const linkAllNames = linkCandidates.slice(0, 60).map(x => x.name);
-      return /*#__PURE__*/React.createElement("div", {
-        className: "relative"
-      }, /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => {
-          setOpenLinkRow(openLinkRow === r.id ? null : r.id);
-          setLinkSearch('');
-        },
-        className: "w-full p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold outline-none text-right flex items-center justify-between gap-2"
-      }, /*#__PURE__*/React.createElement("span", {
-        className: "truncate"
-      }, selected ? selected.name : '— انتخاب / لینک کالا —'), /*#__PURE__*/React.createElement(ChevronDown, {
-        size: 13,
-        className: "shrink-0 text-slate-400"
-      })), openLinkRow === r.id && /*#__PURE__*/React.createElement("div", {
-        className: "absolute z-[80] top-full mt-1 right-0 w-[min(520px,95vw)] bg-white border border-slate-200 rounded-xl shadow-2xl p-2"
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "flex items-center gap-2 mb-2"
-      }, /*#__PURE__*/React.createElement(Search, {
-        size: 14,
-        className: "text-slate-400 shrink-0"
-      }), /*#__PURE__*/React.createElement("input", {
-        autoFocus: true,
-        value: linkSearch,
-        onChange: e => setLinkSearch(e.target.value),
-        placeholder: "\u062C\u0633\u062A\u062C\u0648 \u062F\u0631 \u0646\u0627\u0645\u060C \u0628\u0631\u0646\u062F\u060C \u062A\u06AF\u060C \u0648\u0627\u062D\u062F...",
-        className: "flex-1 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs outline-none"
-      })), /*#__PURE__*/React.createElement("div", {
-        className: "max-h-64 overflow-y-auto space-y-1"
-      }, linkCandidates.length === 0 ? /*#__PURE__*/React.createElement("div", {
-        className: "p-4 text-center text-xs text-slate-400"
-      }, "\u06A9\u0627\u0644\u0627\u06CC\u06CC \u0628\u0627 \u0627\u06CC\u0646 \u0639\u0628\u0627\u0631\u062A \u067E\u06CC\u062F\u0627 \u0646\u0634\u062F.") : linkCandidates.slice(0, 60).map(it => {
-        const {
-          prefix,
-          diff
-        } = splitNameDiff(linkAllNames, it.name);
-        return /*#__PURE__*/React.createElement("button", {
-          key: it.id,
-          type: "button",
-          onClick: () => {
-            updateRow(r.id, {
-              itemId: it.id,
-              targetName: it.name,
-              targetUnit: it.unit || 'کیسه',
-              weightKg: it.bagWeight ? Number(it.bagWeight) / 1000 : r.weightKg
-            });
-            setOpenLinkRow(null);
-            setLinkSearch('');
-          },
-          className: `w-full text-right p-2 rounded-lg border ${it.id === r.itemId ? 'border-indigo-300 bg-indigo-50' : 'border-transparent hover:border-slate-200 hover:bg-slate-50'}`
-        }, /*#__PURE__*/React.createElement("div", {
-          className: "font-black text-xs text-slate-800"
-        }, prefix, diff && /*#__PURE__*/React.createElement("span", {
-          className: `mr-1 px-1 rounded border ${stringToBadgeColor(diff)}`
-        }, diff)), /*#__PURE__*/React.createElement("div", {
-          className: "mt-1 flex items-center gap-1 flex-wrap"
-        }, /*#__PURE__*/React.createElement(ItemDistinguishBadges, {
-          item: it
-        }), getWarehouseById(settings?.warehouses || [], it.warehouseId)?.name && /*#__PURE__*/React.createElement("span", {
-          className: "text-[9px] px-1.5 py-0 rounded font-bold border bg-slate-100 text-slate-600 border-slate-200"
-        }, getWarehouseById(settings?.warehouses || [], it.warehouseId).name)));
-      }))));
-    })() : /*#__PURE__*/React.createElement("input", {
+    }, "\u0627\u06CC\u062C\u0627\u062F \u062C\u062F\u06CC\u062F")), r.mode === 'existing' ? /*#__PURE__*/React.createElement(MahakLinkPicker, {
+      items: items,
+      settings: settings,
+      selectedId: r.itemId,
+      onSelect: it => updateRow(r.id, {
+        itemId: it.id,
+        targetName: it.name,
+        targetUnit: it.unit || 'کیسه',
+        weightKg: it.bagWeight ? Number(it.bagWeight) / 1000 : r.weightKg
+      })
+    }) : /*#__PURE__*/React.createElement("input", {
       value: r.targetName,
       onChange: e => updateRow(r.id, {
         targetName: e.target.value
@@ -4419,9 +4652,11 @@ const MahakImportView = ({
       className: "text-[9px] text-slate-400"
     }, "\u0646\u062A\u06CC\u062C\u0647 \u062A\u0628\u062F\u06CC\u0644", conv.mode === 'package-direct' && /*#__PURE__*/React.createElement("span", {
       className: "text-indigo-500"
-    }, " (\u0645\u0633\u062A\u0642\u06CC\u0645 \u0627\u0632 \u0645\u062D\u06A9)")), conv.ok ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    }, " (\u0645\u0633\u062A\u0642\u06CC\u0645 \u0627\u0632 \u0645\u062D\u06A9)"), conv.mode === 'direct' && /*#__PURE__*/React.createElement("span", {
+      className: "text-indigo-500"
+    }, " (\u0648\u0627\u062D\u062F \u062E\u0648\u062F \u0645\u062D\u06A9)")), conv.ok ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       className: "font-black text-indigo-700 text-base"
-    }, formatNumber(conv.value), " ", r.targetUnit), conv.remainder > 0 && /*#__PURE__*/React.createElement("div", {
+    }, formatNumber(conv.value), " ", conv.stdUnit || r.targetUnit), conv.remainder > 0 && /*#__PURE__*/React.createElement("div", {
       className: "text-[9px] text-amber-700 mt-1"
     }, "\u0645\u0627\u0646\u062F\u0647: ", formatNumber(conv.remainder), " kg")) : /*#__PURE__*/React.createElement("div", {
       className: "text-[9px] font-bold text-red-600 leading-5"
@@ -4515,8 +4750,8 @@ const MahakImportView = ({
         unit: r.targetUnit,
         bagWeight: Number(r.weightKg || 0) * 1000
       } : item;
-      const conv = convertMahakKgToTarget(r.mahakKg, target, r.weightKg, r.forcePackage === true, r.mahakQty2);
-      const isConversionError = !conv.ok;
+      // ردیفی که قرار است خودکار ساخته شود، پیش‌نمایشش باید دقیقاً همان «معیار محک» باشد که واقعاً ساخته می‌شود.
+      const conv = unresolvedNew.some(u => u.id === r.id) ? mahakStandardConv(r) : convertMahakKgToTarget(r.mahakKg, target, r.weightKg, r.forcePackage === true, r.mahakQty2, r.mahakUnit);
       return /*#__PURE__*/React.createElement(React.Fragment, {
         key: r.id
       }, reviewIndex === 0 && pinnedRows.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -4524,7 +4759,6 @@ const MahakImportView = ({
       }, "\u26A0 \u0645\u0648\u0627\u0631\u062F\u06CC \u06A9\u0647 \u0647\u0646\u06AF\u0627\u0645 \u0648\u0631\u0648\u062F \u0628\u0647 \u0628\u0627\u0632\u0628\u06CC\u0646\u06CC \u0646\u06CC\u0627\u0632 \u0628\u0647 \u0627\u0635\u0644\u0627\u062D \u062F\u0627\u0634\u062A\u0646\u062F \u2014 \u0647\u0645\u06CC\u0646\u200C\u062C\u0627 \u0628\u0645\u0627\u0646\u06CC\u062F \u0648 \u0628\u0639\u062F \u062A\u0623\u06CC\u06CC\u062F \u0646\u0647\u0627\u06CC\u06CC \u0628\u0632\u0646\u06CC\u062F (", pinnedRows.length, " \u0645\u0648\u0631\u062F)"), reviewIndex === pinnedRows.length && pinnedRows.length > 0 && /*#__PURE__*/React.createElement("div", {
         className: "mt-5 pt-4 border-t-2 border-slate-200 bg-slate-50 rounded-xl px-4 py-3 text-xs font-black text-slate-700"
       }, "\u2713 \u0633\u0627\u06CC\u0631 ", normalRows.length, " \u0631\u062F\u06CC\u0641 \u0628\u0627\u0632\u0628\u06CC\u0646\u06CC \u0646\u0647\u0627\u06CC\u06CC"), /*#__PURE__*/React.createElement("div", {
-        key: r.id,
         id: `mahak-row-${r.id}`,
         className: `rounded-2xl border p-3 ${conv.ok ? unresolved.some(u => u.id === r.id) ? 'border-amber-400 bg-amber-50/40 ring-2 ring-amber-200' : 'border-slate-200 bg-white' : 'border-red-300 bg-red-50'}`
       }, /*#__PURE__*/React.createElement("div", {
@@ -4535,9 +4769,13 @@ const MahakImportView = ({
         className: "font-black text-sm"
       }, r.mahakName), /*#__PURE__*/React.createElement("div", {
         className: "text-[10px] text-slate-500"
-      }, "\u0645\u062D\u06A9: ", formatNumber(r.mahakKg), " kg"), r.isAmbiguous && /*#__PURE__*/React.createElement("div", {
+      }, "\u0645\u062D\u06A9: ", formatNumber(r.mahakKg), " ", mahakQtyUnitLabel(r), Number(r.mahakQty2) > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, " \u2014 ", /*#__PURE__*/React.createElement("b", {
+        className: "text-indigo-600"
+      }, formatNumber(r.mahakQty2)), " ", r.mahakUnit2 || '', " (\u0645\u0633\u062A\u0642\u06CC\u0645)")), r.isAmbiguous && /*#__PURE__*/React.createElement("div", {
         className: "text-[9px] font-black text-amber-700 bg-amber-100 border border-amber-300 rounded px-1.5 py-0.5 mt-1 inline-block"
-      }, "\u26A0 \u0686\u0646\u062F \u06A9\u0627\u0644\u0627\u06CC \u0647\u0645\u200C\u0646\u0627\u0645 \u062F\u0631 \u0627\u0646\u0628\u0627\u0631 \u067E\u06CC\u062F\u0627 \u0634\u062F \u2014 \u0628\u0627\u06CC\u062F \u062F\u0633\u062A\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0646\u06CC\u060C \u0648\u06AF\u0631\u0646\u0647 \u062F\u0648\u0628\u0627\u0631\u0647 \u062A\u06A9\u0631\u0627\u0631\u06CC \u0633\u0627\u062E\u062A\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      }, "\u26A0 \u0686\u0646\u062F \u06A9\u0627\u0644\u0627\u06CC \u0647\u0645\u200C\u0646\u0627\u0645 \u062F\u0631 \u0627\u0646\u0628\u0627\u0631 \u067E\u06CC\u062F\u0627 \u0634\u062F \u2014 \u0628\u0627\u06CC\u062F \u062F\u0633\u062A\u06CC \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0646\u06CC\u060C \u0648\u06AF\u0631\u0646\u0647 \u062F\u0648\u0628\u0627\u0631\u0647 \u062A\u06A9\u0631\u0627\u0631\u06CC \u0633\u0627\u062E\u062A\u0647 \u0645\u06CC\u200C\u0634\u0648\u062F"), conv.stdUnit && /*#__PURE__*/React.createElement("div", {
+        className: "text-[9px] font-bold text-indigo-600 mt-1"
+      }, "\u0633\u0627\u062E\u062A \u062E\u0648\u062F\u06A9\u0627\u0631 \u0628\u0627 \u0645\u0639\u06CC\u0627\u0631 \u0645\u062D\u06A9: ", formatNumber(conv.value), " ", conv.stdUnit)), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
         className: "text-[9px] text-slate-400 block mb-1"
       }, "\u0631\u0648\u0634"), /*#__PURE__*/React.createElement("div", {
         className: "flex gap-1"
@@ -4553,77 +4791,18 @@ const MahakImportView = ({
           targetWarehouseId: r.targetWarehouseId || defaultMahakWarehouseId
         }),
         className: `flex-1 px-2 py-2 rounded-lg text-[10px] font-bold border ${r.mode === 'new' ? 'bg-emerald-600 text-white' : 'bg-white'}`
-      }, "\u062C\u062F\u06CC\u062F"))), /*#__PURE__*/React.createElement("div", null, r.mode === 'existing' ? (() => {
-        const selected = items.find(i => i.id === r.itemId);
-        const q = openLinkRow === r.id ? normalizeMahakName(linkSearch) : '';
-        const linkCandidates = items.filter(i => !q || normalizeMahakName([i.name, i.brand, i.tag, i.unit, i.bagWeight ? String(i.bagWeight) : ''].filter(Boolean).join(' ')).includes(q)).sort((a, b) => {
-          if (a.id === r.itemId) return -1;
-          if (b.id === r.itemId) return 1;
-          return String(a.name || '').localeCompare(String(b.name || ''), 'fa');
-        });
-        const shownCandidates = linkCandidates.slice(0, 40);
-        const allNames = shownCandidates.map(x => x.name);
-        return /*#__PURE__*/React.createElement("div", {
-          className: "relative"
-        }, /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: () => {
-            setOpenLinkRow(openLinkRow === r.id ? null : r.id);
-            setLinkSearch('');
-          },
-          className: "w-full p-2 rounded-lg bg-white border border-slate-200 text-xs font-bold outline-none text-right flex items-center justify-between gap-2"
-        }, /*#__PURE__*/React.createElement("span", {
-          className: "truncate"
-        }, selected ? selected.name : '— انتخاب کالا —'), /*#__PURE__*/React.createElement(ChevronDown, {
-          size: 13,
-          className: "shrink-0 text-slate-400"
-        })), openLinkRow === r.id && /*#__PURE__*/React.createElement("div", {
-          className: "absolute z-[80] top-full mt-1 right-0 w-[min(420px,90vw)] bg-white border border-slate-200 rounded-xl shadow-2xl p-2"
-        }, /*#__PURE__*/React.createElement("div", {
-          className: "flex items-center gap-2 mb-2"
-        }, /*#__PURE__*/React.createElement(Search, {
-          size: 14,
-          className: "text-slate-400 shrink-0"
-        }), /*#__PURE__*/React.createElement("input", {
-          autoFocus: true,
-          value: linkSearch,
-          onChange: e => setLinkSearch(e.target.value),
-          placeholder: "\u062C\u0633\u062A\u062C\u0648 \u062F\u0631 \u0646\u0627\u0645\u060C \u0628\u0631\u0646\u062F\u060C \u062A\u06AF...",
-          className: "flex-1 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs outline-none"
-        })), /*#__PURE__*/React.createElement("div", {
-          className: "max-h-56 overflow-y-auto space-y-1"
-        }, shownCandidates.length === 0 ? /*#__PURE__*/React.createElement("div", {
-          className: "p-4 text-center text-xs text-slate-400"
-        }, "\u06A9\u0627\u0644\u0627\u06CC\u06CC \u067E\u06CC\u062F\u0627 \u0646\u0634\u062F.") : shownCandidates.map(it => {
-          const {
-            prefix,
-            diff
-          } = splitNameDiff(allNames, it.name);
-          return /*#__PURE__*/React.createElement("button", {
-            key: it.id,
-            type: "button",
-            onClick: () => {
-              updateRow(r.id, {
-                itemId: it.id,
-                targetName: it.name,
-                targetUnit: it.unit || 'کیسه',
-                weightKg: it.bagWeight ? Number(it.bagWeight) / 1000 : r.weightKg
-              });
-              setOpenLinkRow(null);
-              setLinkSearch('');
-            },
-            className: `w-full text-right p-2 rounded-lg border ${it.id === r.itemId ? 'border-indigo-300 bg-indigo-50' : 'border-transparent hover:border-slate-200 hover:bg-slate-50'}`
-          }, /*#__PURE__*/React.createElement("div", {
-            className: "font-black text-xs text-slate-800"
-          }, prefix, diff && /*#__PURE__*/React.createElement("span", {
-            className: `mr-1 px-1 rounded border ${stringToBadgeColor(diff)}`
-          }, diff)), /*#__PURE__*/React.createElement("div", {
-            className: "mt-1"
-          }, /*#__PURE__*/React.createElement(ItemDistinguishBadges, {
-            item: it
-          })));
-        }))));
-      })() : /*#__PURE__*/React.createElement("input", {
+      }, "\u062C\u062F\u06CC\u062F"))), /*#__PURE__*/React.createElement("div", null, r.mode === 'existing' ? /*#__PURE__*/React.createElement(MahakLinkPicker, {
+        items: items,
+        settings: settings,
+        selectedId: r.itemId,
+        placeholder: "\u2014 \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0627\u0644\u0627 \u2014",
+        onSelect: it => updateRow(r.id, {
+          itemId: it.id,
+          targetName: it.name,
+          targetUnit: it.unit || 'کیسه',
+          weightKg: it.bagWeight ? Number(it.bagWeight) / 1000 : r.weightKg
+        })
+      }) : /*#__PURE__*/React.createElement("input", {
         value: r.targetName,
         onChange: e => updateRow(r.id, {
           targetName: e.target.value
@@ -4675,7 +4854,7 @@ const MahakImportView = ({
         placeholder: r.targetUnit === 'کیلوگرم' || r.targetUnit === 'کیلو' ? 'نیاز نیست' : 'وزن هر بسته (kg)'
       })), /*#__PURE__*/React.createElement("div", {
         className: `p-2 rounded-lg text-center text-xs font-black ${conv.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-100 text-red-700'}`
-      }, conv.ok ? `${formatNumber(conv.value)} ${r.targetUnit}` : conv.reason))));
+      }, conv.ok ? `${formatNumber(conv.value)} ${conv.stdUnit || r.targetUnit}` : conv.reason))));
     })), /*#__PURE__*/React.createElement("div", {
       className: "flex justify-between items-center mt-5"
     }, /*#__PURE__*/React.createElement("button", {
@@ -4739,11 +4918,13 @@ const parseMahakExcelFile = file => new Promise((resolve, reject) => {
         nameCol = -1,
         qtyCol = -1,
         qty2Col = -1,
-        unit2Col = -1;
+        unit2Col = -1,
+        unitCol = -1;
       const wantedName = normalizeMahakName('نام کامل کالا');
       const wantedQty = normalizeMahakName('موجودی');
       const wantedQty2 = normalizeMahakName('موجودی 2');
       const wantedUnit2 = normalizeMahakName('واحد 2');
+      const wantedUnit = normalizeMahakName('واحد');
       for (let r = 0; r < Math.min(matrix.length, 20); r++) {
         const row = Array.isArray(matrix[r]) ? matrix[r] : [];
         const normalized = row.map(v => normalizeMahakName(v));
@@ -4755,6 +4936,7 @@ const parseMahakExcelFile = file => new Promise((resolve, reject) => {
           qtyCol = q;
           qty2Col = normalized.findIndex(v => v === wantedQty2);
           unit2Col = normalized.findIndex(v => v === wantedUnit2);
+          unitCol = normalized.findIndex(v => v === wantedUnit);
           break;
         }
       }
@@ -4776,11 +4958,13 @@ const parseMahakExcelFile = file => new Promise((resolve, reject) => {
         if (!rawName || q === null) continue;
         const q2 = qty2Col >= 0 ? parseNum(row[qty2Col]) : null;
         const unit2 = unit2Col >= 0 ? cleanName(row[unit2Col]) : '';
+        const unit = unitCol >= 0 ? cleanName(row[unitCol]) : '';
         allRows.push({
           mahakName: rawName,
           quantity: q,
           quantity2: q2,
-          unit2
+          unit2,
+          unit
         });
       }
       // اگر یک نام دو بار در فایل آمده باشد، جمعشان ثبت می‌شود (نه اینکه ردیف آخر بقیه را پاک کند).
@@ -4796,6 +4980,8 @@ const parseMahakExcelFile = file => new Promise((resolve, reject) => {
         }
         e.quantity += r.quantity;
         if (e.quantity2 !== null || r.quantity2 !== null) e.quantity2 = (e.quantity2 || 0) + (r.quantity2 || 0);
+        if (!e.unit && r.unit) e.unit = r.unit;
+        if (!e.unit2 && r.unit2) e.unit2 = r.unit2;
       });
       const uniqRows = [...mergedMap.values()];
       const nonPositiveRows = uniqRows.filter(r => r.quantity <= 0);
@@ -5078,7 +5264,7 @@ const MotherBagRow = ({
 // ===== مستندات برنامه =====
 // نگهداری: هر تغییری که در برنامه داده می‌شود، باید این متن هم به‌روز شود (و شماره‌ی نسخه/تاریخ بالای آن).
 // هدف: هر هوش مصنوعی یا هر فردی که این فایل را می‌بیند، در کمترین زمان بفهمد برنامه چیست و کجا را باید بخواند.
-const APP_DOCS_VERSION = 'v7.10 — ۱۴۰۵/۰۸/۲۳';
+const APP_DOCS_VERSION = 'v7.11 — ۱۴۰۵/۰۸/۲۴';
 const APP_DOCS_MD = `# مستندات کامل برنامه‌ی «انبار یار» (Pro Mahak Sync)
 
 نسخه‌ی مستندات: ${APP_DOCS_VERSION}
@@ -5103,7 +5289,7 @@ const APP_DOCS_MD = `# مستندات کامل برنامه‌ی «انبار ی
 ## ۲. ماژول‌های برنامه (منوی کناری، به ترتیب نمایش)
 هر ماژول: شناسه‌ی منو، برچسب فارسی، کامپوننت اصلی.
 1. داشبورد و موجودی (dashboard): خلاصه‌ی موجودی، آمار کلی و فاکتورهای در انتظار (رزرو). ستون «خروجی‌های در انتظار» از عرض xl چهار ستون از دوازده است و در عرض‌های کمتر تمام‌عرض زیر موجودی می‌آید؛ ردیف دکمه‌های هر کارت تک‌خطی است (دکمه‌ی اصلی کشسان + آیکن‌های ثابت) و در هیچ عرضی نمی‌شکند.
-2. همگام‌سازی موجودی محک (mahak-import): خواندن فایل اکسل محک، تطبیق نام کالاها، ساخت نگاشت کالا و جایگزینی موجودی‌ها. قبل از Sync، بکاپ خودکار ساخته می‌شود.
+2. همگام‌سازی موجودی محک (mahak-import): خواندن فایل اکسل محک (ستون‌های نام کامل کالا/موجودي/واحد/موجودي ۲/واحد ۲)، تطبیق نام کالاها، ساخت نگاشت کالا و جایگزینی موجودی‌ها. قبل از Sync، بکاپ خودکار ساخته می‌شود. با تیک «معیار محک»، کالاهای جدید دقیقاً با واحد و عدد خودِ محک ساخته می‌شوند: اگر «موجودي ۲» و «واحد ۲» مثبت باشند همان بسته (کیسه/عدد/کارتن) معیار است، وگرنه اگر «واحد» غیر از کیلوگرم باشد همان واحد، و در غیر این صورت کیلوگرم. واحدِ «کیلو گرم/کیلوگرم/kg» یکسان‌سازی می‌شود. برای جلوگیری از کالای تکراری، نام‌ها نرمال‌سازی (ی/ک/نیم‌فاصله/فاصله) می‌شوند; ردیفِ جدیدی که نامش با بیش از یک کالای موجود یکی باشد مسدود می‌شود، نام‌های مشکوک (بدون فاصله یکسان یا شباهت ≥ ۰٫۸) هشدار می‌گیرند، و هنگام اعمال اگر کالای هم‌نام از قبل باشد به‌جای ساختن کپی به همان لینک می‌شود. انبار پیش‌فرضِ کالاهای جدید از تنظیمات (mahakDefaultWarehouseId) و در غیر این صورت اولین انبار انتخاب می‌شود. انتخابگرِ لینک‌کردن کالا (MahakLinkPicker) به‌صورت portal رندر می‌شود تا زیرِ کارت‌ها بریده نشود و با کیبورد (جهت‌نما/Enter/Escape) و جستجو کار می‌کند.
 3. فاکتور فروش وزنی (pos): ثبت فاکتور با اقلام، هزینه‌ی بارگیری (قابل حذف برای هر فاکتور)، مهلت تسویه (متن آزاد)، سررسید دقیق، توضیحات و تأیید ارسال (بار کامل یا نیمه‌رفته). فیلد settlementTerm متن مهلت تسویه است؛ dueDate سررسید دقیق ISO است.
 4. گزارش فاکتورها (history): تاریخچه‌ی فاکتورها؛ ویرایش، تغییر تاریخ (با لاگ تغییرات dateChangeLogs)، چاپ و خروجی اکسل. فاکتورهای لغوشده (status = cancelled) در محاسبات رزرو و سررسید نادیده گرفته می‌شوند.
 5. خرید کالا در راه (purchases): خریدهایی که هنوز نرسیده‌اند؛ با دریافت، به موجودی فیزیکی اضافه می‌شوند. هر خرید وضعیت پرداخت (paymentStatus) و تاریخ تسویه (settledDate) دارد.
@@ -5262,6 +5448,7 @@ const APP_DOCS_MD = `# مستندات کامل برنامه‌ی «انبار ی
 - هر تغییر در برنامه (ماژول جدید، تغییر قانون محاسبه، فیلد جدید، تغییر نام کامپوننت) باید در همین متن ثبت شود.
 - شماره‌ی نسخه و تاریخ بالای همین بخش را با هر تغییر به‌روز کن.
 - تاریخچه‌ی تغییرات:
+  - v7.11 (build 10.14): رفع باگ «معیار محک» و کالای تکراری در همگام‌سازی محک. پیش از این کالاهای جدیدِ خودکار همیشه با واحد کیلوگرم و عددِ خامِ کیلو ساخته می‌شدند (حتی وقتی محک «موجودي ۲/واحد ۲» بسته‌ای داشت) و پیش‌نمایشِ مرحله‌ی ۳ عددِ بسته را نشان می‌داد ولی کیلو می‌ساخت؛ حالا getMahakStandardTarget واحد/عددِ خودِ محک را معیار می‌گیرد (بستهٔ مثبتِ «موجودي ۲» ← همان بسته؛ وگرنه واحدِ غیرکیلوگرم ← همان واحد؛ وگرنه کیلوگرم) و پیش‌نمایش دقیقاً همان چیزی را نشان می‌دهد که ساخته می‌شود. نرمال‌سازی واحد (کیلو گرم/کیلوگرم/kg) و نام؛ گاردِ ضد تکراری در سه لایه: مسدودکردن ردیفِ جدیدِ هم‌نام با چند کالا، هشدارِ نام‌های مشکوک (بدون فاصله یکسان یا شباهت ≥ ۰٫۸)، و لینک‌کردن به کالای هم‌نامِ موجود هنگام اعمال به‌جای ساختن کپی. حذفِ انبارِ هاردکدِ قبلی و جایگزینی با انبار پیش‌فرضِ تنظیمات (mahakDefaultWarehouseId) یا اولین انبار. انتخابگرِ لینک‌کردن کالا به portal (MahakLinkPicker) با کیبورد/جستجو/بدون بریدگی تبدیل شد؛ آمارِ مرحله‌ی ۲ ریسپانسیو و تیکِ «معیار محک» در هر دو مرحله در دسترس است.
   - v7.10 (build 10.13): بازطراحی بصری «خروجی‌های در انتظار» (فقط لایه‌ی ظاهر): رفع افتادن دکمه‌ی لغو به خط بعد در موبایل (ردیف اقدامات تک‌خطی با دکمه‌ی اصلی کشسان و آیکن‌های shrink-0، بدون flex-wrap)؛ فاصله‌گذاری بازتر کارت‌ها/چیپ‌ها/کاشی‌های فیلتر؛ دکمه‌ی گزارش در موبایل تمام‌عرض؛ ستون این بخش در xl از ۳ به ۴ ستون و در عرض‌های کمتر تمام‌عرض؛ اسکرول‌بار لیست هم‌رنگ پالت سرمه‌ای؛ دکمه‌های ویرایش/حذف امانی آیکنی و هم‌اندازه‌ی کارت فاکتور.
   - v7.9 (build 10.11): ساخت نسخه‌ی آفلاین تک‌فایلی توسط خود GitHub (tools/build-offline.js + workflow offline-build؛ خروجی Artifact/Release بدون هیچ fetch از CDN، کتابخانه‌ها از npm و تیلویند از پیش کامپایل می‌شود)؛ افزودن PWA قابل‌نصب ویندوز/موبایل با manifest و service worker و آیکن (ثبت فقط روی https)؛ رفع باگ تفسیر الگوهای replace هنگام inline کردن کتابخانه‌ها.
   - v7.8 (build 10.10): یکسان‌سازی سیستم دیزاین در همه‌ی بخش‌ها (پس‌زمینه‌ی مودال‌ها به توکن سرمه‌ای slate-950، گردی‌ها به مقیاس rounded-2xl/3xl، حذف رنگ‌های hex hardcoded و سایه‌های روشنِ خارج از پالت، اصلاح نگاشت رنگ یادداشت‌ها به پالت معنایی)؛ تکمیل دسترس‌پذیری مودال‌های inline در POS (بارگیری/تسویه، کاهش قیمت، کسری موجودی، کیسه‌ی مادر، ویرایش ردیف) با DialogFrame (Escape/focus-trap/role=dialog/بازگردانی فوکوس).
@@ -19485,8 +19672,31 @@ const App = () => {
             lastUpdated: Date.now()
           };
         } else {
-          const kgFallback = r.autoCreate === true;
-          const defaultMahakWarehouseId = (appSettings?.warehouses || []).find(w => String(w?.name || '').trim() === 'سوله گرجی علیا')?.id || '';
+          // گارد نهایی ضد تکراری: اگر کالایی با همین نام (نرمال‌شده) از قبل هست — حتی اگر در همین Sync
+          // ساخته شده باشد — به‌جای ساختن کپی، موجودی همان کالا جایگزین و لینک به آن ذخیره می‌شود.
+          const normName = normalizeMahakName(r.finalName);
+          const twinIdx = next.findIndex(i => normalizeMahakName(i.name) === normName);
+          if (twinIdx > -1) {
+            const old = next[twinIdx];
+            const delta = convertedQty - (Number(old.quantity) || 0);
+            logTransaction(old, 'IMPORT', delta, convertedQty, undefined, undefined, `همگام‌سازی محک — ${r.mahakName} (لینک به کالای هم‌نام)`);
+            next[twinIdx] = {
+              ...old,
+              quantity: convertedQty,
+              lastUpdated: Date.now()
+            };
+            finalMappings[r.normalized] = {
+              mahakName: r.mahakName,
+              itemId: old.id,
+              mode: 'existing',
+              targetName: old.name,
+              targetUnit: old.unit || r.targetUnit || 'کیسه',
+              weightKg: old.bagWeight ? Number(old.bagWeight) / 1000 : 0,
+              updatedAt: Date.now()
+            };
+            return;
+          }
+          const defaultMahakWarehouseId = appSettings?.mahakDefaultWarehouseId || (appSettings?.warehouses || [])[0]?.id || '';
           const newItem = {
             id: generateId(),
             name: r.finalName,
@@ -19494,8 +19704,8 @@ const App = () => {
             tag: 'عمومی',
             warehouseId: r.targetWarehouseId || defaultMahakWarehouseId,
             quantity: convertedQty,
-            unit: kgFallback ? 'کیلوگرم' : r.targetUnit || 'کیسه',
-            bagWeight: kgFallback ? null : r.converted.weightKg > 0 ? r.converted.weightKg * 1000 : null,
+            unit: r.targetUnit || 'کیلوگرم',
+            bagWeight: r.converted.weightKg > 0 ? r.converted.weightKg * 1000 : null,
             lastUpdated: Date.now()
           };
           logTransaction(newItem, 'IMPORT', convertedQty, convertedQty, undefined, undefined, `همگام‌سازی محک — کالای جدید: ${r.mahakName}`);
@@ -19506,7 +19716,7 @@ const App = () => {
             mode: 'existing',
             targetName: newItem.name,
             targetUnit: newItem.unit,
-            weightKg: kgFallback ? 0 : newItem.bagWeight ? newItem.bagWeight / 1000 : 0,
+            weightKg: newItem.bagWeight ? newItem.bagWeight / 1000 : 0,
             updatedAt: Date.now()
           };
         }
