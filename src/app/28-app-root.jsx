@@ -77,11 +77,15 @@
             const toast = useToast();
             const confirmAction = useConfirm();
 
+            // نسل داده: هر بازیابی پشتیبان آن را جلو می‌برد تا اگر بارگذاری اولیه هنوز در جریان بود،
+            // نتیجه‌ی قدیمیِ آن روی داده‌ی تازه بازیابی‌شده نوشته نشود (باگ پریدن داده بعد از رفرش).
+            const ayDataGenRef = useRef(0);
             useEffect(() => {
                 let alive = true;
+                const gen = ayDataGenRef.current;
                 (async () => {
                     const d = await loadDataSecure();
-                    if (!alive) return;
+                    if (!alive || gen !== ayDataGenRef.current) return;
                     setItems(d.items); setInvoices(d.invoices); setNotes(d.notes); setTransactions(d.transactions);
                     setPurchases(d.purchases); setProcessingOrders(d.processingOrders); setConsignments(d.consignments);
                     setLoading(false);
@@ -1060,6 +1064,9 @@
                         if(preBackupOk === false) throw new Error('ساخت بکاپ قبل از بازیابی ناموفق بود.');
 
                         // داده خام بکاپ را با ساختار نرمال‌شده وارد state می‌کنیم.
+                        // نسل داده را جلو ببر تا بارگذاری اولیه‌ی احتمالاً در جریان، داده‌ی بازیابی‌شده را overwrite نکند.
+                        ayDataGenRef.current++;
+                        setLoading(false);
                         setItems(restored.items);
                         setInvoices(restored.invoices);
                         setNotes(restored.notes);
@@ -1090,6 +1097,12 @@
                             restored.processingOrders,
                             restored.consignments
                         );
+
+                        // ورود موقت را تازه کن تا قفل خودکار بلافاصله بعد از بازیابی فعال نشود
+                        // و کاربر مجبور به ورود مجددِ فوری پس از بازیابی نباشد (تجربه‌ی «پریدن داده بعد از رفرش»).
+                        if (AY_SECURITY.key) {
+                            try { await rememberTrustedUnlock(AY_SECURITY.key, loadSettings().autoLockMinutes); window.dispatchEvent(new Event('anbaryar:trusted-unlock-refreshed')); } catch(e) {}
+                        }
 
                         // ابزارهای داخلیِ بکاپ کامل همچنان برگردانده شوند، ولی کلید امنیتی/ورود موقت دست‌نخورده بماند.
                         if(raw?.localStorage && typeof raw.localStorage === 'object') {
