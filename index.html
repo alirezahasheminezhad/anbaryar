@@ -2614,7 +2614,7 @@ const IDB_STORE = 'app';
 const IDB_DATA_KEY = 'secure-data';
 const IDB_FALLBACK_KEY = 'plain-data-fallback';
 const APP_SCHEMA_VERSION = 11;
-const APP_BUILD = '10.15-restore-persistence-fix';
+const APP_BUILD = '10.16-large-data-save-fix';
 
 // ------------------------------------------------------------------
 // امنیت و ذخیره‌سازی محلی، IndexedDB
@@ -2628,7 +2628,13 @@ const AY_SECURITY = {
 };
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
-const b64 = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+// spread کردن بایت‌ها در fromCharCode برای داده‌ی بزرگ (>~۱۲۰ هزار بایت) خطای stack می‌داد → رمزنگاری شکست می‌خورد و بعد از رفرش داده‌ی قدیمی لود می‌شد؛ پس تکه‌تکه.
+const b64 = bytes => {
+  const u = new Uint8Array(bytes);
+  let s = '';
+  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+  return btoa(s);
+};
 const unb64 = str => Uint8Array.from(atob(str), c => c.charCodeAt(0));
 const randomB64 = (n = 16) => b64(crypto.getRandomValues(new Uint8Array(n)));
 const openAYDB = () => new Promise((resolve, reject) => {
@@ -2925,22 +2931,26 @@ const loadData = () => {
   }
 };
 const loadDataSecure = async () => {
+  // هر دو منبع (امن و پشتیبان) خوانده می‌شوند و جدیدترین (updatedAt) برنده است؛
+  // قبلاً اگر ذخیره‌ی امن شکست می‌خورد، رکورد امنِ قدیمی همیشه بر داده‌ی تازه‌تر ترجیح داده می‌شد.
+  let secure = null,
+    fallback = null;
   try {
     if (AY_SECURITY.key) {
       const envelope = await idbGet(IDB_DATA_KEY);
-      if (envelope) return normalizeData(await decryptAY(envelope));
+      if (envelope) secure = await decryptAY(envelope);
     }
   } catch (e) {
     console.warn('خطا در خواندن دیتای امن:', e);
   }
-  // مسیر پایدار دوم: اگر رمز/کلید آماده نبود یا localStorage جا نداشت،
-  // داده خام معتبر در IndexedDB نگه داشته می‌شود.
   try {
-    const fallback = await idbGet(IDB_FALLBACK_KEY);
-    if (fallback) return normalizeData(fallback);
+    fallback = await idbGet(IDB_FALLBACK_KEY);
   } catch (e) {
     console.warn('خطا در خواندن پشتیبان IndexedDB:', e);
   }
+  const ts = x => x && Date.parse(x.updatedAt) || 0;
+  if (secure && fallback) return normalizeData(ts(fallback) > ts(secure) ? fallback : secure);
+  if (secure || fallback) return normalizeData(secure || fallback);
   return loadData();
 };
 const persistSecureData = async data => {
@@ -5264,7 +5274,7 @@ const MotherBagRow = ({
 // ===== مستندات برنامه =====
 // نگهداری: هر تغییری که در برنامه داده می‌شود، باید این متن هم به‌روز شود (و شماره‌ی نسخه/تاریخ بالای آن).
 // هدف: هر هوش مصنوعی یا هر فردی که این فایل را می‌بیند، در کمترین زمان بفهمد برنامه چیست و کجا را باید بخواند.
-const APP_DOCS_VERSION = 'v7.12 — ۱۴۰۵/۰۸/۲۴';
+const APP_DOCS_VERSION = 'v7.13 — ۱۴۰۵/۰۸/۲۵';
 const APP_DOCS_MD = `# مستندات کامل برنامه‌ی «انبار یار» (Pro Mahak Sync)
 
 نسخه‌ی مستندات: ${APP_DOCS_VERSION}
@@ -5448,6 +5458,7 @@ const APP_DOCS_MD = `# مستندات کامل برنامه‌ی «انبار ی
 - هر تغییر در برنامه (ماژول جدید، تغییر قانون محاسبه، فیلد جدید، تغییر نام کامپوننت) باید در همین متن ثبت شود.
 - شماره‌ی نسخه و تاریخ بالای همین بخش را با هر تغییر به‌روز کن.
 - تاریخچه‌ی تغییرات:
+  - v7.13 (build 10.16): ریشه‌ی واقعی باگ «پریدن داده بعد از رفرشِ بازیابی»: برای داده‌ی حجیم، رمزنگاری با خطای stack شکست می‌خورد و داده فقط در نسخه‌ی پشتیبان ذخیره می‌شد، ولی بعد از رفرش رکورد امنِ قدیمی خوانده می‌شد. تبدیل base64 تکه‌تکه شد و بارگذاری جدیدترین منبع را برمی‌گزیند.
   - v7.12 (build 10.15): رفع باگ «پریدن داده بعد از رفرشِ بازیابی پشتیبان». بازیابی حالا کاملاً پایدار است: (۱) اگر بارگذاری اولیه‌ی برنامه هنوز در جریان باشد، نتیجه‌ی قدیمیِ آن دیگر روی داده‌ی تازه بازیابی‌شده نوشته نمی‌شود (گاردِ نسل داده ayDataGenRef)؛ (۲) بعد از بازیابی موفق، ورود موقت تازه می‌شود تا قفل خودکار بلافاصله فعال نشود و داده‌ی بازیابی‌شده از دست نرود؛ (۳) وضعیت loading پس از بازیابی پاک می‌شود تا ذخیره‌ی خودکار بلافاصله داده‌ی درست را persist کند. داده‌ی بازیابی‌شده همچنان با کلید امنیتی فعلی برنامه رمزنگاری و در IndexedDB ذخیره می‌شود و بعد از رفرش (با ورود مجدد یا ورود موقت) سالم برمی‌گردد.
   - v7.11 (build 10.14): رفع باگ «معیار محک» و کالای تکراری در همگام‌سازی محک. پیش از این کالاهای جدیدِ خودکار همیشه با واحد کیلوگرم و عددِ خامِ کیلو ساخته می‌شدند (حتی وقتی محک «موجودي ۲/واحد ۲» بسته‌ای داشت) و پیش‌نمایشِ مرحله‌ی ۳ عددِ بسته را نشان می‌داد ولی کیلو می‌ساخت؛ حالا getMahakStandardTarget واحد/عددِ خودِ محک را معیار می‌گیرد (بستهٔ مثبتِ «موجودي ۲» ← همان بسته؛ وگرنه واحدِ غیرکیلوگرم ← همان واحد؛ وگرنه کیلوگرم) و پیش‌نمایش دقیقاً همان چیزی را نشان می‌دهد که ساخته می‌شود. نرمال‌سازی واحد (کیلو گرم/کیلوگرم/kg) و نام؛ گاردِ ضد تکراری در سه لایه: مسدودکردن ردیفِ جدیدِ هم‌نام با چند کالا، هشدارِ نام‌های مشکوک (بدون فاصله یکسان یا شباهت ≥ ۰٫۸)، و لینک‌کردن به کالای هم‌نامِ موجود هنگام اعمال به‌جای ساختن کپی. حذفِ انبارِ هاردکدِ قبلی و جایگزینی با انبار پیش‌فرضِ تنظیمات (mahakDefaultWarehouseId) یا اولین انبار. انتخابگرِ لینک‌کردن کالا به portal (MahakLinkPicker) با کیبورد/جستجو/بدون بریدگی تبدیل شد؛ آمارِ مرحله‌ی ۲ ریسپانسیو و تیکِ «معیار محک» در هر دو مرحله در دسترس است.
   - v7.10 (build 10.13): بازطراحی بصری «خروجی‌های در انتظار» (فقط لایه‌ی ظاهر): رفع افتادن دکمه‌ی لغو به خط بعد در موبایل (ردیف اقدامات تک‌خطی با دکمه‌ی اصلی کشسان و آیکن‌های shrink-0، بدون flex-wrap)؛ فاصله‌گذاری بازتر کارت‌ها/چیپ‌ها/کاشی‌های فیلتر؛ دکمه‌ی گزارش در موبایل تمام‌عرض؛ ستون این بخش در xl از ۳ به ۴ ستون و در عرض‌های کمتر تمام‌عرض؛ اسکرول‌بار لیست هم‌رنگ پالت سرمه‌ای؛ دکمه‌های ویرایش/حذف امانی آیکنی و هم‌اندازه‌ی کارت فاکتور.

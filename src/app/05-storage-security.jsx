@@ -9,7 +9,7 @@
         const IDB_DATA_KEY = 'secure-data';
         const IDB_FALLBACK_KEY = 'plain-data-fallback';
         const APP_SCHEMA_VERSION = 11;
-        const APP_BUILD = '10.15-restore-persistence-fix';
+        const APP_BUILD = '10.16-large-data-save-fix';
 
         // ------------------------------------------------------------------
         // امنیت و ذخیره‌سازی محلی، IndexedDB
@@ -20,7 +20,8 @@
         const AY_SECURITY = { key: null, unlocked: false };
         const textEncoder = new TextEncoder();
         const textDecoder = new TextDecoder();
-        const b64 = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+        // spread کردن بایت‌ها در fromCharCode برای داده‌ی بزرگ (>~۱۲۰ هزار بایت) خطای stack می‌داد → رمزنگاری شکست می‌خورد و بعد از رفرش داده‌ی قدیمی لود می‌شد؛ پس تکه‌تکه.
+        const b64 = (bytes) => { const u = new Uint8Array(bytes); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
         const unb64 = (str) => Uint8Array.from(atob(str), c => c.charCodeAt(0));
         const randomB64 = (n=16) => b64(crypto.getRandomValues(new Uint8Array(n)));
 
@@ -153,18 +154,19 @@
             catch (e) { return normalizeData(null); }
         };
         const loadDataSecure = async () => {
+            // هر دو منبع (امن و پشتیبان) خوانده می‌شوند و جدیدترین (updatedAt) برنده است؛
+            // قبلاً اگر ذخیره‌ی امن شکست می‌خورد، رکورد امنِ قدیمی همیشه بر داده‌ی تازه‌تر ترجیح داده می‌شد.
+            let secure = null, fallback = null;
             try {
                 if (AY_SECURITY.key) {
                     const envelope = await idbGet(IDB_DATA_KEY);
-                    if (envelope) return normalizeData(await decryptAY(envelope));
+                    if (envelope) secure = await decryptAY(envelope);
                 }
             } catch(e) { console.warn('خطا در خواندن دیتای امن:', e); }
-            // مسیر پایدار دوم: اگر رمز/کلید آماده نبود یا localStorage جا نداشت،
-            // داده خام معتبر در IndexedDB نگه داشته می‌شود.
-            try {
-                const fallback = await idbGet(IDB_FALLBACK_KEY);
-                if (fallback) return normalizeData(fallback);
-            } catch(e) { console.warn('خطا در خواندن پشتیبان IndexedDB:', e); }
+            try { fallback = await idbGet(IDB_FALLBACK_KEY); } catch(e) { console.warn('خطا در خواندن پشتیبان IndexedDB:', e); }
+            const ts = (x) => (x && Date.parse(x.updatedAt)) || 0;
+            if (secure && fallback) return normalizeData(ts(fallback) > ts(secure) ? fallback : secure);
+            if (secure || fallback) return normalizeData(secure || fallback);
             return loadData();
         };
         const persistSecureData = async (data) => {
