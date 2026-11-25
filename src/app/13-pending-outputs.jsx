@@ -281,17 +281,29 @@
                                     return (
                                         <div key={`inv-${inv.id}`} className="animate-in bg-white border border-slate-200 border-r-4 border-amber-400 rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-all">
                                             <div className="flex justify-between items-start gap-3 mb-3.5">
-                                                <div className="min-w-0"><span className={`inline-block mb-1.5 text-[10px] px-2.5 py-1 rounded-full border font-black ${kindMeta.invoice.badge}`}>{kindMeta.invoice.label}</span><div className="font-black text-slate-800 text-[15px] truncate">{inv.customer}</div></div>
+                                                <div className="min-w-0"><span className={`inline-block mb-1.5 text-[10px] px-2.5 py-1 rounded-full border font-black ${kindMeta.invoice.badge}`}>{kindMeta.invoice.label}</span>{inv.items.some(i => Number(i.shippedQty) > 0) && <span className="inline-block mb-1.5 mr-1.5 text-[10px] px-2.5 py-1 rounded-full border font-black bg-orange-500 text-white border-orange-600">بخشی رفته • باقی‌مانده در رزرو</span>}<div className="font-black text-slate-800 text-[15px] truncate">{inv.customer}</div></div>
                                                 <div className="text-left shrink-0"><div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold"><Calendar size={11}/> {inv.date}</div><div className="mt-1.5 text-[10px] font-black text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2.5 py-0.5 w-fit mr-auto">{inv.items.length} قلم</div></div>
                                             </div>
                                             <div className="flex flex-wrap gap-2 pt-3.5 border-t border-dashed border-slate-200">
-                                                {inv.items.map((i, idx) => (
-                                                    <span key={idx} className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px]">
-                                                        <ItemNameLabel it={i} inventoryItems={inventoryItems} isPending={true} className="font-bold text-slate-700" />
-                                                        {(() => { const b = resolveItemDisplay(i, inventoryItems, true).display.brand; return b && b !== 'متفرقه' && (<span className="bg-indigo-50 text-indigo-600 text-[9px] px-1.5 py-0.5 rounded border border-indigo-100 font-bold">{b}</span>); })()}
-                                                        <b className="text-indigo-700">×{formatNumber(i.qty || 0)}</b>
+                                                {inv.items.map((i, idx) => {
+                                                    const shipped = Number(i.shippedQty) || 0;
+                                                    const remaining = (Number(i.qty) || 0) - shipped;
+                                                    // لغوِ باقی‌مانده هم shippedQty را پر می‌کند؛ مقدارِ لغوشده «رفته» حساب نمی‌شود
+                                                    const cancelled = Number(i.remainderCancelledQty) || 0;
+                                                    const done = shipped > 0 && remaining <= 0.0001;
+                                                    const partial = shipped > 0 && !done;
+                                                    return (
+                                                    <span key={idx} className={`inline-flex items-center flex-wrap gap-1 border rounded-lg px-2.5 py-1.5 text-[11px] ${done ? 'bg-slate-100 border-slate-200' : partial ? 'bg-orange-50 border-orange-400 border-2' : 'bg-slate-50 border-slate-200'}`}>
+                                                        <span className={`inline-flex items-center gap-1 ${done ? 'line-through decoration-2 decoration-slate-500 opacity-60' : ''}`}>
+                                                            <ItemNameLabel it={i} inventoryItems={inventoryItems} isPending={true} className="font-bold text-slate-700" />
+                                                            {(() => { const b = resolveItemDisplay(i, inventoryItems, true).display.brand; return b && b !== 'متفرقه' && (<span className="bg-indigo-50 text-indigo-600 text-[9px] px-1.5 py-0.5 rounded border border-indigo-100 font-bold">{b}</span>); })()}
+                                                            <b className="text-indigo-700">×{formatNumber(i.qty || 0)}</b>
+                                                        </span>
+                                                        {done && <span className="bg-emerald-100 text-emerald-700 text-[10px] px-1.5 py-0.5 rounded-full font-black">{cancelled > 0 ? `✓ ${formatNumber(shipped - cancelled)} رفت • ${formatNumber(cancelled)} لغو` : '✓ کامل رفت'}</span>}
+                                                        {partial && <span className="bg-orange-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black">{formatNumber(remaining)} مانده در رزرو • {formatNumber(shipped)} رفت</span>}
                                                     </span>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                             {/* ردیف اقدامات: تک‌خطی و بدون flex-wrap؛ «تایید نهایی» کشسان (min-w-0) و
                                                 آیکن‌ها shrink-0 تا دکمه‌ی حذف هرگز به خط بعد نیفتد (باگ عرض‌های کم). */}
