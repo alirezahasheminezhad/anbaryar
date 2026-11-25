@@ -39,3 +39,4 @@
 - 2026-11-25 (build 10.17، docs v7.14): چاپ تکی یادداشت‌ها (A4/A5 عمودی، رنگی/سیاه‌وسفید) در `18-notes-jalali.jsx`؛ `printElementInNewWindow` گزینه‌ی `fixedWidth/multiPage` گرفت (پیش‌فرض فاکتور بدون تغییر).
 - 2026-11-25 (خواست کاربر): هر push روی `main` باید نسخه‌ی آفلاین بسازد و به‌صورت Release **جدید** (`v<APP_BUILD>.<run>`) منتشر کند؛ Releaseهای قبلی حذف/بازنویسی نشوند. Release غلتان `offline-latest` دیگر به‌روز نمی‌شود. بعد از هر push با `git ls-remote --tags origin` ساخته‌شدن تگ را بررسی کن؛ `APP_BUILD` را هر بار بالا ببر.
 - 2026-11-25 (build 10.18، docs v7.15): نمایش وضعیت ارسال جزئی روی کارت فاکتور رزرو (`13-pending-outputs.jsx`)؛ فقط لایه‌ی ظاهر.
+- 2026-11-25 (build 10.19، docs v7.16): «چاپ کارهای باز» در `18-notes-jalali.jsx` (`printNotes` برای تکی و کلی).

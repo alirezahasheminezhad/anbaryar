@@ -142,29 +142,35 @@
         // برگه‌ی چاپی یک یادداشت (سایز ثابت A4/A5). حالت سیاه‌وسفید: فقط مشکی روی سفید، بدون پس‌زمینه‌ی رنگی.
         // متن کاربر از طریق textContent/outerHTML خود مرورگر escape می‌شود.
         const NOTE_PRINT_ACCENT = {indigo:'#4f46e5',amber:'#b45309',emerald:'#047857',rose:'#be123c'};
-        const printNote = (note, paper, mono) => {
+        // list: یک یادداشت (چاپ تکی) یا همه‌ی کارهای باز (چاپ کلی)
+        const printNotes = (list, paper, mono) => {
             const small = paper==='A5';
-            const accent = mono ? '#000' : (NOTE_PRINT_ACCENT[note.color]||NOTE_PRINT_ACCENT.indigo);
             const root = document.createElement('div');
             root.style.cssText = `color:${mono?'#000':'#0f172a'};font-size:${small?11:13}px;line-height:1.9;overflow-wrap:anywhere;-webkit-print-color-adjust:exact;print-color-adjust:exact`;
             const add = (tag, text, css) => { const e=document.createElement(tag); e.textContent=text; e.style.cssText=css; root.appendChild(e); };
             const block = 'white-space:pre-wrap;margin:0 0 12px';
-            add('h1', note.title||'یادداشت', `font-size:${small?16:21}px;margin:0 0 6px;padding-bottom:6px;border-bottom:2px solid ${accent};color:${accent}`);
+            const many = list.length>1;
+            const docTitle = many ? 'کارهای باز' : (list[0].title||'یادداشت');
+            if(many) add('div', `کارهای باز (${list.length.toLocaleString('fa-IR')} مورد) — ${new Date().toLocaleDateString('fa-IR')}`, `font-weight:900;font-size:${small?13:16}px;text-align:center;margin:0 0 14px`);
+            list.forEach(note => {
+            const accent = mono ? '#000' : (NOTE_PRINT_ACCENT[note.color]||NOTE_PRINT_ACCENT.indigo);
+            add('h1', note.title||'یادداشت', `font-size:${small?16:21}px;margin:${many?'18px':'0'} 0 6px;padding-bottom:6px;border-bottom:2px solid ${accent};color:${accent};break-after:avoid`);
             add('div', [`اولویت: ${{urgent:'فوری',high:'مهم',low:'کم'}[note.priority]||'عادی'}`, note.dueDate&&`موعد: ${formatJalali(note.dueDate,true)}`, note.isDone&&'انجام‌شده', ...(note.tags||[]).map(t=>`#${t}`)].filter(Boolean).join('  |  '), `margin:0 0 12px;font-size:${small?9:11}px;color:${mono?'#000':'#475569'}`);
             if(note.text) add('div', note.text, block);
             if(note.description) add('div', note.description, `${block};padding:8px 10px;border:1px solid ${mono?'#000':'#cbd5e1'};border-radius:8px;background:${mono?'#fff':'#f8fafc'}`);
             (note.subtasks||[]).forEach(s=>add('div', `${s.isDone?'☑':'☐'}  ${s.text}`, `padding:3px 0;border-bottom:1px dashed ${mono?'#000':'#cbd5e1'};break-inside:avoid`));
-            printElementInNewWindow(root, note.title||'یادداشت', paper, {fixedWidth:true, multiPage:true});
+            });
+            printElementInNewWindow(root, docTitle, paper, {fixedWidth:true, multiPage:true});
         };
 
-        const NotePrintModal = ({ note, onClose }) => {
+        const NotePrintModal = ({ list, onClose }) => {
             const dialogRef = useDialogA11y(onClose);
             const [paper,setPaper]=useState(()=>localStorage.getItem('anbaryar_note_paper')||'A4');
             const [mono,setMono]=useState(()=>localStorage.getItem('anbaryar_note_mono')==='1');
-            const print=()=>{localStorage.setItem('anbaryar_note_paper',paper);localStorage.setItem('anbaryar_note_mono',mono?'1':'0');printNote(note,paper,mono);onClose()};
+            const print=()=>{localStorage.setItem('anbaryar_note_paper',paper);localStorage.setItem('anbaryar_note_mono',mono?'1':'0');printNotes(list,paper,mono);onClose()};
             const opt=on=>`flex-1 p-2.5 rounded-full text-xs font-bold border transition ${on?'bg-indigo-600 text-white border-indigo-600':'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`;
             return <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div ref={dialogRef} className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-5 space-y-4" dir="rtl">
-                <div className="flex justify-between items-center"><h3 className="font-black text-slate-800 flex items-center gap-2"><Printer size={19} className="text-indigo-600"/>چاپ یادداشت</h3><button onClick={onClose} aria-label="بستن" className="p-2 rounded-full hover:bg-slate-100"><X size={19}/></button></div>
+                <div className="flex justify-between items-center"><h3 className="font-black text-slate-800 flex items-center gap-2"><Printer size={19} className="text-indigo-600"/>{list.length>1?`چاپ ${list.length.toLocaleString('fa-IR')} کار باز`:'چاپ یادداشت'}</h3><button onClick={onClose} aria-label="بستن" className="p-2 rounded-full hover:bg-slate-100"><X size={19}/></button></div>
                 <div><div className="text-xs font-bold text-slate-500 mb-2">سایز کاغذ</div><div className="flex gap-2">{['A4','A5'].map(p=><button key={p} aria-pressed={paper===p} onClick={()=>setPaper(p)} className={opt(paper===p)}>{p}</button>)}</div></div>
                 <div><div className="text-xs font-bold text-slate-500 mb-2">حالت چاپ</div><div className="flex gap-2">{[[false,'رنگی'],[true,'سیاه‌وسفید']].map(([v,l])=><button key={l} aria-pressed={mono===v} onClick={()=>setMono(v)} className={opt(mono===v)}>{l}</button>)}</div></div>
                 <button onClick={print} className="w-full py-3.5 rounded-full bg-indigo-600 text-white font-black hover:bg-indigo-700 transition">چاپ</button>
@@ -185,6 +191,8 @@
             const JM=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
             const _now=new Date(); const tj=gregorianToJalali(_now.getFullYear(),_now.getMonth()+1,_now.getDate());
             const stOpen=notes.filter(n=>!n.isDone&&!n.archived).length, stDone=notes.filter(n=>n.isDone).length, stUrgent=notes.filter(n=>n.priority==='urgent'&&!n.isDone).length, stOver=notes.filter(n=>isOverdue(n)).length, stPin=notes.filter(n=>n.pinned).length;
+            // چاپ کلی: همه‌ی کارهای تمام‌نشده (مستقل از فیلتر/جستجو)، اول سنجاق‌شده، بعد اولویت و موعد
+            const openList=notes.filter(n=>!n.isDone&&!n.archived).sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0)||priorityRank(b)-priorityRank(a)||(dueRank(a)===dueRank(b)?0:dueRank(a)-dueRank(b)));
             const pct=notes.length?Math.round(stDone/notes.length*100):0; const RR=34, CC=2*Math.PI*RR;
             const tint={indigo:'bg-indigo-50',amber:'bg-amber-50',emerald:'bg-emerald-50',rose:'bg-rose-50'};
             const prioCls=p=>p==='urgent'?'bg-red-500 text-white':p==='high'?'bg-amber-100 text-amber-700':p==='low'?'bg-white/70 text-slate-400':'bg-white/80 text-slate-500';
@@ -196,7 +204,10 @@
                         <div className="w-16 h-16 rounded-full bg-white border border-slate-200 flex flex-col items-center justify-center leading-none shrink-0"><b className="text-2xl font-black text-slate-900">{tj.jd.toLocaleString('fa-IR')}</b><span className="text-[9px] text-slate-400 mt-1">{JM[tj.jm-1]}</span></div>
                         <div><div className="text-2xl font-black text-slate-900">یادداشت‌ها</div><div className="text-xs text-slate-400 mt-1">کارها، پیگیری‌ها و چک‌لیست‌ها</div></div>
                     </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                    <button onClick={()=>setPrintTarget(openList)} disabled={!openList.length} className="h-12 px-5 rounded-full bg-white border border-slate-200 text-slate-700 font-bold text-sm flex items-center gap-2 hover:bg-slate-100 active:scale-95 transition disabled:opacity-40 disabled:pointer-events-none"><Printer size={17}/>چاپ کارهای باز</button>
                     <button onClick={()=>setEditModal('new')} className="h-12 pr-5 pl-1.5 rounded-full bg-indigo-600 text-white font-bold text-sm flex items-center gap-3 shadow-lg hover:bg-indigo-700 active:scale-95 transition">یادداشت جدید<span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center"><Plus size={17}/></span></button>
+                    </div>
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="bg-white rounded-3xl p-4 flex flex-col justify-between min-h-[112px]"><div className="text-xs text-slate-400 font-bold">باز</div><div><div className="text-4xl font-black text-slate-900 leading-none">{stOpen.toLocaleString('fa-IR')}</div><div className="flex gap-1 mt-3">{Array.from({length:Math.min(notes.length,14)},(_,i)=><i key={i} className={`w-1.5 h-1.5 rounded-full ${i<Math.round((notes.length?stDone/notes.length:0)*Math.min(notes.length,14))?'bg-indigo-600':'bg-slate-200'}`}/>)}</div></div></div>
@@ -217,9 +228,9 @@
                             <div className="flex flex-wrap items-center gap-1.5 mt-3"><span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${prioCls(n.priority)}`}>{prioLbl(n.priority)}</span>{n.dueDate&&<span className={`px-2.5 py-1 rounded-full bg-white/80 text-[10px] font-bold flex items-center gap-1 ${isOverdue(n)?'text-indigo-600':'text-slate-500'}`}><Calendar size={11}/>{formatJalali(n.dueDate,true)}{isOverdue(n)?' • عقب‌افتاده':''}</span>}{viewMode!=='compact'&&(n.tags||[]).map(t=><span key={t} className="px-2.5 py-1 rounded-full bg-white/60 text-slate-500 text-[10px] font-bold">#{t}</span>)}</div>
                             {total>0&&<div className="flex items-center gap-2 mt-3"><div className="flex gap-1">{Array.from({length:Math.min(total,12)},(_,i)=><i key={i} className={`w-2 h-2 rounded-full ${i<Math.round(done/total*Math.min(total,12))?'bg-indigo-600':'bg-slate-300/70'}`}/>)}</div><span className="text-[10px] text-slate-400 font-bold">{done.toLocaleString('fa-IR')}/{total.toLocaleString('fa-IR')}</span></div>}
                         </div>
-                        <div className={`flex ${small?'flex-row':'flex-col'} gap-1.5 shrink-0`}><button onClick={()=>togglePin(n.id)} className={circ} title="سنجاق">{n.pinned?<PinOff size={14}/>:<Pin size={14}/>}</button><button onClick={()=>setEditModal(n)} className={circ} title="ویرایش"><Edit3 size={14}/></button><button onClick={()=>setPrintTarget(n)} className={circ} title="چاپ" aria-label="چاپ"><Printer size={14}/></button><button onClick={()=>remove(n.id)} className={circ+' !text-indigo-600'} title="حذف"><Trash2 size={14}/></button></div>
+                        <div className={`flex ${small?'flex-row':'flex-col'} gap-1.5 shrink-0`}><button onClick={()=>togglePin(n.id)} className={circ} title="سنجاق">{n.pinned?<PinOff size={14}/>:<Pin size={14}/>}</button><button onClick={()=>setEditModal(n)} className={circ} title="ویرایش"><Edit3 size={14}/></button><button onClick={()=>setPrintTarget([n])} className={circ} title="چاپ" aria-label="چاپ"><Printer size={14}/></button><button onClick={()=>remove(n.id)} className={circ+' !text-indigo-600'} title="حذف"><Trash2 size={14}/></button></div>
                     </div></div>})}</div>
-                {printTarget&&<NotePrintModal note={printTarget} onClose={()=>setPrintTarget(null)}/>}
+                {printTarget&&<NotePrintModal list={printTarget} onClose={()=>setPrintTarget(null)}/>}
                 {editModal&&<NoteEditModal note={editModal==='new'?null:editModal} onClose={()=>setEditModal(null)} onSave={saveNote} savedCustomTags={savedCustomTags}/>}
             </div>;
         };
