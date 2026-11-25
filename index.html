@@ -598,7 +598,12 @@ const PAPER_HEIGHT_MM = {
   A4: 297,
   A5: 210
 };
-const printElementInNewWindow = (el, docTitle, paperSize) => {
+const PAPER_WIDTH_MM = {
+  A4: 210,
+  A5: 148
+};
+// opts.fixedWidth: عرض چیدمان دقیقاً برابر عرض کاغذ (روی موبایل/هر پنجره‌ای یکسان). opts.multiPage: متن بلند به صفحه‌ی بعد برود، کوچک نشود.
+const printElementInNewWindow = (el, docTitle, paperSize, opts = {}) => {
   if (!el) return;
   const paper = PAPER_HEIGHT_MM[paperSize] ? paperSize : 'A4';
   const printableHeightPx = Math.floor((PAPER_HEIGHT_MM[paper] - 16) * PX_PER_MM);
@@ -611,14 +616,15 @@ const printElementInNewWindow = (el, docTitle, paperSize) => {
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="utf-8" />
-<title>${docTitle || 'چاپ'}</title>
+<title>${String(docTitle || 'چاپ').replace(/</g, '&lt;')}</title>
 <style>
   @font-face{font-family:'Vazirmatn';src:url(data:font/woff2;base64,${window.__VAZIRMATN_FONT_B64}) format('woff2');font-weight:100 900;font-style:normal;font-display:swap;}
   * { box-sizing: border-box; }
   body { font-family: 'Vazirmatn', sans-serif; margin: 0; padding: 8px; background: #fff; line-height: 1.3; }
   table { border-collapse: collapse; }
   /* ارتفاع html/body برابر ناحیه‌ی قابل‌چاپ و overflow:hidden → هر چه بیرون بزند صفحه‌ی دوم نمی‌سازد (فاکتور همیشه تک‌صفحه) */
-  @media print { body { padding: 0; } html, body { height: ${printableHeightPx - 1}px; overflow: hidden; } #fit-root { break-after: avoid; page-break-after: avoid; } @page { size: ${paper}; margin: 0.8cm; } }
+  ${opts.fixedWidth ? `#fit-root { width: ${PAPER_WIDTH_MM[paper] - 16}mm; margin: 0 auto; }` : ''}
+  @media print { body { padding: 0; } ${opts.multiPage ? '' : `html, body { height: ${printableHeightPx - 1}px; overflow: hidden; } #fit-root { break-after: avoid; page-break-after: avoid; }`} @page { size: ${paper}${opts.fixedWidth ? ' portrait' : ''}; margin: 0.8cm; } }
 </style>
 </head>
 <body><div id="fit-root">${el.outerHTML}</div>
@@ -631,6 +637,7 @@ const printElementInNewWindow = (el, docTitle, paperSize) => {
     var maxH = ${printableHeightPx};
     function fit() {
       root.style.zoom = 1;
+      if (${!!opts.multiPage}) return;
       var z = 1;
       if (root.getBoundingClientRect().height > maxH) {
         z = Math.max(0.1, maxH / root.getBoundingClientRect().height);
@@ -2614,7 +2621,7 @@ const IDB_STORE = 'app';
 const IDB_DATA_KEY = 'secure-data';
 const IDB_FALLBACK_KEY = 'plain-data-fallback';
 const APP_SCHEMA_VERSION = 11;
-const APP_BUILD = '10.16-large-data-save-fix';
+const APP_BUILD = '10.17-note-print';
 
 // ------------------------------------------------------------------
 // امنیت و ذخیره‌سازی محلی، IndexedDB
@@ -5274,7 +5281,7 @@ const MotherBagRow = ({
 // ===== مستندات برنامه =====
 // نگهداری: هر تغییری که در برنامه داده می‌شود، باید این متن هم به‌روز شود (و شماره‌ی نسخه/تاریخ بالای آن).
 // هدف: هر هوش مصنوعی یا هر فردی که این فایل را می‌بیند، در کمترین زمان بفهمد برنامه چیست و کجا را باید بخواند.
-const APP_DOCS_VERSION = 'v7.13 — ۱۴۰۵/۰۸/۲۵';
+const APP_DOCS_VERSION = 'v7.14 — ۱۴۰۵/۰۹/۰۴';
 const APP_DOCS_MD = `# مستندات کامل برنامه‌ی «انبار یار» (Pro Mahak Sync)
 
 نسخه‌ی مستندات: ${APP_DOCS_VERSION}
@@ -5314,7 +5321,7 @@ const APP_DOCS_MD = `# مستندات کامل برنامه‌ی «انبار ی
 14. کجا رفت؟ (گردش کالا، item-flow، کامپوننت ItemFlowView): مسیر یک کالا بر اساس تراکنش‌ها دسته‌بندی می‌شود: خرید (PURCHASE_RECEIVE)، ارسال به پردازش (PROCESS_SEND)، بازگشت از پردازش (PROCESS_RETURN)، امانی گرفته/داده‌شده، فروش (SALE)، اصلاح شمارش (ADJUSTMENT)، افزایش دستی (ADD)، ورود اکسل/محک (IMPORT). با دکمه‌ی «مشاهده تک‌تک تراکنش‌ها» به HistoryModal می‌رسی.
 15. استعلام: ابزار داخلی استعلام (EmbeddedToolView با نوع estelam).
 16. پشتیبان‌گیری کلی (backup): ساخت پشتیبان کامل (شامل کالاها، فاکتورها، خرید، بار در راه، امانی، پردازش، یادداشت‌ها، تنظیمات و داده‌های ابزارهای داخلی) و بازیابی از فایل .json یا .aybackup. ابزار «بررسی و تعمیر ارجاع‌های قدیمی» ارجاع‌های ادغام‌شده‌ی قدیمی را اصلاح می‌کند. کلید ورود موقت در پشتیبان ذخیره نمی‌شود.
-17. یادداشت‌ها (notes): یادداشت‌های آزاد با برچسب‌های سفارشی (کلید anbaryar_custom_tags).
+17. یادداشت‌ها (notes): یادداشت‌های آزاد با برچسب‌های سفارشی (کلید anbaryar_custom_tags). چاپ هر یادداشت (NotePrintModal / printNote): سایز ثابت A4 یا A5 عمودی، رنگی یا سیاه‌وسفید؛ انتخاب‌ها ذخیره می‌شود و متن بلند به صفحه‌ی بعد می‌رود.
 18. مستندات (docs): همین متن؛ قابل دانلود (Markdown) و کپی.
 19. تنظیمات (settings): انبارها، هزینه‌ی بارگیری هر تن (loadingCostPerTon)، حد آستانه‌ی موجودی کم (lowStockThreshold)، روزهای غیرفعالی مشتری (customerInactivityDays)، ساخت نسخه‌ی آفلاین، و تغییر رمز.
 20. اعلان‌ها: در منو، تعداد فاکتورهای سررسیدگذشته/امروز نشان داده می‌شود (dueAlertCount).
@@ -5458,6 +5465,7 @@ const APP_DOCS_MD = `# مستندات کامل برنامه‌ی «انبار ی
 - هر تغییر در برنامه (ماژول جدید، تغییر قانون محاسبه، فیلد جدید، تغییر نام کامپوننت) باید در همین متن ثبت شود.
 - شماره‌ی نسخه و تاریخ بالای همین بخش را با هر تغییر به‌روز کن.
 - تاریخچه‌ی تغییرات:
+  - v7.14 (build 10.17): چاپ یادداشت‌ها با سایز ثابت A4/A5 و حالت سیاه‌وسفید مناسب چاپ.
   - v7.13 (build 10.16): ریشه‌ی واقعی باگ «پریدن داده بعد از رفرشِ بازیابی»: برای داده‌ی حجیم، رمزنگاری با خطای stack شکست می‌خورد و داده فقط در نسخه‌ی پشتیبان ذخیره می‌شد، ولی بعد از رفرش رکورد امنِ قدیمی خوانده می‌شد. تبدیل base64 تکه‌تکه شد و بارگذاری جدیدترین منبع را برمی‌گزیند.
   - v7.12 (build 10.15): رفع باگ «پریدن داده بعد از رفرشِ بازیابی پشتیبان». بازیابی حالا کاملاً پایدار است: (۱) اگر بارگذاری اولیه‌ی برنامه هنوز در جریان باشد، نتیجه‌ی قدیمیِ آن دیگر روی داده‌ی تازه بازیابی‌شده نوشته نمی‌شود (گاردِ نسل داده ayDataGenRef)؛ (۲) بعد از بازیابی موفق، ورود موقت تازه می‌شود تا قفل خودکار بلافاصله فعال نشود و داده‌ی بازیابی‌شده از دست نرود؛ (۳) وضعیت loading پس از بازیابی پاک می‌شود تا ذخیره‌ی خودکار بلافاصله داده‌ی درست را persist کند. داده‌ی بازیابی‌شده همچنان با کلید امنیتی فعلی برنامه رمزنگاری و در IndexedDB ذخیره می‌شود و بعد از رفرش (با ورود مجدد یا ورود موقت) سالم برمی‌گردد.
   - v7.11 (build 10.14): رفع باگ «معیار محک» و کالای تکراری در همگام‌سازی محک. پیش از این کالاهای جدیدِ خودکار همیشه با واحد کیلوگرم و عددِ خامِ کیلو ساخته می‌شدند (حتی وقتی محک «موجودي ۲/واحد ۲» بسته‌ای داشت) و پیش‌نمایشِ مرحله‌ی ۳ عددِ بسته را نشان می‌داد ولی کیلو می‌ساخت؛ حالا getMahakStandardTarget واحد/عددِ خودِ محک را معیار می‌گیرد (بستهٔ مثبتِ «موجودي ۲» ← همان بسته؛ وگرنه واحدِ غیرکیلوگرم ← همان واحد؛ وگرنه کیلوگرم) و پیش‌نمایش دقیقاً همان چیزی را نشان می‌دهد که ساخته می‌شود. نرمال‌سازی واحد (کیلو گرم/کیلوگرم/kg) و نام؛ گاردِ ضد تکراری در سه لایه: مسدودکردن ردیفِ جدیدِ هم‌نام با چند کالا، هشدارِ نام‌های مشکوک (بدون فاصله یکسان یا شباهت ≥ ۰٫۸)، و لینک‌کردن به کالای هم‌نامِ موجود هنگام اعمال به‌جای ساختن کپی. حذفِ انبارِ هاردکدِ قبلی و جایگزینی با انبار پیش‌فرضِ تنظیمات (mahakDefaultWarehouseId) یا اولین انبار. انتخابگرِ لینک‌کردن کالا به portal (MahakLinkPicker) با کیبورد/جستجو/بدون بریدگی تبدیل شد؛ آمارِ مرحله‌ی ۲ ریسپانسیو و تیکِ «معیار محک» در هر دو مرحله در دسترس است.
@@ -12575,10 +12583,102 @@ const NoteEditModal = ({
     className: "flex-1 py-3.5 rounded-full bg-indigo-600 text-white font-black shadow-lg shadow-indigo-900/20 hover:bg-indigo-700 transition"
   }, "\u0630\u062E\u06CC\u0631\u0647 \u06CC\u0627\u062F\u062F\u0627\u0634\u062A"))));
 };
+
+// برگه‌ی چاپی یک یادداشت (سایز ثابت A4/A5). حالت سیاه‌وسفید: فقط مشکی روی سفید، بدون پس‌زمینه‌ی رنگی.
+// متن کاربر از طریق textContent/outerHTML خود مرورگر escape می‌شود.
+const NOTE_PRINT_ACCENT = {
+  indigo: '#4f46e5',
+  amber: '#b45309',
+  emerald: '#047857',
+  rose: '#be123c'
+};
+const printNote = (note, paper, mono) => {
+  const small = paper === 'A5';
+  const accent = mono ? '#000' : NOTE_PRINT_ACCENT[note.color] || NOTE_PRINT_ACCENT.indigo;
+  const root = document.createElement('div');
+  root.style.cssText = `color:${mono ? '#000' : '#0f172a'};font-size:${small ? 11 : 13}px;line-height:1.9;overflow-wrap:anywhere;-webkit-print-color-adjust:exact;print-color-adjust:exact`;
+  const add = (tag, text, css) => {
+    const e = document.createElement(tag);
+    e.textContent = text;
+    e.style.cssText = css;
+    root.appendChild(e);
+  };
+  const block = 'white-space:pre-wrap;margin:0 0 12px';
+  add('h1', note.title || 'یادداشت', `font-size:${small ? 16 : 21}px;margin:0 0 6px;padding-bottom:6px;border-bottom:2px solid ${accent};color:${accent}`);
+  add('div', [`اولویت: ${{
+    urgent: 'فوری',
+    high: 'مهم',
+    low: 'کم'
+  }[note.priority] || 'عادی'}`, note.dueDate && `موعد: ${formatJalali(note.dueDate, true)}`, note.isDone && 'انجام‌شده', ...(note.tags || []).map(t => `#${t}`)].filter(Boolean).join('  |  '), `margin:0 0 12px;font-size:${small ? 9 : 11}px;color:${mono ? '#000' : '#475569'}`);
+  if (note.text) add('div', note.text, block);
+  if (note.description) add('div', note.description, `${block};padding:8px 10px;border:1px solid ${mono ? '#000' : '#cbd5e1'};border-radius:8px;background:${mono ? '#fff' : '#f8fafc'}`);
+  (note.subtasks || []).forEach(s => add('div', `${s.isDone ? '☑' : '☐'}  ${s.text}`, `padding:3px 0;border-bottom:1px dashed ${mono ? '#000' : '#cbd5e1'};break-inside:avoid`));
+  printElementInNewWindow(root, note.title || 'یادداشت', paper, {
+    fixedWidth: true,
+    multiPage: true
+  });
+};
+const NotePrintModal = ({
+  note,
+  onClose
+}) => {
+  const dialogRef = useDialogA11y(onClose);
+  const [paper, setPaper] = useState(() => localStorage.getItem('anbaryar_note_paper') || 'A4');
+  const [mono, setMono] = useState(() => localStorage.getItem('anbaryar_note_mono') === '1');
+  const print = () => {
+    localStorage.setItem('anbaryar_note_paper', paper);
+    localStorage.setItem('anbaryar_note_mono', mono ? '1' : '0');
+    printNote(note, paper, mono);
+    onClose();
+  };
+  const opt = on => `flex-1 p-2.5 rounded-full text-xs font-bold border transition ${on ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    ref: dialogRef,
+    className: "bg-white rounded-3xl w-full max-w-sm shadow-2xl p-5 space-y-4",
+    dir: "rtl"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between items-center"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-black text-slate-800 flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement(Printer, {
+    size: 19,
+    className: "text-indigo-600"
+  }), "\u0686\u0627\u067E \u06CC\u0627\u062F\u062F\u0627\u0634\u062A"), /*#__PURE__*/React.createElement("button", {
+    onClick: onClose,
+    "aria-label": "\u0628\u0633\u062A\u0646",
+    className: "p-2 rounded-full hover:bg-slate-100"
+  }, /*#__PURE__*/React.createElement(X, {
+    size: 19
+  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-bold text-slate-500 mb-2"
+  }, "\u0633\u0627\u06CC\u0632 \u06A9\u0627\u063A\u0630"), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, ['A4', 'A5'].map(p => /*#__PURE__*/React.createElement("button", {
+    key: p,
+    "aria-pressed": paper === p,
+    onClick: () => setPaper(p),
+    className: opt(paper === p)
+  }, p)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs font-bold text-slate-500 mb-2"
+  }, "\u062D\u0627\u0644\u062A \u0686\u0627\u067E"), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, [[false, 'رنگی'], [true, 'سیاه‌وسفید']].map(([v, l]) => /*#__PURE__*/React.createElement("button", {
+    key: l,
+    "aria-pressed": mono === v,
+    onClick: () => setMono(v),
+    className: opt(mono === v)
+  }, l)))), /*#__PURE__*/React.createElement("button", {
+    onClick: print,
+    className: "w-full py-3.5 rounded-full bg-indigo-600 text-white font-black hover:bg-indigo-700 transition"
+  }, "\u0686\u0627\u067E")));
+};
 const Notes = ({
   notes,
   onUpdateNotes
 }) => {
+  const [printTarget, setPrintTarget] = useState(null);
   const confirmAction = useConfirm();
   const [editModal, setEditModal] = useState(null);
   const [sortBy, setSortBy] = useState('newest');
@@ -12865,13 +12965,23 @@ const Notes = ({
     }, /*#__PURE__*/React.createElement(Edit3, {
       size: 14
     })), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setPrintTarget(n),
+      className: circ,
+      title: "\u0686\u0627\u067E",
+      "aria-label": "\u0686\u0627\u067E"
+    }, /*#__PURE__*/React.createElement(Printer, {
+      size: 14
+    })), /*#__PURE__*/React.createElement("button", {
       onClick: () => remove(n.id),
       className: circ + ' !text-indigo-600',
       title: "\u062D\u0630\u0641"
     }, /*#__PURE__*/React.createElement(Trash2, {
       size: 14
     })))));
-  })), editModal && /*#__PURE__*/React.createElement(NoteEditModal, {
+  })), printTarget && /*#__PURE__*/React.createElement(NotePrintModal, {
+    note: printTarget,
+    onClose: () => setPrintTarget(null)
+  }), editModal && /*#__PURE__*/React.createElement(NoteEditModal, {
     note: editModal === 'new' ? null : editModal,
     onClose: () => setEditModal(null),
     onSave: saveNote,

@@ -139,7 +139,40 @@
             </div></div>
         };
 
+        // برگه‌ی چاپی یک یادداشت (سایز ثابت A4/A5). حالت سیاه‌وسفید: فقط مشکی روی سفید، بدون پس‌زمینه‌ی رنگی.
+        // متن کاربر از طریق textContent/outerHTML خود مرورگر escape می‌شود.
+        const NOTE_PRINT_ACCENT = {indigo:'#4f46e5',amber:'#b45309',emerald:'#047857',rose:'#be123c'};
+        const printNote = (note, paper, mono) => {
+            const small = paper==='A5';
+            const accent = mono ? '#000' : (NOTE_PRINT_ACCENT[note.color]||NOTE_PRINT_ACCENT.indigo);
+            const root = document.createElement('div');
+            root.style.cssText = `color:${mono?'#000':'#0f172a'};font-size:${small?11:13}px;line-height:1.9;overflow-wrap:anywhere;-webkit-print-color-adjust:exact;print-color-adjust:exact`;
+            const add = (tag, text, css) => { const e=document.createElement(tag); e.textContent=text; e.style.cssText=css; root.appendChild(e); };
+            const block = 'white-space:pre-wrap;margin:0 0 12px';
+            add('h1', note.title||'یادداشت', `font-size:${small?16:21}px;margin:0 0 6px;padding-bottom:6px;border-bottom:2px solid ${accent};color:${accent}`);
+            add('div', [`اولویت: ${{urgent:'فوری',high:'مهم',low:'کم'}[note.priority]||'عادی'}`, note.dueDate&&`موعد: ${formatJalali(note.dueDate,true)}`, note.isDone&&'انجام‌شده', ...(note.tags||[]).map(t=>`#${t}`)].filter(Boolean).join('  |  '), `margin:0 0 12px;font-size:${small?9:11}px;color:${mono?'#000':'#475569'}`);
+            if(note.text) add('div', note.text, block);
+            if(note.description) add('div', note.description, `${block};padding:8px 10px;border:1px solid ${mono?'#000':'#cbd5e1'};border-radius:8px;background:${mono?'#fff':'#f8fafc'}`);
+            (note.subtasks||[]).forEach(s=>add('div', `${s.isDone?'☑':'☐'}  ${s.text}`, `padding:3px 0;border-bottom:1px dashed ${mono?'#000':'#cbd5e1'};break-inside:avoid`));
+            printElementInNewWindow(root, note.title||'یادداشت', paper, {fixedWidth:true, multiPage:true});
+        };
+
+        const NotePrintModal = ({ note, onClose }) => {
+            const dialogRef = useDialogA11y(onClose);
+            const [paper,setPaper]=useState(()=>localStorage.getItem('anbaryar_note_paper')||'A4');
+            const [mono,setMono]=useState(()=>localStorage.getItem('anbaryar_note_mono')==='1');
+            const print=()=>{localStorage.setItem('anbaryar_note_paper',paper);localStorage.setItem('anbaryar_note_mono',mono?'1':'0');printNote(note,paper,mono);onClose()};
+            const opt=on=>`flex-1 p-2.5 rounded-full text-xs font-bold border transition ${on?'bg-indigo-600 text-white border-indigo-600':'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`;
+            return <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div ref={dialogRef} className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-5 space-y-4" dir="rtl">
+                <div className="flex justify-between items-center"><h3 className="font-black text-slate-800 flex items-center gap-2"><Printer size={19} className="text-indigo-600"/>چاپ یادداشت</h3><button onClick={onClose} aria-label="بستن" className="p-2 rounded-full hover:bg-slate-100"><X size={19}/></button></div>
+                <div><div className="text-xs font-bold text-slate-500 mb-2">سایز کاغذ</div><div className="flex gap-2">{['A4','A5'].map(p=><button key={p} aria-pressed={paper===p} onClick={()=>setPaper(p)} className={opt(paper===p)}>{p}</button>)}</div></div>
+                <div><div className="text-xs font-bold text-slate-500 mb-2">حالت چاپ</div><div className="flex gap-2">{[[false,'رنگی'],[true,'سیاه‌وسفید']].map(([v,l])=><button key={l} aria-pressed={mono===v} onClick={()=>setMono(v)} className={opt(mono===v)}>{l}</button>)}</div></div>
+                <button onClick={print} className="w-full py-3.5 rounded-full bg-indigo-600 text-white font-black hover:bg-indigo-700 transition">چاپ</button>
+            </div></div>;
+        };
+
         const Notes = ({ notes, onUpdateNotes }) => {
+            const [printTarget,setPrintTarget]=useState(null);
             const confirmAction=useConfirm(); const [editModal,setEditModal]=useState(null); const [sortBy,setSortBy]=useState('newest'); const [viewMode,setViewMode]=useState(()=>localStorage.getItem('anbaryar_notes_view')||'card'); const [filter,setFilter]=useState('all'); const [searchText,setSearchText]=useState('');
             const [savedCustomTags,setSavedCustomTags]=useState(()=>{try{return JSON.parse(localStorage.getItem('anbaryar_custom_tags')||'[]')}catch(e){return[]}});
             const saveNote=n=>{const normalized={...n,updatedAt:Date.now()};const exists=notes.some(x=>x.id===n.id);onUpdateNotes(exists?notes.map(x=>x.id===n.id?normalized:x):[normalized,...notes]);const custom=(n.tags||[]).filter(t=>!PRIORITY_TAGS.includes(t));const merged=[...new Set([...savedCustomTags,...custom])];setSavedCustomTags(merged);try{localStorage.setItem('anbaryar_custom_tags',JSON.stringify(merged))}catch(e){}};
@@ -184,8 +217,9 @@
                             <div className="flex flex-wrap items-center gap-1.5 mt-3"><span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${prioCls(n.priority)}`}>{prioLbl(n.priority)}</span>{n.dueDate&&<span className={`px-2.5 py-1 rounded-full bg-white/80 text-[10px] font-bold flex items-center gap-1 ${isOverdue(n)?'text-indigo-600':'text-slate-500'}`}><Calendar size={11}/>{formatJalali(n.dueDate,true)}{isOverdue(n)?' • عقب‌افتاده':''}</span>}{viewMode!=='compact'&&(n.tags||[]).map(t=><span key={t} className="px-2.5 py-1 rounded-full bg-white/60 text-slate-500 text-[10px] font-bold">#{t}</span>)}</div>
                             {total>0&&<div className="flex items-center gap-2 mt-3"><div className="flex gap-1">{Array.from({length:Math.min(total,12)},(_,i)=><i key={i} className={`w-2 h-2 rounded-full ${i<Math.round(done/total*Math.min(total,12))?'bg-indigo-600':'bg-slate-300/70'}`}/>)}</div><span className="text-[10px] text-slate-400 font-bold">{done.toLocaleString('fa-IR')}/{total.toLocaleString('fa-IR')}</span></div>}
                         </div>
-                        <div className={`flex ${small?'flex-row':'flex-col'} gap-1.5 shrink-0`}><button onClick={()=>togglePin(n.id)} className={circ} title="سنجاق">{n.pinned?<PinOff size={14}/>:<Pin size={14}/>}</button><button onClick={()=>setEditModal(n)} className={circ} title="ویرایش"><Edit3 size={14}/></button><button onClick={()=>remove(n.id)} className={circ+' !text-indigo-600'} title="حذف"><Trash2 size={14}/></button></div>
+                        <div className={`flex ${small?'flex-row':'flex-col'} gap-1.5 shrink-0`}><button onClick={()=>togglePin(n.id)} className={circ} title="سنجاق">{n.pinned?<PinOff size={14}/>:<Pin size={14}/>}</button><button onClick={()=>setEditModal(n)} className={circ} title="ویرایش"><Edit3 size={14}/></button><button onClick={()=>setPrintTarget(n)} className={circ} title="چاپ" aria-label="چاپ"><Printer size={14}/></button><button onClick={()=>remove(n.id)} className={circ+' !text-indigo-600'} title="حذف"><Trash2 size={14}/></button></div>
                     </div></div>})}</div>
+                {printTarget&&<NotePrintModal note={printTarget} onClose={()=>setPrintTarget(null)}/>}
                 {editModal&&<NoteEditModal note={editModal==='new'?null:editModal} onClose={()=>setEditModal(null)} onSave={saveNote} savedCustomTags={savedCustomTags}/>}
             </div>;
         };

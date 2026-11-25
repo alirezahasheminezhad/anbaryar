@@ -246,7 +246,9 @@
         // دومِ تقریباً خالی بسازد. حالا این عدد مستقیماً از رویِ سایز واقعیِ کاغذِ انتخاب‌شده محاسبه می‌شود.
         const PX_PER_MM = 96 / 25.4;
         const PAPER_HEIGHT_MM = { A4: 297, A5: 210 };
-        const printElementInNewWindow = (el, docTitle, paperSize) => {
+        const PAPER_WIDTH_MM = { A4: 210, A5: 148 };
+        // opts.fixedWidth: عرض چیدمان دقیقاً برابر عرض کاغذ (روی موبایل/هر پنجره‌ای یکسان). opts.multiPage: متن بلند به صفحه‌ی بعد برود، کوچک نشود.
+        const printElementInNewWindow = (el, docTitle, paperSize, opts = {}) => {
             if (!el) return;
             const paper = PAPER_HEIGHT_MM[paperSize] ? paperSize : 'A4';
             const printableHeightPx = Math.floor((PAPER_HEIGHT_MM[paper] - 16) * PX_PER_MM);
@@ -259,14 +261,15 @@
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="utf-8" />
-<title>${docTitle || 'چاپ'}</title>
+<title>${String(docTitle || 'چاپ').replace(/</g, '&lt;')}</title>
 <style>
   @font-face{font-family:'Vazirmatn';src:url(data:font/woff2;base64,${window.__VAZIRMATN_FONT_B64}) format('woff2');font-weight:100 900;font-style:normal;font-display:swap;}
   * { box-sizing: border-box; }
   body { font-family: 'Vazirmatn', sans-serif; margin: 0; padding: 8px; background: #fff; line-height: 1.3; }
   table { border-collapse: collapse; }
   /* ارتفاع html/body برابر ناحیه‌ی قابل‌چاپ و overflow:hidden → هر چه بیرون بزند صفحه‌ی دوم نمی‌سازد (فاکتور همیشه تک‌صفحه) */
-  @media print { body { padding: 0; } html, body { height: ${printableHeightPx - 1}px; overflow: hidden; } #fit-root { break-after: avoid; page-break-after: avoid; } @page { size: ${paper}; margin: 0.8cm; } }
+  ${opts.fixedWidth ? `#fit-root { width: ${PAPER_WIDTH_MM[paper] - 16}mm; margin: 0 auto; }` : ''}
+  @media print { body { padding: 0; } ${opts.multiPage ? '' : `html, body { height: ${printableHeightPx - 1}px; overflow: hidden; } #fit-root { break-after: avoid; page-break-after: avoid; }`} @page { size: ${paper}${opts.fixedWidth ? ' portrait' : ''}; margin: 0.8cm; } }
 </style>
 </head>
 <body><div id="fit-root">${el.outerHTML}</div>
@@ -279,6 +282,7 @@
     var maxH = ${printableHeightPx};
     function fit() {
       root.style.zoom = 1;
+      if (${!!opts.multiPage}) return;
       var z = 1;
       if (root.getBoundingClientRect().height > maxH) {
         z = Math.max(0.1, maxH / root.getBoundingClientRect().height);
