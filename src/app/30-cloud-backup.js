@@ -37,6 +37,7 @@ const AY_CLOUD = (() => {
         const headers = {
             'apikey': AY_CLOUD_KEY,
             'Authorization': 'Bearer ' + current.access_token,
+            'Content-Type': 'application/json',
             ...(options.headers || {})
         };
         const response = await fetch(options.url || AY_CLOUD_FUNCTION, {
