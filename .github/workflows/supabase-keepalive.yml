@@ -15,7 +15,10 @@ jobs:
           SUPABASE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZveXR0dnZwc2Nlbmt4Ym9iYXpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1ODM5ODAsImV4cCI6MjExMDE1OTk4MH0.Tjv-n3OinihjPAHh6AppQmrUbXudUC2QMXbcyISWlmo
         run: |
           set -euo pipefail
+          echo "Supabase keepalive at $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           curl --fail-with-body --silent --show-error \
+            --connect-timeout 10 --max-time 30 \
+            --retry 3 --retry-all-errors --retry-delay 10 \
             "$SUPABASE_URL/rest/v1/rpc/anbaryar_keepalive" \
             -X POST \
             -H "apikey: $SUPABASE_KEY" \
