@@ -18458,6 +18458,10 @@ const App = () => {
   const [saveError, setSaveError] = useState(false);
   const [securityNudgeDismissed, setSecurityNudgeDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [cloudBackups, setCloudBackups] = useState([]);
+  const [cloudBusy, setCloudBusy] = useState(false);
+  const [cloudError, setCloudError] = useState('');
+  const [cloudAccount, setCloudAccount] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingItem, setEditingItem] = useState(null);
   const [historyItem, setHistoryItem] = useState(null);
@@ -18567,6 +18571,16 @@ const App = () => {
     }, 400);
     return () => clearTimeout(t);
   }, [items, invoices, notes, transactions, purchases, processingOrders, consignments, loading]);
+  useEffect(() => {
+    if (loading) return;
+    const last = Date.parse(localStorage.getItem('anbaryar_cloud_last_backup') || '');
+    if (!last || Date.now() - last >= 24 * 60 * 60 * 1000) {
+      const timer = setTimeout(() => {
+        handleCloudUpload(true);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings]);
   const logTransaction = (item, type, quantity, newStock, invoiceId, recipient, desc, txId) => {
     const id = txId || generateId();
     const newTx = {
@@ -19977,6 +19991,119 @@ const App = () => {
       return false;
     }
   };
+  const makeCloudBackupSnapshot = async () => {
+    const local = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k !== TRUSTED_UNLOCK_KEY) local[k] = localStorage.getItem(k);
+    }
+    let secureEnvelope = null;
+    try {
+      secureEnvelope = await idbGet(IDB_DATA_KEY);
+    } catch (e) {}
+    return {
+      format: 'ANBARYAR_FULL_BACKUP',
+      version: 2,
+      appBuild: APP_BUILD,
+      schemaVersion: APP_SCHEMA_VERSION,
+      date: new Date().toISOString(),
+      data: {
+        items,
+        invoices,
+        notes,
+        transactions,
+        purchases,
+        processingOrders,
+        consignments
+      },
+      settings: appSettings,
+      localStorage: local,
+      securityConfig: getSecurityConfig(),
+      secureEnvelope,
+      embedded: {
+        estelamLocal: localStorage.getItem('freightAppData_v2'),
+        userPurchasesLocal: {
+          autoBackup: localStorage.getItem('autoBackup'),
+          theme: localStorage.getItem('theme')
+        },
+        invDb: {
+          products: await getIDBAll('InvDB_v4', 'products'),
+          history: await getIDBAll('InvDB_v4', 'history')
+        }
+      }
+    };
+  };
+  const handleCloudUpload = async (automatic = false) => {
+    if (cloudBusy) return;
+    setCloudBusy(true);
+    setCloudError('');
+    try {
+      const snapshot = await makeCloudBackupSnapshot();
+      const result = await AY_CLOUD.upload(snapshot);
+      localStorage.setItem('anbaryar_cloud_last_backup', new Date().toISOString());
+      const list = await AY_CLOUD.list();
+      setCloudBackups(list.backups || []);
+      if (!automatic) toast.show('پشتیبان ابری با موفقیت ذخیره شد');
+      return result;
+    } catch (err) {
+      setCloudError(err?.message || 'پشتیبان ابری انجام نشد');
+      if (!automatic) toast.show('پشتیبان ابری ناموفق بود: ' + (err?.message || 'خطای نامشخص'));
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+  const refreshCloudBackups = async () => {
+    setCloudBusy(true);
+    setCloudError('');
+    try {
+      const [list, account] = await Promise.all([AY_CLOUD.list(), AY_CLOUD.account()]);
+      setCloudBackups(list.backups || []);
+      setCloudAccount(account);
+    } catch (err) {
+      setCloudError(err?.message || 'دریافت فهرست پشتیبان‌ها ناموفق بود');
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+  useEffect(() => {
+    if (view === 'backup') refreshCloudBackups();
+  }, [view]);
+  const handleCloudLinkGoogle = async () => {
+    try {
+      setCloudError('');
+      await AY_CLOUD.linkGoogle();
+    } catch (err) {
+      setCloudError(err?.message || 'اتصال گوگل انجام نشد');
+    }
+  };
+  const handleCloudGoogleLogin = async () => {
+    try {
+      setCloudError('');
+      await AY_CLOUD.signInGoogle();
+    } catch (err) {
+      setCloudError(err?.message || 'ورود با گوگل انجام نشد');
+    }
+  };
+  const handleCloudRestore = async id => {
+    const ok = await confirmAction('این نسخه ابری جایگزین اطلاعات فعلی انباریار می‌شود. قبل از ادامه یک فایل پشتیبان محلی بسازید. ادامه می‌دهید؟');
+    if (!ok) return;
+    try {
+      setCloudBusy(true);
+      const backup = await AY_CLOUD.restore(id);
+      const file = new File([JSON.stringify(backup)], 'anbaryar-cloud-restore.aybackup.json', {
+        type: 'application/json'
+      });
+      handleSystemRestore({
+        target: {
+          files: [file]
+        }
+      });
+    } catch (err) {
+      toast.show('بازیابی ابری ناموفق بود: ' + (err?.message || 'خطای نامشخص'));
+    } finally {
+      setCloudBusy(false);
+    }
+  };
   const handleSystemRestore = e => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -20496,6 +20623,18 @@ const App = () => {
   }, /*#__PURE__*/React.createElement("b", null, "\u0627\u0645\u0646\u06CC\u062A:"), " \u06A9\u0644\u06CC\u062F \u0648\u0631\u0648\u062F \u0645\u0648\u0642\u062A \u06F3\u06F0 \u062F\u0642\u06CC\u0642\u0647\u200C\u0627\u06CC \u062F\u0631 Backup \u0630\u062E\u06CC\u0631\u0647 \u0646\u0645\u06CC\u200C\u0634\u0648\u062F.")), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap gap-3 mt-5"
   }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => handleCloudUpload(false),
+    disabled: cloudBusy,
+    className: "flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-5 py-3 rounded-full text-sm font-black transition"
+  }, /*#__PURE__*/React.createElement(Save, {
+    size: 18
+  }), cloudBusy ? 'در حال انجام...' : 'ذخیره در فضای ابری'), /*#__PURE__*/React.createElement("button", {
+    onClick: refreshCloudBackups,
+    disabled: cloudBusy,
+    className: "flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-3 rounded-full text-sm font-black transition"
+  }, /*#__PURE__*/React.createElement(Upload, {
+    size: 18
+  }), "\u062F\u0631\u06CC\u0627\u0641\u062A \u0641\u0647\u0631\u0633\u062A \u0627\u0628\u0631\u06CC"), /*#__PURE__*/React.createElement("button", {
     onClick: handleSystemBackup,
     className: "flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-full text-sm font-black transition"
   }, /*#__PURE__*/React.createElement(Save, {
@@ -20510,6 +20649,53 @@ const App = () => {
     className: "hidden",
     onChange: handleSystemRestore
   })))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mt-5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-3"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    className: "text-lg font-black text-slate-800"
+  }, "\u062D\u0633\u0627\u0628 \u0627\u0628\u0631\u06CC \u0627\u0646\u0628\u0627\u0631\u06CC\u0627\u0631"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400 mt-1"
+  }, cloudAccount?.user?.email || (cloudAccount?.user?.is_anonymous ? "حساب موقت این دستگاه" : "برای بررسی وضعیت، فهرست را تازه‌سازی کنید"))), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-emerald-700"
+  }, "Supabase Auth")), /*#__PURE__*/React.createElement("p", {
+    className: "mt-3 text-xs text-slate-500"
+  }, "\u0628\u0631\u0627\u06CC \u062D\u0641\u0638 \u0646\u0633\u062E\u0647\u200C\u0647\u0627\u06CC \u0647\u0645\u06CC\u0646 \u062F\u0633\u062A\u06AF\u0627\u0647\u060C \u06AF\u0648\u06AF\u0644 \u0631\u0627 \u0628\u0647 \u062D\u0633\u0627\u0628 \u0641\u0639\u0644\u06CC \u067E\u06CC\u0648\u0646\u062F \u0628\u0632\u0646\u06CC\u062F. \u0628\u0631\u0627\u06CC \u062F\u0633\u062A\u0631\u0633\u06CC \u0628\u0647 \u062D\u0633\u0627\u0628\u06CC \u06A9\u0647 \u0642\u0628\u0644\u0627\u064B \u0631\u0648\u06CC \u062F\u0633\u062A\u06AF\u0627\u0647 \u062F\u06CC\u06AF\u0631\u06CC \u0645\u062A\u0635\u0644 \u06A9\u0631\u062F\u0647\u200C\u0627\u06CC\u062F\u060C \u0627\u0632 \u0648\u0631\u0648\u062F \u0628\u0627 \u06AF\u0648\u06AF\u0644 \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u06A9\u0646\u06CC\u062F."), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-2 mt-4"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: handleCloudLinkGoogle,
+    className: "rounded-full bg-slate-900 px-4 py-2.5 text-xs font-bold text-white"
+  }, "\u0627\u062A\u0635\u0627\u0644 \u06AF\u0648\u06AF\u0644 \u0628\u0647 \u0647\u0645\u06CC\u0646 \u062F\u0633\u062A\u06AF\u0627\u0647"), /*#__PURE__*/React.createElement("button", {
+    onClick: handleCloudGoogleLogin,
+    className: "rounded-full border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700"
+  }, "\u0648\u0631\u0648\u062F \u0628\u0627 \u062D\u0633\u0627\u0628 Google"))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mt-5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-3"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    className: "text-lg font-black text-slate-800"
+  }, "\u067E\u0634\u062A\u06CC\u0628\u0627\u0646\u200C\u0647\u0627\u06CC \u0627\u0628\u0631\u06CC Supabase"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400 mt-1"
+  }, "\u0646\u0633\u062E\u0647 \u062E\u0648\u062F\u06A9\u0627\u0631 \u0631\u0648\u0632\u0627\u0646\u0647\u061B \u062D\u062F\u0627\u06A9\u062B\u0631 \u06F3\u06F0 \u0646\u0633\u062E\u0647 \u06CC\u0627 \u06F6\u06F0\u06F0 \u0645\u06AF\u0627\u0628\u0627\u06CC\u062A. \u0642\u062F\u06CC\u0645\u06CC\u200C\u062A\u0631\u06CC\u0646 \u0646\u0633\u062E\u0647\u200C\u0647\u0627 \u067E\u0633 \u0627\u0632 \u0630\u062E\u06CC\u0631\u0647 \u0645\u0648\u0641\u0642 \u0646\u0633\u062E\u0647 \u062C\u062F\u06CC\u062F \u062D\u0630\u0641 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F.")), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-emerald-700"
+  }, "\u0641\u0636\u0627\u06CC \u062E\u0635\u0648\u0635\u06CC")), cloudError && /*#__PURE__*/React.createElement("p", {
+    className: "mt-3 text-xs text-rose-600"
+  }, cloudError), /*#__PURE__*/React.createElement("div", {
+    className: "mt-4 space-y-2"
+  }, cloudBackups.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400"
+  }, "\u0628\u0631\u0627\u06CC \u0645\u0634\u0627\u0647\u062F\u0647 \u0646\u0633\u062E\u0647\u200C\u0647\u0627\u060C \xAB\u062F\u0631\u06CC\u0627\u0641\u062A \u0641\u0647\u0631\u0633\u062A \u0627\u0628\u0631\u06CC\xBB \u0631\u0627 \u0628\u0632\u0646\u06CC\u062F.") : cloudBackups.map(b => /*#__PURE__*/React.createElement("div", {
+    key: b.id,
+    className: "flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-xs"
+  }, /*#__PURE__*/React.createElement("b", null, new Date(b.created_at).toLocaleString('fa-IR')), /*#__PURE__*/React.createElement("div", {
+    className: "text-slate-400 mt-1"
+  }, (Number(b.size_bytes) / 1024 / 1024).toFixed(2), " \u0645\u06AF\u0627\u0628\u0627\u06CC\u062A \xB7 ", b.app_build || 'نسخه نامشخص')), /*#__PURE__*/React.createElement("button", {
+    onClick: () => handleCloudRestore(b.id),
+    disabled: cloudBusy,
+    className: "rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+  }, "\u0628\u0627\u0632\u06CC\u0627\u0628\u06CC \u0627\u06CC\u0646 \u0646\u0633\u062E\u0647"))))), /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mt-5"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-3"
@@ -20669,6 +20855,156 @@ const App = () => {
     onClose: () => setShowSecurityCenter(false)
   }));
 };
+const AY_CLOUD_URL = 'https://foyttvvpscenkxbobazs.supabase.co';
+const AY_CLOUD_KEY = 'sb_publishable_AhAgG-9rYk_PwD3cFjNCAA_bzK06eO2';
+const AY_CLOUD_FUNCTION = AY_CLOUD_URL + '/functions/v1/anbaryar-cloud-backup';
+const AY_CLOUD = (() => {
+  let clientPromise = null;
+  let sessionPromise = null;
+  const client = () => {
+    if (!clientPromise) clientPromise = import('https://esm.sh/@supabase/supabase-js@2').then(({
+      createClient
+    }) => createClient(AY_CLOUD_URL, AY_CLOUD_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    }));
+    return clientPromise;
+  };
+  const session = async () => {
+    if (sessionPromise) return await sessionPromise;
+    sessionPromise = (async () => {
+      const sb = await client();
+      let {
+        data: {
+          session
+        }
+      } = await sb.auth.getSession();
+      if (!session) {
+        const result = await sb.auth.signInAnonymously();
+        if (result.error) throw result.error;
+        session = result.data.session;
+      }
+      if (!session?.access_token) throw new Error('ورود ابری انجام نشد.');
+      return session;
+    })();
+    try {
+      return await sessionPromise;
+    } finally {
+      sessionPromise = null;
+    }
+  };
+  const call = async (action, options = {}) => {
+    const current = await session();
+    const headers = {
+      'apikey': AY_CLOUD_KEY,
+      'Authorization': 'Bearer ' + current.access_token,
+      ...(options.headers || {})
+    };
+    const response = await fetch(AY_CLOUD_FUNCTION, {
+      method: 'POST',
+      headers,
+      body: options.body || JSON.stringify({
+        action
+      })
+    });
+    if (!response.ok) {
+      let message = 'ارتباط با سرویس پشتیبان ابری ناموفق بود.';
+      try {
+        message = (await response.json()).error || message;
+      } catch (e) {}
+      throw new Error(message);
+    }
+    return options.raw ? response : response.json();
+  };
+  const gzip = async value => {
+    if (!('CompressionStream' in window)) throw new Error('مرورگر از فشرده‌سازی پشتیبان پشتیبانی نمی‌کند.');
+    const stream = new Blob([JSON.stringify(value)], {
+      type: 'application/json'
+    }).stream().pipeThrough(new CompressionStream('gzip'));
+    return await new Response(stream).blob();
+  };
+  return {
+    upload: async value => {
+      const secured = typeof AY_SECURITY !== 'undefined' && AY_SECURITY.key ? {
+        format: 'ANBARYAR_CLOUD_ENCRYPTED',
+        envelope: await encryptAY(value)
+      } : value;
+      const blob = await gzip(secured);
+      if (blob.size > 45 * 1024 * 1024) throw new Error('حجم نسخه پشتیبان از سقف ۴۵ مگابایت بیشتر است.');
+      return await call('upload', {
+        body: blob,
+        headers: {
+          'Content-Type': 'application/gzip',
+          'X-AY-App-Build': String(value.appBuild || ''),
+          'X-AY-Schema-Version': String(value.schemaVersion || '')
+        }
+      });
+    },
+    list: async () => await call('list'),
+    account: async () => {
+      const sb = await client();
+      const current = await session();
+      const {
+        data,
+        error
+      } = await sb.auth.getUserIdentities();
+      if (error) throw error;
+      return {
+        user: current.user,
+        identities: data?.identities || []
+      };
+    },
+    linkGoogle: async () => {
+      const sb = await client();
+      await session();
+      const {
+        data,
+        error
+      } = await sb.auth.linkIdentity({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.href
+        }
+      });
+      if (error) throw error;
+      return data;
+    },
+    signInGoogle: async () => {
+      const sb = await client();
+      const {
+        data,
+        error
+      } = await sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.href
+        }
+      });
+      if (error) throw error;
+      return data;
+    },
+    restore: async id => {
+      const response = await call('restore', {
+        body: JSON.stringify({
+          action: 'restore',
+          id
+        }),
+        raw: true
+      });
+      if (!('DecompressionStream' in window)) throw new Error('مرورگر از بازکردن پشتیبان فشرده پشتیبانی نمی‌کند.');
+      const stream = response.body.pipeThrough(new DecompressionStream('gzip'));
+      const decoded = JSON.parse(await new Response(stream).text());
+      if (decoded?.format === 'ANBARYAR_CLOUD_ENCRYPTED') {
+        if (!AY_SECURITY.key) throw new Error('این نسخه رمزنگاری شده است؛ ابتدا با رمز انباریار وارد شوید.');
+        return await decryptAY(decoded.envelope);
+      }
+      return decoded;
+    }
+  };
+})();
 window.addEventListener('error', e => {
   console.error('AnbarYar runtime error:', e.error || e.message);
 });

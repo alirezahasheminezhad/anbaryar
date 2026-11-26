@@ -56,6 +56,7 @@ MODULES = [
     "assets/estelam-app.js",
     "app/27-embedded-tools.jsx",
     "app/28-app-root.jsx",
+    "app/30-cloud-backup.js",
     "app/29-boot.jsx",
     "99-html-tail.html",
 ]
