@@ -9,7 +9,7 @@
         const { 
           Download, Upload, Search, FileSpreadsheet, PackageOpen, 
           Plus, Tag, Box, Hash, Layers, Package, Trash2, Minus, 
-          Truck, X, Check, Lock, ShieldCheck, CloudCheck, WifiOff, AlertTriangle,
+          Truck, X, Check, Lock, ShieldCheck, Cloud, CloudCheck, WifiOff, AlertTriangle,
           LayoutDashboard, FileText, History, Scale, Store, Clock,
           Eye, Edit3, FilePlus, Info, Save, RefreshCw, Pencil, ClipboardList, CheckSquare, Square,
           Calendar, User, PackageX, ArrowUpRight, ArrowDownLeft, Edit, Settings, CheckCircle,
