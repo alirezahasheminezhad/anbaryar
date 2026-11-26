@@ -28,6 +28,14 @@ jobs:
       - run: npm ci
       - name: Build generated index
         run: python3 build.py
+      - name: Build single-file offline app
+        run: node tools/build-offline.js
+      - name: Upload single-file offline build
+        uses: actions/upload-artifact@v4
+        with:
+          name: anbar-yar-offline-preview
+          path: dist/anbar-yar-offline.html
+          retention-days: 7
       - name: Commit generated index when changed
         run: |
           set -euo pipefail
