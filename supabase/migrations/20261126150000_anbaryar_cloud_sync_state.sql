@@ -14,3 +14,9 @@ comment on column public.anbaryar_backup_files.is_sync_state is
   'True for the current mutable synchronization snapshot; false for retained historical backups.';
 comment on column public.anbaryar_backup_files.sync_revision is
   'Optimistic concurrency revision for cloud synchronization.';
+
+-- Browser clients must not query backup metadata directly.
+-- All reads/writes go through the authenticated Edge Function using the service role.
+drop policy if exists "AnbarYar users can read own backup metadata"
+  on public.anbaryar_backup_files;
+revoke all on table public.anbaryar_backup_files from anon, authenticated;
