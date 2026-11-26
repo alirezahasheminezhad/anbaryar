@@ -92,6 +92,7 @@
             const ayInitialSaveRef = useRef(true);
             const ayCloudSyncBusyRef = useRef(false);
             const ayCloudSyncStartupRef = useRef(false);
+            const ayCloudMutationSeqRef = useRef(0);
             useEffect(() => {
                 let alive = true;
                 const gen = ayDataGenRef.current;
@@ -139,6 +140,11 @@
             // شروع اولیه از داده‌ی محلی/ابری تشخیص داده می‌شود و تغییرات بعدی با تأخیر کوتاه تجمیع می‌شوند.
             useEffect(() => {
                 if (loading || new URLSearchParams(window.location.search).has('ay_auth_bridge')) return;
+                ayCloudMutationSeqRef.current += 1;
+            }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings]);
+
+            useEffect(() => {
+                if (loading || new URLSearchParams(window.location.search).has('ay_auth_bridge')) return;
                 const reason = ayCloudSyncStartupRef.current ? 'local-change' : 'startup';
                 ayCloudSyncStartupRef.current = true;
                 const timer = setTimeout(() => handleCloudSync(reason), reason === 'startup' ? 2400 : 1600);
@@ -148,12 +154,36 @@
             useEffect(() => {
                 if (loading || new URLSearchParams(window.location.search).has('ay_auth_bridge')) return;
                 const retry = () => {
-                    if (navigator.onLine && document.visibilityState === 'visible') handleCloudSync('poll');
+                    if (navigator.onLine && document.visibilityState === 'visible') {
+                        handleCloudSync('poll');
+                        const last = Date.parse(localStorage.getItem('anbary_cloud_last_backup') || '');
+                        if (!last || Date.now() - last >= 24 * 60 * 60 * 1000) handleCloudUpload(true);
+                    }
                 };
                 window.addEventListener('online', retry);
+                window.addEventListener('focus', retry);
+                document.addEventListener('visibilitychange', retry);
                 const timer = setInterval(retry, 15000);
-                return () => { window.removeEventListener('online', retry); clearInterval(timer); };
+                return () => {
+                    window.removeEventListener('online', retry);
+                    window.removeEventListener('focus', retry);
+                    document.removeEventListener('visibilitychange', retry);
+                    clearInterval(timer);
+                };
             }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings, cloudSyncConflict]);
+
+            // ابزار استعلام در iframe هم‌مبدأ است؛ تغییر localStorage آن از پنجره‌ی اصلی با storage event دیده می‌شود.
+            useEffect(() => {
+                const embeddedKeys = new Set(['freightAppData_v2', 'autoBackup', 'theme']);
+                const onStorage = (event) => {
+                    if (event.key && embeddedKeys.has(event.key)) {
+                        localStorage.setItem('anbary_cloud_sync_force_dirty', String(Date.now()) + ':' + Math.random().toString(36).slice(2));
+                        handleCloudSync('embedded-change');
+                    }
+                };
+                window.addEventListener('storage', onStorage);
+                return () => window.removeEventListener('storage', onStorage);
+            }, []);
 
             const logTransaction = (item, type, quantity, newStock, invoiceId, recipient, desc, txId) => {
                 const id = txId || generateId();
@@ -1202,27 +1232,55 @@
                     const forceDirty = localStorage.getItem('anbary_cloud_sync_force_dirty') === '1';
                     const localHasData = !!(items.length || invoices.length || notes.length || transactions.length || purchases.length || processingOrders.length || consignments.length || currentLocalUpdated || forceDirty);
                     const localDirty = forceDirty || (currentLocalUpdated && currentLocalUpdated !== lastSyncedLocalUpdated);
-                    const remote = await AY_CLOUD.syncGet();
-
+                    const remoteMeta = await AY_CLOUD.syncMeta();
                     const deviceId = getCloudDeviceId();
+                    let retryAfterSync = false;
                     const pushLocal = async (baseRevision) => {
+                        const mutationAtStart = ayCloudMutationSeqRef.current;
                         const snapshot = await makeCloudBackupSnapshot();
+                        // اگر داده هنگام آماده‌سازی snapshot عوض شد، نسخه‌ی ناقص را به ابر نفرست.
+                        if (mutationAtStart !== ayCloudMutationSeqRef.current) {
+                            retryAfterSync = true;
+                            return null;
+                        }
+                        const snapshotUpdatedAt = localStorage.getItem('anbary_local_updated_at') || '';
+                        const snapshotForceMarker = localStorage.getItem('anbary_cloud_sync_force_dirty') || '';
                         const result = await AY_CLOUD.syncPush(snapshot, baseRevision, deviceId);
-                        const updatedAt = localStorage.getItem('anbary_local_updated_at') || '';
                         localStorage.setItem('anbary_cloud_sync_revision', String(result.revision));
                         localStorage.setItem('anbary_cloud_sync_owner', ownerId);
-                        localStorage.setItem('anbary_cloud_sync_local_updated_at', updatedAt);
-                        localStorage.removeItem('anbary_cloud_sync_force_dirty');
+                        localStorage.setItem('anbary_cloud_sync_local_updated_at', snapshotUpdatedAt);
+                        if ((localStorage.getItem('anbary_cloud_sync_force_dirty') || '') === snapshotForceMarker) {
+                            localStorage.removeItem('anbary_cloud_sync_force_dirty');
+                        }
                         setCloudSyncRevision(Number(result.revision));
                         setCloudSyncConflict(null);
-                        setCloudSyncStatus('synced');
+                        const changedDuringUpload =
+                            mutationAtStart !== ayCloudMutationSeqRef.current ||
+                            (localStorage.getItem('anbary_local_updated_at') || '') !== snapshotUpdatedAt ||
+                            (localStorage.getItem('anbary_cloud_sync_force_dirty') || '') !== '';
+                        retryAfterSync = retryAfterSync || changedDuringUpload;
+                        setCloudSyncStatus(changedDuringUpload ? 'syncing' : 'synced');
                         return result;
                     };
+
+                    // در poll عادی فقط متادیتا خوانده می‌شود؛ snapshot حجیم تنها هنگام تغییر revision دریافت می‌شود.
+                    if (sameOwner && localRevision > 0 && remoteMeta.exists && Number(remoteMeta.revision) === localRevision) {
+                        if (localDirty) await pushLocal(localRevision);
+                        else setCloudSyncStatus('synced');
+                        return;
+                    }
+                    if (sameOwner && localRevision === 0 && !remoteMeta.exists) {
+                        await pushLocal(0);
+                        return;
+                    }
+
+                    const remote = remoteMeta.exists ? await AY_CLOUD.syncGet() : null;
 
                     if (!remote) {
                         if (localRevision > 0) {
                             setCloudSyncConflict({ remote: null, revision: 0, reason: 'missing' });
                             setCloudSyncStatus('conflict');
+                            toast.show('نسخه‌ی ابری قبلی پیدا نشد؛ برای جلوگیری از حذف داده‌ها، از بخش پشتیبان‌گیری نسخه‌ی مبنا را انتخاب کن.');
                         } else {
                             await pushLocal(0);
                         }
@@ -1235,6 +1293,7 @@
                         } else {
                             setCloudSyncConflict({ remote, revision: remote.revision, reason: 'first-link' });
                             setCloudSyncStatus('conflict');
+                            toast.show('نسخه‌ی محلی و ابری هر دو اطلاعات دارند؛ برای همگام‌سازی اولیه، نسخه‌ی مبنا را انتخاب کن.');
                         }
                         return;
                     }
@@ -1249,6 +1308,7 @@
                         if (localDirty) {
                             setCloudSyncConflict({ remote, revision: remote.revision, reason: 'both-changed' });
                             setCloudSyncStatus('conflict');
+                            toast.show('تغییر هم‌زمان در چند دستگاه شناسایی شد؛ هیچ نسخه‌ای خودکار جایگزین نشد.');
                         } else {
                             await applyCloudSyncRecord(remote, ownerId);
                         }
@@ -1257,12 +1317,16 @@
 
                     setCloudSyncConflict({ remote, revision: remote.revision, reason: 'server-older' });
                     setCloudSyncStatus('conflict');
+                    toast.show('نسخه‌ی محلی از نسخه‌ی ابری جدیدتر است؛ قبل از ادامه، نسخه‌ی مبنا را انتخاب کن.');
                 } catch (err) {
                     console.warn('Cloud sync did not complete:', err);
                     setCloudSyncStatus(navigator.onLine ? 'error' : 'offline');
                     setCloudError(err?.message || 'همگام‌سازی ابری انجام نشد؛ اطلاعات محلی محفوظ است.');
                 } finally {
                     ayCloudSyncBusyRef.current = false;
+                    if (typeof retryAfterSync !== 'undefined' && retryAfterSync) {
+                        setTimeout(() => handleCloudSync('queued-change'), 700);
+                    }
                 }
             };
 
