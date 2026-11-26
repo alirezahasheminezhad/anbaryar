@@ -2622,7 +2622,7 @@ const IDB_STORE = 'app';
 const IDB_DATA_KEY = 'secure-data';
 const IDB_FALLBACK_KEY = 'plain-data-fallback';
 const APP_SCHEMA_VERSION = 11;
-const APP_BUILD = '10.20-google-popup-profile';
+const APP_BUILD = '10.21-cloud-key-session-cache';
 
 // ------------------------------------------------------------------
 // امنیت و ذخیره‌سازی محلی، IndexedDB
@@ -21461,10 +21461,66 @@ const AY_CLOUD_FUNCTION = AY_CLOUD_URL + '/functions/v1/anbaryar-cloud-backup';
 const AY_CLOUD_SITE_URL = 'https://alirezahasheminezhad.github.io/anbaryar/';
 const AY_CLOUD_SITE_ORIGIN = 'https://alirezahasheminezhad.github.io';
 // کلید ابری از رمز اولین دستگاه مشتق می‌شود و در حافظه‌ی همین تب می‌ماند؛ هر دستگاه با واردکردن رمز آن را باز می‌کند.
+// کلید مشترک ابری در حافظه و sessionStorage همین تب نگهداری می‌شود؛ با Refresh دوباره درخواست رمز نمی‌شود.
 const AY_CLOUD_CRYPTO = {
   key: null,
   saltB64: '',
   hashB64: ''
+};
+const AY_CLOUD_KEY_SESSION_CACHE = 'anbaryar_cloud_key_cache_v1';
+const readAyCloudKeySessionCache = () => {
+  try {
+    const entries = JSON.parse(sessionStorage.getItem(AY_CLOUD_KEY_SESSION_CACHE) || '[]');
+    return Array.isArray(entries) ? entries.filter(x => x && x.saltB64 && x.hashB64 && x.keyB64) : [];
+  } catch (e) {
+    return [];
+  }
+};
+const rememberAyCloudKeyForSession = async (key, saltB64, hashB64) => {
+  try {
+    const raw = await crypto.subtle.exportKey('raw', key);
+    const entries = readAyCloudKeySessionCache().filter(x => x.saltB64 !== saltB64 || x.hashB64 !== hashB64);
+    entries.push({
+      v: 1,
+      saltB64,
+      hashB64,
+      keyB64: b64(raw),
+      savedAt: Date.now()
+    });
+    // چند کلید آخر نگه داشته می‌شود تا نسخه‌های ابری قبلاً بازشده هم دوباره رمز نخواهند.
+    sessionStorage.setItem(AY_CLOUD_KEY_SESSION_CACHE, JSON.stringify(entries.slice(-8)));
+  } catch (e) {
+    console.warn('ذخیره موقت کلید ابری انجام نشد:', e);
+  }
+};
+const restoreAyCloudKeyForSession = async (saltB64, hashB64) => {
+  const record = readAyCloudKeySessionCache().find(x => x.saltB64 === saltB64 && x.hashB64 === hashB64);
+  if (!record) return null;
+  try {
+    return await crypto.subtle.importKey('raw', unb64(record.keyB64), {
+      name: 'AES-GCM'
+    }, true, ['encrypt', 'decrypt']);
+  } catch (e) {
+    console.warn('بازیابی کلید ابری نشست ناموفق بود:', e);
+    return null;
+  }
+};
+const restoreLatestAyCloudKeyForSession = async () => {
+  if (AY_CLOUD_CRYPTO.key) return true;
+  const entries = readAyCloudKeySessionCache();
+  const record = entries[entries.length - 1];
+  if (!record) return false;
+  try {
+    AY_CLOUD_CRYPTO.key = await crypto.subtle.importKey('raw', unb64(record.keyB64), {
+      name: 'AES-GCM'
+    }, true, ['encrypt', 'decrypt']);
+    AY_CLOUD_CRYPTO.saltB64 = record.saltB64;
+    AY_CLOUD_CRYPTO.hashB64 = record.hashB64;
+    return true;
+  } catch (e) {
+    console.warn('بازیابی آخرین کلید ابری نشست ناموفق بود:', e);
+    return false;
+  }
 };
 const AY_CLOUD = (() => {
   let clientPromise = null;
@@ -21554,11 +21610,27 @@ const AY_CLOUD = (() => {
     if (decoded.saltB64 && decoded.hashB64) {
       const cachedMatches = AY_CLOUD_CRYPTO.key && AY_CLOUD_CRYPTO.saltB64 === decoded.saltB64 && AY_CLOUD_CRYPTO.hashB64 === decoded.hashB64;
       if (cachedMatches) return await decryptAY(decoded.envelope, AY_CLOUD_CRYPTO.key);
+
+      // اگر همین رمزنگاری قبلاً در این تب تأیید شده باشد، کلید را از sessionStorage برگردان.
+      const sessionKey = await restoreAyCloudKeyForSession(decoded.saltB64, decoded.hashB64);
+      if (sessionKey) {
+        try {
+          const value = await decryptAY(decoded.envelope, sessionKey);
+          AY_CLOUD_CRYPTO.key = sessionKey;
+          AY_CLOUD_CRYPTO.saltB64 = decoded.saltB64;
+          AY_CLOUD_CRYPTO.hashB64 = decoded.hashB64;
+          return value;
+        } catch (e) {
+          // اگر رکورد نشست خراب یا متعلق به کلید دیگری بود، مسیر ورود با رمز را ادامه بده.
+          console.warn('کلید ذخیره‌شده‌ی ابری قابل استفاده نبود؛ رمز دوباره بررسی می‌شود:', e);
+        }
+      }
       const localConfig = typeof getSecurityConfig === 'function' ? getSecurityConfig() : null;
       if (AY_SECURITY?.key && localConfig?.salt === decoded.saltB64 && localConfig?.hash === decoded.hashB64) {
         AY_CLOUD_CRYPTO.key = AY_SECURITY.key;
         AY_CLOUD_CRYPTO.saltB64 = decoded.saltB64;
         AY_CLOUD_CRYPTO.hashB64 = decoded.hashB64;
+        await rememberAyCloudKeyForSession(AY_CLOUD_CRYPTO.key, decoded.saltB64, decoded.hashB64);
         return await decryptAY(decoded.envelope, AY_CLOUD_CRYPTO.key);
       }
       const password = window.prompt('برای بازکردن داده‌های ابری انباریار، رمز ابریِ دستگاهی را وارد کن که نخستین بار این همگام‌سازی را راه‌اندازی کرده است:');
@@ -21570,6 +21642,7 @@ const AY_CLOUD = (() => {
       AY_CLOUD_CRYPTO.key = key;
       AY_CLOUD_CRYPTO.saltB64 = decoded.saltB64;
       AY_CLOUD_CRYPTO.hashB64 = decoded.hashB64;
+      await rememberAyCloudKeyForSession(key, decoded.saltB64, decoded.hashB64);
       return value;
     }
 
@@ -21578,6 +21651,8 @@ const AY_CLOUD = (() => {
     return await decryptAY(decoded.envelope);
   };
   const secureValue = async value => {
+    // بعد از Refresh هم کلید مشترک همین نشست را قبل از استفاده از رمز محلی بازیابی کن.
+    if (!AY_CLOUD_CRYPTO.key) await restoreLatestAyCloudKeyForSession();
     // پس از اولین دریافت، از همان کلید مشترک ابری استفاده می‌کنیم؛ قفل محلی هر دستگاه مستقل باقی می‌ماند.
     if (AY_CLOUD_CRYPTO.key) {
       return {
