@@ -1,0 +1,24 @@
+name: Supabase keepalive
+on:
+  schedule:
+    - cron: '17 13 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep AnbarYar Supabase project active
+        env:
+          SUPABASE_URL: https://foyttvvpscenkxbobazs.supabase.co
+          SUPABASE_KEY: sb_publishable_AhAgG-9rYk_PwD3cFjNCAA_bzK06eO2
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            "$SUPABASE_URL/rest/v1/rpc/anbaryar_keepalive" \
+            -X POST \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}'
