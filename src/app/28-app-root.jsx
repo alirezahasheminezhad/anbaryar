@@ -20,6 +20,7 @@
             const [cloudBackups, setCloudBackups] = useState([]);
             const [cloudBusy, setCloudBusy] = useState(false);
             const [cloudError, setCloudError] = useState('');
+            const [cloudAccount, setCloudAccount] = useState(null);
             const [searchTerm, setSearchTerm] = useState('');
             const [editingItem, setEditingItem] = useState(null);
             const [historyItem, setHistoryItem] = useState(null);
@@ -1086,10 +1087,20 @@
             };
             const refreshCloudBackups = async () => {
                 setCloudBusy(true); setCloudError('');
-                try { const list=await AY_CLOUD.list(); setCloudBackups(list.backups || []); }
+                try { const [list,account]=await Promise.all([AY_CLOUD.list(),AY_CLOUD.account()]); setCloudBackups(list.backups || []); setCloudAccount(account); }
                 catch(err) { setCloudError(err?.message || 'دریافت فهرست پشتیبان‌ها ناموفق بود'); }
                 finally { setCloudBusy(false); }
             };
+
+            const handleCloudLinkGoogle = async () => {
+                try { setCloudError(''); await AY_CLOUD.linkGoogle(); }
+                catch(err) { setCloudError(err?.message || 'اتصال گوگل انجام نشد'); }
+            };
+            const handleCloudGoogleLogin = async () => {
+                try { setCloudError(''); await AY_CLOUD.signInGoogle(); }
+                catch(err) { setCloudError(err?.message || 'ورود با گوگل انجام نشد'); }
+            };
+
             const handleCloudRestore = async (id) => {
                 const ok=await confirmAction('این نسخه ابری جایگزین اطلاعات فعلی انباریار می‌شود. قبل از ادامه یک فایل پشتیبان محلی بسازید. ادامه می‌دهید؟');
                 if(!ok) return;
@@ -1392,6 +1403,11 @@
                                     <div className="flex flex-wrap gap-3 mt-5"><button onClick={()=>handleCloudUpload(false)} disabled={cloudBusy} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-5 py-3 rounded-full text-sm font-black transition"><Save size={18}/>{cloudBusy?'در حال انجام...':'ذخیره در فضای ابری'}</button><button onClick={refreshCloudBackups} disabled={cloudBusy} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-3 rounded-full text-sm font-black transition"><Upload size={18}/>دریافت فهرست ابری</button><button onClick={handleSystemBackup} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-full text-sm font-black transition"><Save size={18}/> ساخت پشتیبان کامل</button><label className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-3 rounded-full text-sm font-black cursor-pointer hover:bg-slate-50 transition"><Upload size={18}/> بازیابی<input type="file" accept=".json,.aybackup" className="hidden" onChange={handleSystemRestore}/></label></div>
                                 </div>
 
+                                <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mt-5">
+                                    <div className="flex items-center justify-between gap-3"><div><h3 className="text-lg font-black text-slate-800">حساب ابری انباریار</h3><p className="text-xs text-slate-400 mt-1">{cloudAccount?.user?.email || (cloudAccount?.user?.is_anonymous ? "حساب موقت این دستگاه" : "برای بررسی وضعیت، فهرست را تازه‌سازی کنید")}</p></div><span className="text-xs font-bold text-emerald-700">Supabase Auth</span></div>
+                                    <p className="mt-3 text-xs text-slate-500">برای حفظ نسخه‌های همین دستگاه، گوگل را به حساب فعلی پیوند بزنید. برای دسترسی به حسابی که قبلاً روی دستگاه دیگری متصل کرده‌اید، از ورود با گوگل استفاده کنید.</p>
+                                    <div className="flex flex-wrap gap-2 mt-4"><button onClick={handleCloudLinkGoogle} className="rounded-full bg-slate-900 px-4 py-2.5 text-xs font-bold text-white">اتصال گوگل به همین دستگاه</button><button onClick={handleCloudGoogleLogin} className="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700">ورود با حساب Google</button></div>
+                                </div>
                                 <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mt-5">
                                     <div className="flex items-center justify-between gap-3"><div><h3 className="text-lg font-black text-slate-800">پشتیبان‌های ابری Supabase</h3><p className="text-xs text-slate-400 mt-1">نسخه خودکار روزانه؛ حداکثر ۳۰ نسخه یا ۶۰۰ مگابایت. قدیمی‌ترین نسخه‌ها پس از ذخیره موفق نسخه جدید حذف می‌شوند.</p></div><span className="text-xs font-bold text-emerald-700">فضای خصوصی</span></div>
                                     {cloudError && <p className="mt-3 text-xs text-rose-600">{cloudError}</p>}
