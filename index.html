@@ -18492,6 +18492,11 @@ const App = () => {
   // hash (که از خودِ view می‌آید) در listener نادیده گرفته می‌شود تا editingInvoice هنگام ویرایش فاکتور پاک نشود.
   const lastProgHashRef = useRef(null);
   useEffect(() => {
+    // Supabase باید callback ورود را بخواند؛ تغییر زودهنگام hash می‌تواند token/code را پاک کند.
+    const search = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+    const isAuthCallback = search.has('code') || search.has('token_hash') || search.has('ay_auth_bridge') || search.has('access_token') || hash.has('access_token') || hash.has('code') || hash.has('error') || hash.has('error_description');
+    if (isAuthCallback) return;
     const target = '#' + view;
     if (window.location.hash !== target) {
       lastProgHashRef.current = target;
