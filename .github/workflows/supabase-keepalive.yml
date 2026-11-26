@@ -12,7 +12,7 @@ jobs:
       - name: Keep AnbarYar Supabase project active
         env:
           SUPABASE_URL: https://foyttvvpscenkxbobazs.supabase.co
-          SUPABASE_KEY: sb_publishable_AhAgG-9rYk_PwD3cFjNCAA_bzK06eO2
+          SUPABASE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZveXR0dnZwc2Nlbmt4Ym9iYXpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1ODM5ODAsImV4cCI6MjExMDE1OTk4MH0.Tjv-n3OinihjPAHh6AppQmrUbXudUC2QMXbcyISWlmo
         run: |
           set -euo pipefail
           curl --fail-with-body --silent --show-error \
