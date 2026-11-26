@@ -101,6 +101,8 @@
             const ayCloudSyncBusyRef = useRef(false);
             const ayCloudSyncStartupRef = useRef(false);
             const ayCloudMutationSeqRef = useRef(0);
+            const ayCloudLiveStateRef = useRef(null);
+            ayCloudLiveStateRef.current = { items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings };
             useEffect(() => {
                 let alive = true;
                 const gen = ayDataGenRef.current;
@@ -1230,6 +1232,23 @@
                 ayCloudSyncBusyRef.current = true;
                 setCloudSyncStatus('syncing');
                 let retryAfterSync = false;
+                const startState = ayCloudLiveStateRef.current;
+                const startDirtyMarker = localStorage.getItem('anbary_cloud_sync_force_dirty') || '';
+                const startLocalUpdated = localStorage.getItem('anbary_local_updated_at') || '';
+                const localChangedDuringRequest = () => {
+                    const current = ayCloudLiveStateRef.current;
+                    return !current ||
+                        current.items !== startState.items ||
+                        current.invoices !== startState.invoices ||
+                        current.notes !== startState.notes ||
+                        current.transactions !== startState.transactions ||
+                        current.purchases !== startState.purchases ||
+                        current.processingOrders !== startState.processingOrders ||
+                        current.consignments !== startState.consignments ||
+                        current.appSettings !== startState.appSettings ||
+                        (localStorage.getItem('anbary_cloud_sync_force_dirty') || '') !== startDirtyMarker ||
+                        (localStorage.getItem('anbary_local_updated_at') || '') !== startLocalUpdated;
+                };
                 try {
                     const account = await AY_CLOUD.account();
                     setCloudAccount(account);
@@ -1242,12 +1261,16 @@
                     const localHasData = !!(items.length || invoices.length || notes.length || transactions.length || purchases.length || processingOrders.length || consignments.length || currentLocalUpdated || forceDirty);
                     const localDirty = forceDirty || (currentLocalUpdated && currentLocalUpdated !== lastSyncedLocalUpdated);
                     const remoteMeta = await AY_CLOUD.syncMeta();
+                    if (localChangedDuringRequest()) {
+                        retryAfterSync = true;
+                        return;
+                    }
                     const deviceId = getCloudDeviceId();
                     const pushLocal = async (baseRevision) => {
                         const mutationAtStart = ayCloudMutationSeqRef.current;
                         const snapshot = await makeCloudBackupSnapshot();
-                        // اگر داده هنگام آماده‌سازی snapshot عوض شد، نسخه‌ی ناقص را به ابر نفرست.
-                        if (mutationAtStart !== ayCloudMutationSeqRef.current) {
+                        // اگر داده هنگام انتظار برای شبکه یا آماده‌سازی snapshot عوض شد، نسخه‌ی قدیمی را نفرست.
+                        if (localChangedDuringRequest() || mutationAtStart !== ayCloudMutationSeqRef.current) {
                             retryAfterSync = true;
                             return null;
                         }
@@ -1263,6 +1286,7 @@
                         setCloudSyncRevision(Number(result.revision));
                         setCloudSyncConflict(null);
                         const changedDuringUpload =
+                            localChangedDuringRequest() ||
                             mutationAtStart !== ayCloudMutationSeqRef.current ||
                             (localStorage.getItem('anbary_local_updated_at') || '') !== snapshotUpdatedAt ||
                             (localStorage.getItem('anbary_cloud_sync_force_dirty') || '') !== '';
@@ -1290,6 +1314,16 @@
                     }
 
                     const remote = remoteMeta.exists ? await AY_CLOUD.syncGet() : null;
+                    if (localChangedDuringRequest()) {
+                        if (remote && Number(remote.revision) > localRevision) {
+                            setCloudSyncConflict({ remote, revision: remote.revision, reason: 'local-changed-during-pull' });
+                            setCloudSyncStatus('conflict');
+                            toast.show('هنگام دریافت نسخه‌ی ابری، اطلاعات این دستگاه هم تغییر کرد؛ برای جلوگیری از جایگزینی ناخواسته، نسخه‌ی مبنا را انتخاب کن.');
+                        } else {
+                            retryAfterSync = true;
+                        }
+                        return;
+                    }
 
                     if (!remote) {
                         if (localRevision > 0) {
