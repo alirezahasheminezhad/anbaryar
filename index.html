@@ -18643,7 +18643,7 @@ const App = () => {
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
-  }, []);
+  }, [items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings, cloudSyncConflict]);
   const logTransaction = (item, type, quantity, newStock, invoiceId, recipient, desc, txId) => {
     const id = txId || generateId();
     const newTx = {
@@ -20160,7 +20160,7 @@ const App = () => {
     if (raw?.localStorage && typeof raw.localStorage === 'object') {
       Object.entries(raw.localStorage).forEach(([key, value]) => {
         if (key === TRUSTED_UNLOCK_KEY || key === SECURITY_KEY || key === STORAGE_KEY) return;
-        if (key.startsWith('anbary_cloud_sync_') || key === 'anbary_cloud_last_backup' || key === 'anbary_local_updated_at' || key.startsWith('sb-')) return;
+        if (key.startsWith('anbary_cloud_sync_') || key === 'anbary_cloud_last_backup' || key === 'anbary_local_updated_at' || key === 'anbary_cloud_device_id' || key.startsWith('sb-')) return;
         try {
           localStorage.setItem(key, value);
         } catch (e) {}
