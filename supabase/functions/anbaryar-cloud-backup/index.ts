@@ -94,6 +94,29 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  if (payload.action === "sync-meta") {
+    const { data: current, error: currentError } = await admin.from("anbaryar_backup_files")
+      .select("sync_revision, created_at")
+      .eq("owner_id", ownerId).eq("is_sync_state", true).maybeSingle();
+    if (currentError) return json({ error: "Could not read cloud sync metadata" }, 500);
+
+    if (current) {
+      return json({ exists: true, revision: Number(current.sync_revision || 0), updatedAt: current.created_at, legacy: false });
+    }
+
+    const { data: oldBackup, error: oldError } = await admin.from("anbaryar_backup_files")
+      .select("created_at")
+      .eq("owner_id", ownerId).eq("is_sync_state", false)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (oldError) return json({ error: "Could not read legacy cloud metadata" }, 500);
+    return json({
+      exists: !!oldBackup,
+      revision: 0,
+      updatedAt: oldBackup?.created_at || null,
+      legacy: !!oldBackup,
+    });
+  }
+
   if (payload.action === "sync-get") {
     const { data: current, error: currentError } = await admin.from("anbaryar_backup_files")
       .select("id, object_path, size_bytes, created_at, sync_revision")
