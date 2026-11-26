@@ -8,7 +8,7 @@ const AY_CLOUD = (() => {
     const client = () => {
         if (!clientPromise) clientPromise = import('https://esm.sh/@supabase/supabase-js@2')
             .then(({ createClient }) => createClient(AY_CLOUD_URL, AY_CLOUD_KEY, {
-                auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+                auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
             }));
         return clientPromise;
     };
@@ -58,6 +58,34 @@ const AY_CLOUD = (() => {
             }});
         },
         list: async () => await call('list'),
+
+        account: async () => {
+            const sb = await client();
+            const current = await session();
+            const { data, error } = await sb.auth.getUserIdentities();
+            if (error) throw error;
+            return { user: current.user, identities: data?.identities || [] };
+        },
+        linkGoogle: async () => {
+            const sb = await client();
+            await session();
+            const { data, error } = await sb.auth.linkIdentity({
+                provider: 'google',
+                options: { redirectTo: window.location.href }
+            });
+            if (error) throw error;
+            return data;
+        },
+        signInGoogle: async () => {
+            const sb = await client();
+            const { data, error } = await sb.auth.signInWithOAuth({
+                provider: 'google',
+                options: { redirectTo: window.location.href }
+            });
+            if (error) throw error;
+            return data;
+        },
+
         restore: async (id) => {
             const response = await call('restore', { body: JSON.stringify({ action: 'restore', id }), raw: true });
             if (!('DecompressionStream' in window)) throw new Error('مرورگر از بازکردن پشتیبان فشرده پشتیبانی نمی‌کند.');
