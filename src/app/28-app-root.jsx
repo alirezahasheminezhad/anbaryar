@@ -122,7 +122,7 @@
                     const timer=setTimeout(() => { handleCloudUpload(true); }, 2500);
                     return () => clearTimeout(timer);
                 }
-            }, [loading]);
+            }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings]);
 
             const logTransaction = (item, type, quantity, newStock, invoiceId, recipient, desc, txId) => {
                 const id = txId || generateId();
