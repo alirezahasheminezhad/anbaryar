@@ -21,6 +21,11 @@
             const [cloudBusy, setCloudBusy] = useState(false);
             const [cloudError, setCloudError] = useState('');
             const [cloudAccount, setCloudAccount] = useState(null);
+            const [cloudSyncStatus, setCloudSyncStatus] = useState('idle');
+            const [cloudSyncRevision, setCloudSyncRevision] = useState(() => Number(localStorage.getItem('anbary_cloud_sync_revision') || 0));
+            const [cloudSyncConflict, setCloudSyncConflict] = useState(null);
+            const [cloudEmail, setCloudEmail] = useState('');
+            const [cloudEmailSent, setCloudEmailSent] = useState(false);
             const [searchTerm, setSearchTerm] = useState('');
             const [editingItem, setEditingItem] = useState(null);
             const [historyItem, setHistoryItem] = useState(null);
@@ -84,6 +89,9 @@
             // نسل داده: هر بازیابی پشتیبان آن را جلو می‌برد تا اگر بارگذاری اولیه هنوز در جریان بود،
             // نتیجه‌ی قدیمیِ آن روی داده‌ی تازه بازیابی‌شده نوشته نشود (باگ پریدن داده بعد از رفرش).
             const ayDataGenRef = useRef(0);
+            const ayInitialSaveRef = useRef(true);
+            const ayCloudSyncBusyRef = useRef(false);
+            const ayCloudSyncStartupRef = useRef(false);
             useEffect(() => {
                 let alive = true;
                 const gen = ayDataGenRef.current;
@@ -100,6 +108,8 @@
 
             useEffect(() => {
                 if (loading) return;
+                // اولین اجرا فقط داده‌ی موجود را hydrate کرده است؛ ذخیره‌ی مجدد لازم نیست.
+                if (ayInitialSaveRef.current) { ayInitialSaveRef.current = false; return; }
                 // debounce کوتاه: تغییرهای پشت‌سرهم (تایپ/چند setState) یک‌بار ذخیره شوند.
                 const t = setTimeout(async () => {
                     try {
@@ -123,6 +133,26 @@
                     const timer=setTimeout(() => { handleCloudUpload(true); }, 2500);
                     return () => clearTimeout(timer);
                 }
+            }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings]);
+
+            // همگام‌سازی خودکار: ذخیره‌ی محلی همیشه اول انجام می‌شود؛ بعد از آن نسخه‌ی کامل به ابر می‌رود.
+            // شروع اولیه از داده‌ی محلی/ابری تشخیص داده می‌شود و تغییرات بعدی با تأخیر کوتاه تجمیع می‌شوند.
+            useEffect(() => {
+                if (loading) return;
+                const reason = ayCloudSyncStartupRef.current ? 'local-change' : 'startup';
+                ayCloudSyncStartupRef.current = true;
+                const timer = setTimeout(() => handleCloudSync(reason), reason === 'startup' ? 2400 : 1600);
+                return () => clearTimeout(timer);
+            }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings]);
+
+            useEffect(() => {
+                if (loading) return;
+                const retry = () => {
+                    if (navigator.onLine && document.visibilityState === 'visible') handleCloudSync('poll');
+                };
+                window.addEventListener('online', retry);
+                const timer = setInterval(retry, 15000);
+                return () => { window.removeEventListener('online', retry); clearInterval(timer); };
             }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings]);
 
             const logTransaction = (item, type, quantity, newStock, invoiceId, recipient, desc, txId) => {
@@ -1092,6 +1122,209 @@
                 finally { setCloudBusy(false); }
             };
 
+            const getCloudDeviceId = () => {
+                let id = localStorage.getItem('anbaryar_cloud_device_id');
+                if (!id) {
+                    id = (window.crypto?.randomUUID ? crypto.randomUUID() : 'ay-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+                    localStorage.setItem('anbaryar_cloud_device_id', id);
+                }
+                return id;
+            };
+
+            const applyCloudSyncRecord = async (record, ownerId) => {
+                const raw = record?.snapshot || {};
+                const source = raw?.format === 'ANBARYAR_FULL_BACKUP'
+                    ? (raw.data || {})
+                    : (raw?.data && (raw.data.items || raw.data.invoices) ? raw.data : raw);
+                const restored = normalizeData(JSON.parse(JSON.stringify(source || {})));
+                if (!Array.isArray(restored.items) || !Array.isArray(restored.invoices)) throw new Error('ساختار نسخه‌ی ابری معتبر نیست.');
+
+                ayDataGenRef.current++;
+                setItems(restored.items);
+                setInvoices(restored.invoices);
+                setNotes(restored.notes);
+                setTransactions(restored.transactions);
+                setPurchases(restored.purchases);
+                setProcessingOrders(restored.processingOrders);
+                setConsignments(restored.consignments);
+
+                if (raw?.settings && typeof raw.settings === 'object') {
+                    const merged = { ...appSettings, ...raw.settings };
+                    setAppSettings(merged);
+                    saveSettings(merged);
+                }
+                if (raw?.localStorage && typeof raw.localStorage === 'object') {
+                    Object.entries(raw.localStorage).forEach(([key, value]) => {
+                        if (key === TRUSTED_UNLOCK_KEY || key === SECURITY_KEY || key === STORAGE_KEY) return;
+                        if (key.startsWith('anbary_cloud_sync_') || key === 'anbary_cloud_last_backup' || key === 'anbary_local_updated_at' || key.startsWith('sb-')) return;
+                        try { localStorage.setItem(key, value); } catch(e) {}
+                    });
+                }
+                if (raw?.embedded?.estelamLocal != null) {
+                    try { localStorage.setItem('freightAppData_v2', raw.embedded.estelamLocal); } catch(e) {}
+                }
+                if (raw?.embedded?.userPurchasesLocal) {
+                    Object.entries(raw.embedded.userPurchasesLocal).forEach(([key, value]) => {
+                        if (value != null) try { localStorage.setItem(key, value); } catch(e) {}
+                    });
+                }
+                if (raw?.embedded?.invDb) {
+                    await restoreIDBAll('InvDB_v4', 'products', raw.embedded.invDb.products || []);
+                    await restoreIDBAll('InvDB_v4', 'history', raw.embedded.invDb.history || []);
+                }
+
+                await saveData(restored.items, restored.invoices, restored.notes, restored.transactions, restored.purchases, restored.processingOrders, restored.consignments);
+                await new Promise(resolve => setTimeout(resolve, 900));
+                const localUpdated = localStorage.getItem('anbary_local_updated_at') || '';
+                localStorage.setItem('anbary_cloud_sync_revision', String(record.revision || 0));
+                localStorage.setItem('anbary_cloud_sync_owner', ownerId || '');
+                localStorage.setItem('anbary_cloud_sync_local_updated_at', localUpdated);
+                localStorage.removeItem('anbary_cloud_sync_force_dirty');
+                setCloudSyncRevision(Number(record.revision || 0));
+                setCloudSyncConflict(null);
+                setCloudSyncStatus('synced');
+            };
+
+            const handleCloudSync = async (reason = 'manual') => {
+                if (ayCloudSyncBusyRef.current) return;
+                if (!navigator.onLine) { setCloudSyncStatus('offline'); return; }
+                if (cloudSyncConflict) return;
+                ayCloudSyncBusyRef.current = true;
+                setCloudSyncStatus('syncing');
+                try {
+                    const account = await AY_CLOUD.account();
+                    setCloudAccount(account);
+                    const ownerId = account?.user?.id || '';
+                    const sameOwner = !!ownerId && localStorage.getItem('anbary_cloud_sync_owner') === ownerId;
+                    const localRevision = sameOwner ? Number(localStorage.getItem('anbary_cloud_sync_revision') || 0) : 0;
+                    const currentLocalUpdated = localStorage.getItem('anbary_local_updated_at') || '';
+                    const lastSyncedLocalUpdated = sameOwner ? (localStorage.getItem('anbary_cloud_sync_local_updated_at') || '') : '';
+                    const forceDirty = localStorage.getItem('anbary_cloud_sync_force_dirty') === '1';
+                    const localHasData = !!(items.length || invoices.length || notes.length || transactions.length || purchases.length || processingOrders.length || consignments.length || currentLocalUpdated || forceDirty);
+                    const localDirty = forceDirty || (currentLocalUpdated && currentLocalUpdated !== lastSyncedLocalUpdated) || reason === 'local-change';
+                    const remote = await AY_CLOUD.syncGet();
+
+                    const deviceId = getCloudDeviceId();
+                    const pushLocal = async (baseRevision) => {
+                        const snapshot = await makeCloudBackupSnapshot();
+                        const result = await AY_CLOUD.syncPush(snapshot, baseRevision, deviceId);
+                        const updatedAt = localStorage.getItem('anbary_local_updated_at') || '';
+                        localStorage.setItem('anbary_cloud_sync_revision', String(result.revision));
+                        localStorage.setItem('anbary_cloud_sync_owner', ownerId);
+                        localStorage.setItem('anbary_cloud_sync_local_updated_at', updatedAt);
+                        localStorage.removeItem('anbary_cloud_sync_force_dirty');
+                        setCloudSyncRevision(Number(result.revision));
+                        setCloudSyncConflict(null);
+                        setCloudSyncStatus('synced');
+                        return result;
+                    };
+
+                    if (!remote) {
+                        if (localRevision > 0) {
+                            setCloudSyncConflict({ remote: null, revision: 0, reason: 'missing' });
+                            setCloudSyncStatus('conflict');
+                        } else {
+                            await pushLocal(0);
+                        }
+                        return;
+                    }
+
+                    if (!sameOwner || localRevision === 0) {
+                        if (!localHasData) {
+                            await applyCloudSyncRecord(remote, ownerId);
+                        } else {
+                            setCloudSyncConflict({ remote, revision: remote.revision, reason: 'first-link' });
+                            setCloudSyncStatus('conflict');
+                        }
+                        return;
+                    }
+
+                    if (remote.revision === localRevision) {
+                        if (localDirty) await pushLocal(localRevision);
+                        else setCloudSyncStatus('synced');
+                        return;
+                    }
+
+                    if (remote.revision > localRevision) {
+                        if (localDirty) {
+                            setCloudSyncConflict({ remote, revision: remote.revision, reason: 'both-changed' });
+                            setCloudSyncStatus('conflict');
+                        } else {
+                            await applyCloudSyncRecord(remote, ownerId);
+                        }
+                        return;
+                    }
+
+                    setCloudSyncConflict({ remote, revision: remote.revision, reason: 'server-older' });
+                    setCloudSyncStatus('conflict');
+                } catch (err) {
+                    console.warn('Cloud sync did not complete:', err);
+                    setCloudSyncStatus(navigator.onLine ? 'error' : 'offline');
+                    setCloudError(err?.message || 'همگام‌سازی ابری انجام نشد؛ اطلاعات محلی محفوظ است.');
+                } finally {
+                    ayCloudSyncBusyRef.current = false;
+                }
+            };
+
+            const handleResolveCloudUseRemote = async () => {
+                if (!cloudSyncConflict?.remote) return;
+                try {
+                    setCloudBusy(true);
+                    const account = await AY_CLOUD.account();
+                    await applyCloudSyncRecord(cloudSyncConflict.remote, account?.user?.id || '');
+                    toast.show('نسخه‌ی ابری دریافت و روی این دستگاه اعمال شد.');
+                } catch (err) {
+                    setCloudError(err?.message || 'دریافت نسخه‌ی ابری ناموفق بود.');
+                } finally { setCloudBusy(false); }
+            };
+
+            const handleResolveCloudUseLocal = async () => {
+                if (!cloudSyncConflict) return;
+                try {
+                    setCloudBusy(true);
+                    setCloudError('');
+                    const account = await AY_CLOUD.account();
+                    const ownerId = account?.user?.id || '';
+                    const snapshot = await makeCloudBackupSnapshot();
+                    const result = await AY_CLOUD.syncPush(snapshot, Number(cloudSyncConflict.revision || 0), getCloudDeviceId());
+                    const updatedAt = localStorage.getItem('anbary_local_updated_at') || '';
+                    localStorage.setItem('anbary_cloud_sync_revision', String(result.revision));
+                    localStorage.setItem('anbary_cloud_sync_owner', ownerId);
+                    localStorage.setItem('anbary_cloud_sync_local_updated_at', updatedAt);
+                    localStorage.removeItem('anbary_cloud_sync_force_dirty');
+                    setCloudSyncRevision(Number(result.revision));
+                    setCloudSyncConflict(null);
+                    setCloudSyncStatus('synced');
+                    toast.show('نسخه‌ی همین دستگاه روی فضای ابری ثبت شد.');
+                } catch (err) {
+                    setCloudError(err?.message || 'ثبت نسخه‌ی این دستگاه ناموفق بود.');
+                    if (err?.code === 'SYNC_CONFLICT') {
+                        try {
+                            const remote = await AY_CLOUD.syncGet();
+                            setCloudSyncConflict({ remote, revision: remote?.revision || 0, reason: 'changed-again' });
+                            setCloudSyncStatus('conflict');
+                        } catch (_) {}
+                    }
+                } finally { setCloudBusy(false); }
+            };
+
+            const handleCloudEmailLogin = async () => {
+                const email = String(cloudEmail || '').trim();
+                if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+                    setCloudError('یک نشانی ایمیل معتبر وارد کنید.');
+                    return;
+                }
+                try {
+                    setCloudBusy(true);
+                    setCloudError('');
+                    await AY_CLOUD.signInEmail(email);
+                    setCloudEmailSent(true);
+                    toast.show('لینک ورود به ایمیل شما ارسال شد؛ صندوق ورودی و پوشه‌ی Spam را بررسی کنید.');
+                } catch (err) {
+                    setCloudError(err?.message || 'ارسال لینک ورود ایمیلی ناموفق بود.');
+                } finally { setCloudBusy(false); }
+            };
+
             useEffect(() => {
                 if (view === 'backup') refreshCloudBackups();
             }, [view]);
@@ -1409,8 +1642,31 @@
 
                                 <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mt-5">
                                     <div className="flex items-center justify-between gap-3"><div><h3 className="text-lg font-black text-slate-800">حساب ابری انباریار</h3><p className="text-xs text-slate-400 mt-1">{cloudAccount?.user?.email || (cloudAccount?.user?.is_anonymous ? "حساب موقت این دستگاه" : "برای بررسی وضعیت، فهرست را تازه‌سازی کنید")}</p></div><span className="text-xs font-bold text-emerald-700">Supabase Auth</span></div>
-                                    <p className="mt-3 text-xs text-slate-500">برای حفظ نسخه‌های همین دستگاه، گوگل را به حساب فعلی پیوند بزنید. برای دسترسی به حسابی که قبلاً روی دستگاه دیگری متصل کرده‌اید، از ورود با گوگل استفاده کنید.</p>
+                                    <p className="mt-3 text-xs text-slate-500">برای اشتراک اطلاعات بین دستگاه‌ها، گوگل را به حساب همین دستگاه متصل کنید یا با حساب Google قبلی وارد شوید. در فایل آفلاین نیز ورود گوگل از طریق پنجره‌ی واسط نسخه‌ی وب انجام می‌شود.</p>
                                     <div className="flex flex-wrap gap-2 mt-4"><button onClick={handleCloudLinkGoogle} className="rounded-full bg-slate-900 px-4 py-2.5 text-xs font-bold text-white">اتصال گوگل به همین دستگاه</button><button onClick={handleCloudGoogleLogin} className="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700">ورود با حساب Google</button></div>
+                                    <div className="mt-5 border-t border-slate-100 pt-4">
+                                        <label className="block text-xs font-bold text-slate-700 mb-2">ورود با ایمیل</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            <input type="email" dir="ltr" autoComplete="email" value={cloudEmail} onChange={e=>{setCloudEmail(e.target.value);setCloudEmailSent(false);}} placeholder="name@example.com" className="min-w-[220px] flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400"/>
+                                            <button onClick={handleCloudEmailLogin} disabled={cloudBusy} className="rounded-full bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{cloudBusy?'در حال ارسال...':'ارسال لینک ورود'}</button>
+                                        </div>
+                                        {cloudEmailSent && <p className="mt-2 text-xs text-emerald-700">لینک ورود ارسال شد. روی همان دستگاه و مرورگری که برنامه را باز کرده‌ای، لینک ایمیل را باز کن.</p>}
+                                    </div>
+                                    <div className="mt-5 border-t border-slate-100 pt-4">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div><p className="text-sm font-bold text-slate-800">همگام‌سازی خودکار اطلاعات</p><p className="mt-1 text-xs text-slate-500">{cloudSyncStatus==='synced'?'همه‌ی تغییرات با فضای ابری هماهنگ است.':cloudSyncStatus==='syncing'?'در حال همگام‌سازی اطلاعات...':cloudSyncStatus==='offline'?'آفلاین؛ تغییرات روی همین دستگاه می‌ماند و پس از اتصال ارسال می‌شود.':cloudSyncStatus==='conflict'?'تعارض بین نسخه‌ی محلی و ابری؛ تا انتخاب شما هیچ نسخه‌ای جایگزین نمی‌شود.':cloudSyncStatus==='error'?'ارتباط ابری برقرار نشد؛ داده‌های محلی محفوظ است.':'آماده‌سازی همگام‌سازی...'}</p></div>
+                                            <button onClick={()=>handleCloudSync('manual')} disabled={cloudBusy || cloudSyncStatus==='syncing'} className="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 disabled:opacity-50">همگام‌سازی همین الان</button>
+                                        </div>
+                                        <p className="mt-2 text-[11px] text-slate-400">نسخه‌ی وب و فایل آفلاین یک داده‌ی ابری مشترک دارند. هنگام قطع اینترنت، کار ادامه دارد و با وصل‌شدن اینترنت صف تغییرات ارسال می‌شود.</p>
+                                        {cloudSyncConflict && <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                                            <p className="text-xs font-bold text-amber-900">دو نسخه‌ی متفاوت پیدا شد. برای جلوگیری از حذف ناخواسته‌ی اطلاعات، انتخاب کن کدام نسخه مبنا باشد.</p>
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                {cloudSyncConflict.remote && <button onClick={handleResolveCloudUseRemote} disabled={cloudBusy} className="rounded-full bg-indigo-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">استفاده از نسخه‌ی ابری</button>}
+                                                <button onClick={handleResolveCloudUseLocal} disabled={cloudBusy} className="rounded-full border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-900 disabled:opacity-50">ثبت نسخه‌ی همین دستگاه روی ابر</button>
+                                            </div>
+                                        </div>}
+                                    </div>
+                                    {cloudError && <p className="mt-3 text-xs text-rose-600">{cloudError}</p>}
                                 </div>
                                 <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mt-5">
                                     <div className="flex items-center justify-between gap-3"><div><h3 className="text-lg font-black text-slate-800">پشتیبان‌های ابری Supabase</h3><p className="text-xs text-slate-400 mt-1">نسخه خودکار روزانه؛ حداکثر ۳۰ نسخه یا ۶۰۰ مگابایت. قدیمی‌ترین نسخه‌ها پس از ذخیره موفق نسخه جدید حذف می‌شوند.</p></div><span className="text-xs font-bold text-emerald-700">فضای خصوصی</span></div>
