@@ -48,7 +48,7 @@ const AY_CLOUD = (() => {
     };
     return {
         upload: async (value) => {
-            const secured = window.AY_SECURITY?.key ? { format: 'ANBARYAR_CLOUD_ENCRYPTED', envelope: await window.encryptAY(value) } : value;
+            const secured = typeof AY_SECURITY !== 'undefined' && AY_SECURITY.key ? { format: 'ANBARYAR_CLOUD_ENCRYPTED', envelope: await encryptAY(value) } : value;
             const blob = await gzip(secured);
             if (blob.size > 45 * 1024 * 1024) throw new Error('حجم نسخه پشتیبان از سقف ۴۵ مگابایت بیشتر است.');
             return await call('upload', { body: blob, headers: {
@@ -62,7 +62,12 @@ const AY_CLOUD = (() => {
             const response = await call('restore', { body: JSON.stringify({ action: 'restore', id }), raw: true });
             if (!('DecompressionStream' in window)) throw new Error('مرورگر از بازکردن پشتیبان فشرده پشتیبانی نمی‌کند.');
             const stream = response.body.pipeThrough(new DecompressionStream('gzip'));
-            return JSON.parse(await new Response(stream).text());
+            const decoded = JSON.parse(await new Response(stream).text());
+            if (decoded?.format === 'ANBARYAR_CLOUD_ENCRYPTED') {
+                if (!AY_SECURITY.key) throw new Error('این نسخه رمزنگاری شده است؛ ابتدا با رمز انباریار وارد شوید.');
+                return await decryptAY(decoded.envelope);
+            }
+            return decoded;
         }
     };
 })();
