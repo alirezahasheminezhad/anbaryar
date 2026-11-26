@@ -48,7 +48,8 @@ const AY_CLOUD = (() => {
     };
     return {
         upload: async (value) => {
-            const blob = await gzip(value);
+            const secured = window.AY_SECURITY?.key ? { format: 'ANBARYAR_CLOUD_ENCRYPTED', envelope: await window.encryptAY(value) } : value;
+            const blob = await gzip(secured);
             if (blob.size > 45 * 1024 * 1024) throw new Error('حجم نسخه پشتیبان از سقف ۴۵ مگابایت بیشتر است.');
             return await call('upload', { body: blob, headers: {
                 'Content-Type': 'application/gzip',
