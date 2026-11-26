@@ -1309,6 +1309,10 @@
             };
 
             const handleCloudEmailLogin = async () => {
+                if (window.location.protocol === 'file:') {
+                    setCloudError('ورود با ایمیل از نسخه وب انجام می‌شود؛ در فایل آفلاین برای ورود ابری از اتصال گوگل استفاده کن.');
+                    return;
+                }
                 const email = String(cloudEmail || '').trim();
                 if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
                     setCloudError('یک نشانی ایمیل معتبر وارد کنید.');
