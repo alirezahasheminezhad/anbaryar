@@ -1383,7 +1383,28 @@
                 if (!cloudSyncConflict?.remote) return;
                 try {
                     setCloudBusy(true);
+                    const startState = ayCloudLiveStateRef.current;
+                    const startDirtyMarker = localStorage.getItem('anbary_cloud_sync_force_dirty') || '';
+                    const startLocalUpdated = localStorage.getItem('anbary_local_updated_at') || '';
+                    const changedBeforeApply = () => {
+                        const current = ayCloudLiveStateRef.current;
+                        return !current ||
+                            current.items !== startState.items ||
+                            current.invoices !== startState.invoices ||
+                            current.notes !== startState.notes ||
+                            current.transactions !== startState.transactions ||
+                            current.purchases !== startState.purchases ||
+                            current.processingOrders !== startState.processingOrders ||
+                            current.consignments !== startState.consignments ||
+                            current.appSettings !== startState.appSettings ||
+                            (localStorage.getItem('anbary_cloud_sync_force_dirty') || '') !== startDirtyMarker ||
+                            (localStorage.getItem('anbary_local_updated_at') || '') !== startLocalUpdated;
+                    };
                     const account = await AY_CLOUD.account();
+                    if (changedBeforeApply()) {
+                        setCloudError('اطلاعات این دستگاه هنگام آماده‌سازی بازیابی تغییر کرد؛ نسخه‌ی انتخاب‌شده را دوباره بررسی کن.');
+                        return;
+                    }
                     await applyCloudSyncRecord(cloudSyncConflict.remote, account?.user?.id || '');
                     toast.show('نسخه‌ی ابری دریافت و روی این دستگاه اعمال شد.');
                 } catch (err) {
@@ -1396,11 +1417,32 @@
                 try {
                     setCloudBusy(true);
                     setCloudError('');
+                    const startState = ayCloudLiveStateRef.current;
+                    const startDirtyMarker = localStorage.getItem('anbary_cloud_sync_force_dirty') || '';
+                    const startLocalUpdated = localStorage.getItem('anbary_local_updated_at') || '';
+                    const changedBeforeSnapshot = () => {
+                        const current = ayCloudLiveStateRef.current;
+                        return !current ||
+                            current.items !== startState.items ||
+                            current.invoices !== startState.invoices ||
+                            current.notes !== startState.notes ||
+                            current.transactions !== startState.transactions ||
+                            current.purchases !== startState.purchases ||
+                            current.processingOrders !== startState.processingOrders ||
+                            current.consignments !== startState.consignments ||
+                            current.appSettings !== startState.appSettings ||
+                            (localStorage.getItem('anbary_cloud_sync_force_dirty') || '') !== startDirtyMarker ||
+                            (localStorage.getItem('anbary_local_updated_at') || '') !== startLocalUpdated;
+                    };
                     const account = await AY_CLOUD.account();
                     const ownerId = account?.user?.id || '';
+                    if (changedBeforeSnapshot()) {
+                        setCloudError('اطلاعات این دستگاه هنگام آماده‌سازی ثبت نسخه تغییر کرد؛ برای جلوگیری از ارسال نسخه‌ی قدیمی، دوباره تلاش کن.');
+                        return;
+                    }
                     const mutationAtStart = ayCloudMutationSeqRef.current;
                     const snapshot = await makeCloudBackupSnapshot();
-                    if (mutationAtStart !== ayCloudMutationSeqRef.current) {
+                    if (changedBeforeSnapshot() || mutationAtStart !== ayCloudMutationSeqRef.current) {
                         setCloudError('هنگام آماده‌سازی نسخه، اطلاعات تغییر کرد؛ همگام‌سازی دوباره تلاش می‌شود.');
                         setTimeout(() => handleCloudSync('queued-change'), 700);
                         return;
