@@ -272,6 +272,7 @@ const {
   Check,
   Lock,
   ShieldCheck,
+  Cloud,
   CloudCheck,
   WifiOff,
   AlertTriangle,
@@ -2621,7 +2622,7 @@ const IDB_STORE = 'app';
 const IDB_DATA_KEY = 'secure-data';
 const IDB_FALLBACK_KEY = 'plain-data-fallback';
 const APP_SCHEMA_VERSION = 11;
-const APP_BUILD = '10.19-print-open-notes';
+const APP_BUILD = '10.20-google-popup-profile';
 
 // ------------------------------------------------------------------
 // امنیت و ذخیره‌سازی محلی، IndexedDB
@@ -3266,18 +3267,32 @@ const TopNav = ({
   reservedCounts,
   lowStockThreshold = 100,
   lastSaved,
-  saveError
+  saveError,
+  cloudAccount = null,
+  cloudSyncStatus = 'idle'
 }) => {
   const [moreOpen, setMoreOpen] = useState(false);
+  const [cloudOpen, setCloudOpen] = useState(false);
   const moreRef = useRef(null);
+  const cloudRef = useRef(null);
   useEffect(() => {
     const h = e => {
       if (moreRef.current && !moreRef.current.contains(e.target)) setMoreOpen(false);
+      if (cloudRef.current && !cloudRef.current.contains(e.target)) setCloudOpen(false);
     };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
   const isOnline = navigator.onLine;
+  const cloudUser = cloudAccount?.user || null;
+  const googleIdentity = (cloudAccount?.identities || []).find(identity => identity.provider === 'google');
+  const cloudProviders = cloudUser?.app_metadata?.providers || [];
+  const isGoogleConnected = !!googleIdentity || cloudUser?.app_metadata?.provider === 'google' || cloudProviders.includes('google') || cloudUser?.user_metadata?.provider === 'google';
+  const googleProfile = googleIdentity?.identity_data || {};
+  const cloudAvatar = googleProfile.avatar_url || googleProfile.picture || cloudUser?.user_metadata?.avatar_url || cloudUser?.user_metadata?.picture || '';
+  const cloudEmail = cloudUser?.email || googleProfile.email || '';
+  const cloudStatusLabel = cloudSyncStatus === 'synced' ? 'همگام‌سازی به‌روز' : cloudSyncStatus === 'syncing' ? 'در حال همگام‌سازی…' : cloudSyncStatus === 'offline' ? 'آفلاین؛ اطلاعات محلی محفوظ است' : cloudSyncStatus === 'conflict' ? 'نیاز به انتخاب نسخه' : cloudSyncStatus === 'error' ? 'خطا در همگام‌سازی' : 'وضعیت همگام‌سازی بررسی نشده';
+  const cloudDot = isGoogleConnected ? 'bg-emerald-500' : cloudUser?.is_anonymous ? 'bg-amber-400' : 'bg-slate-400';
 
   // آیتم‌های اصلی در خودِ نوار؛ بقیه زیر «بیشتر». id/برچسب‌ها همان منوی قبلی ساید‌بار است.
   const primary = [{
@@ -3414,7 +3429,60 @@ const TopNav = ({
     title: "\u062D\u0627\u0644\u062A \u0622\u0641\u0644\u0627\u06CC\u0646"
   }, /*#__PURE__*/React.createElement(WifiOff, {
     size: 16
-  })), /*#__PURE__*/React.createElement("button", {
+  })), /*#__PURE__*/React.createElement("div", {
+    ref: cloudRef,
+    className: "relative"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setCloudOpen(open => !open),
+    "aria-haspopup": "menu",
+    "aria-expanded": cloudOpen,
+    className: `relative w-10 h-10 rounded-full bg-white shadow-sm border flex items-center justify-center overflow-hidden transition cursor-pointer ${isGoogleConnected ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-100 hover:border-indigo-200'}`,
+    "aria-label": "\u0648\u0636\u0639\u06CC\u062A \u0627\u062A\u0635\u0627\u0644 \u0627\u0628\u0631\u06CC \u0627\u0646\u0628\u0627\u0631 \u06CC\u0627\u0631",
+    title: isGoogleConnected ? 'حساب Google متصل است' : 'اتصال حساب Google'
+  }, isGoogleConnected && cloudAvatar ? /*#__PURE__*/React.createElement("img", {
+    src: cloudAvatar,
+    alt: "\u0639\u06A9\u0633 \u067E\u0631\u0648\u0641\u0627\u06CC\u0644 Google",
+    referrerPolicy: "no-referrer",
+    className: "w-full h-full object-cover"
+  }) : /*#__PURE__*/React.createElement(Cloud, {
+    size: 19,
+    className: isGoogleConnected ? 'text-emerald-600' : 'text-slate-500'
+  }), /*#__PURE__*/React.createElement("span", {
+    className: `absolute bottom-0.5 left-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white ${cloudDot}`
+  })), cloudOpen && /*#__PURE__*/React.createElement("div", {
+    role: "menu",
+    dir: "rtl",
+    className: "absolute left-0 top-full mt-2 w-72 max-w-[85vw] rounded-2xl bg-white border border-slate-100 shadow-xl p-3 z-50"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3 pb-3 border-b border-slate-100"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden shrink-0"
+  }, isGoogleConnected && cloudAvatar ? /*#__PURE__*/React.createElement("img", {
+    src: cloudAvatar,
+    alt: "",
+    referrerPolicy: "no-referrer",
+    className: "w-full h-full object-cover"
+  }) : /*#__PURE__*/React.createElement(Cloud, {
+    size: 20,
+    className: "text-slate-500"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "min-w-0 flex-1"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-black text-slate-800"
+  }, isGoogleConnected ? 'حساب Google متصل' : cloudUser?.is_anonymous ? 'حساب موقت این دستگاه' : 'اتصال ابری انبار یار'), /*#__PURE__*/React.createElement("p", {
+    dir: "ltr",
+    className: "text-[11px] text-slate-500 truncate text-right mt-0.5"
+  }, cloudEmail || (cloudUser?.is_anonymous ? 'هنوز به Google متصل نشده' : 'برای مشاهده وضعیت، تنظیمات را باز کنید')))), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 px-1 py-3 text-xs text-slate-600"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: `w-2 h-2 rounded-full shrink-0 ${cloudSyncStatus === 'error' || cloudSyncStatus === 'conflict' ? 'bg-amber-500' : cloudSyncStatus === 'synced' ? 'bg-emerald-500' : cloudSyncStatus === 'syncing' ? 'bg-blue-500' : 'bg-slate-300'}`
+  }), cloudStatusLabel), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setCloudOpen(false);
+      setView('backup');
+    },
+    className: "w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-3 transition"
+  }, isGoogleConnected ? 'مدیریت اتصال و همگام‌سازی' : 'اتصال Google و تنظیمات ابری'))), /*#__PURE__*/React.createElement("button", {
     onClick: () => setView('critical'),
     className: iconBtn,
     "aria-label": criticalItems.length > 0 ? `بارهای بحرانی (${criticalItems.length})` : 'بارهای بحرانی',
@@ -5283,7 +5351,7 @@ const MotherBagRow = ({
 // ===== مستندات برنامه =====
 // نگهداری: هر تغییری که در برنامه داده می‌شود، باید این متن هم به‌روز شود (و شماره‌ی نسخه/تاریخ بالای آن).
 // هدف: هر هوش مصنوعی یا هر فردی که این فایل را می‌بیند، در کمترین زمان بفهمد برنامه چیست و کجا را باید بخواند.
-const APP_DOCS_VERSION = 'v7.16 — ۱۴۰۵/۰۹/۰۴';
+const APP_DOCS_VERSION = 'v7.17 — ۱۴۰۵/۰۹/۰۵';
 const APP_DOCS_MD = `# مستندات کامل برنامه‌ی «انبار یار» (Pro Mahak Sync)
 
 نسخه‌ی مستندات: ${APP_DOCS_VERSION}
@@ -5467,6 +5535,7 @@ const APP_DOCS_MD = `# مستندات کامل برنامه‌ی «انبار ی
 - هر تغییر در برنامه (ماژول جدید، تغییر قانون محاسبه، فیلد جدید، تغییر نام کامپوننت) باید در همین متن ثبت شود.
 - شماره‌ی نسخه و تاریخ بالای همین بخش را با هر تغییر به‌روز کن.
 - تاریخچه‌ی تغییرات:
+  - v7.17 (build 10.20): ورود Google پنجره‌ای با callback روی GitHub Pages، انتقال نشست به صفحه‌ی اصلی با nonce، fallback از BroadcastChannel، نمایش وضعیت اتصال/همگام‌سازی و عکس پروفایل Google در نوار بالا.
   - v7.16 (build 10.19): دکمه‌ی «چاپ کارهای باز» در یادداشت‌ها؛ همه‌ی یادداشت‌های انجام‌نشده و غیرآرشیو در یک چاپ (A4/A5، رنگی یا سیاه‌وسفید).
   - v7.15 (build 10.18): کارت فاکتور رزرو در «خروجی‌های در انتظار» وضعیت ارسال را نشان می‌دهد: ردیف کامل‌رفته خط‌خورده، ردیف نیمه‌رفته با مقدار مانده در رزرو، و برچسب کلی روی کارت (فقط ظاهر).
   - v7.14 (build 10.17): چاپ یادداشت‌ها با سایز ثابت A4/A5 و حالت سیاه‌وسفید مناسب چاپ.
@@ -18545,6 +18614,53 @@ const App = () => {
   const toast = useToast();
   const confirmAction = useConfirm();
 
+  // وضعیت ورود ابری با تغییر نشست Supabase همگام می‌ماند؛ در حالت آفلاین کتابخانه‌ی ابری اصلاً بارگذاری نمی‌شود.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('ay_auth_bridge')) return;
+    let alive = true;
+    let starting = false;
+    let subscription = null;
+    const startWatching = () => {
+      if (!alive || !navigator.onLine || starting || subscription) return;
+      starting = true;
+      AY_CLOUD.watchAuth((event, session) => {
+        if (!alive) return;
+        if (event === 'SIGNED_OUT') {
+          setCloudAccount(null);
+          setCloudSyncStatus('idle');
+          return;
+        }
+        if (!session?.user) return;
+        setCloudAccount(prev => ({
+          user: session.user,
+          identities: prev?.user?.id === session.user.id ? prev.identities || [] : []
+        }));
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+          // فراخوانی account را از callback رویداد خارج می‌کنیم تا قفل داخلی Auth ایجاد نشود.
+          setTimeout(() => {
+            AY_CLOUD.account().then(account => {
+              if (alive) setCloudAccount(account);
+            }).catch(err => console.warn('Cloud account refresh failed:', err));
+          }, 0);
+        }
+      }).then(next => {
+        starting = false;
+        subscription = next;
+        if (!alive) subscription?.unsubscribe();
+      }).catch(err => {
+        starting = false;
+        console.warn('Cloud auth listener failed:', err);
+      });
+    };
+    startWatching();
+    window.addEventListener('online', startWatching);
+    return () => {
+      alive = false;
+      window.removeEventListener('online', startWatching);
+      subscription?.unsubscribe();
+    };
+  }, []);
+
   // نسل داده: هر بازیابی پشتیبان آن را جلو می‌برد تا اگر بارگذاری اولیه هنوز در جریان بود،
   // نتیجه‌ی قدیمیِ آن روی داده‌ی تازه بازیابی‌شده نوشته نشود (باگ پریدن داده بعد از رفرش).
   const ayDataGenRef = useRef(0);
@@ -20469,18 +20585,32 @@ const App = () => {
   }, [view]);
   const handleCloudLinkGoogle = async () => {
     try {
+      setCloudBusy(true);
       setCloudError('');
       await AY_CLOUD.linkGoogle();
+      const account = await AY_CLOUD.account();
+      setCloudAccount(account);
+      toast.show('حساب Google به همین دستگاه متصل شد.');
+      await handleCloudSync('google-link');
     } catch (err) {
       setCloudError(err?.message || 'اتصال گوگل انجام نشد');
+    } finally {
+      setCloudBusy(false);
     }
   };
   const handleCloudGoogleLogin = async () => {
     try {
+      setCloudBusy(true);
       setCloudError('');
       await AY_CLOUD.signInGoogle();
+      const account = await AY_CLOUD.account();
+      setCloudAccount(account);
+      toast.show('ورود با Google انجام شد؛ همگام‌سازی بررسی می‌شود.');
+      await handleCloudSync('google-login');
     } catch (err) {
       setCloudError(err?.message || 'ورود با گوگل انجام نشد');
+    } finally {
+      setCloudBusy(false);
     }
   };
   const handleCloudRestore = async id => {
@@ -20734,7 +20864,9 @@ const App = () => {
     reservedCounts: reservedCounts,
     lowStockThreshold: appSettings.lowStockThreshold ?? 100,
     lastSaved: lastSaved,
-    saveError: saveError
+    saveError: saveError,
+    cloudAccount: cloudAccount,
+    cloudSyncStatus: cloudSyncStatus
   }), /*#__PURE__*/React.createElement("main", {
     className: "flex-1 min-h-0 overflow-y-auto px-4 md:px-8 pb-8"
   }, /*#__PURE__*/React.createElement("div", {
@@ -21051,15 +21183,29 @@ const App = () => {
     className: "bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mt-5"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between gap-3"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3 min-w-0"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-12 h-12 shrink-0 rounded-full bg-slate-100 overflow-hidden flex items-center justify-center"
+  }, (cloudAccount?.identities || []).some(identity => identity.provider === 'google') && (cloudAccount?.user?.user_metadata?.avatar_url || cloudAccount?.user?.user_metadata?.picture) ? /*#__PURE__*/React.createElement("img", {
+    src: cloudAccount.user.user_metadata.avatar_url || cloudAccount.user.user_metadata.picture,
+    alt: "\u0639\u06A9\u0633 \u067E\u0631\u0648\u0641\u0627\u06CC\u0644 Google",
+    referrerPolicy: "no-referrer",
+    className: "w-full h-full object-cover"
+  }) : /*#__PURE__*/React.createElement(Cloud, {
+    size: 21,
+    className: "text-slate-500"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "min-w-0"
+  }, /*#__PURE__*/React.createElement("h3", {
     className: "text-lg font-black text-slate-800"
   }, "\u062D\u0633\u0627\u0628 \u0627\u0628\u0631\u06CC \u0627\u0646\u0628\u0627\u0631\u06CC\u0627\u0631"), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-400 mt-1"
-  }, cloudAccount?.user?.email || (cloudAccount?.user?.is_anonymous ? "حساب موقت این دستگاه" : "برای بررسی وضعیت، فهرست را تازه‌سازی کنید"))), /*#__PURE__*/React.createElement("span", {
-    className: "text-xs font-bold text-emerald-700"
-  }, "Supabase Auth")), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400 mt-1 truncate"
+  }, cloudAccount?.user?.email || (cloudAccount?.user?.is_anonymous ? "حساب موقت این دستگاه" : "برای بررسی وضعیت، فهرست را تازه‌سازی کنید")))), /*#__PURE__*/React.createElement("span", {
+    className: `text-xs font-bold px-3 py-1.5 rounded-full ${(cloudAccount?.identities || []).some(identity => identity.provider === 'google') ? 'text-emerald-700 bg-emerald-50' : 'text-amber-700 bg-amber-50'}`
+  }, (cloudAccount?.identities || []).some(identity => identity.provider === 'google') ? 'Google متصل' : 'Google متصل نیست')), /*#__PURE__*/React.createElement("p", {
     className: "mt-3 text-xs text-slate-500"
-  }, "\u0628\u0631\u0627\u06CC \u0627\u0634\u062A\u0631\u0627\u06A9 \u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0628\u06CC\u0646 \u062F\u0633\u062A\u06AF\u0627\u0647\u200C\u0647\u0627\u060C \u0628\u0627 \u0647\u0645\u0627\u0646 \u062D\u0633\u0627\u0628 Google \u062F\u0631 \u0647\u0645\u0647\u200C\u06CC \u062F\u0633\u062A\u06AF\u0627\u0647\u200C\u0647\u0627 \u0648\u0627\u0631\u062F \u0634\u0648\u06CC\u062F. \u06AF\u0632\u06CC\u0646\u0647\u200C\u06CC \xAB\u0627\u062A\u0635\u0627\u0644 \u06AF\u0648\u06AF\u0644 \u0628\u0647 \u0647\u0645\u06CC\u0646 \u062F\u0633\u062A\u06AF\u0627\u0647\xBB \u062D\u0633\u0627\u0628 \u0645\u0648\u0642\u062A \u0631\u0627 \u0628\u0647 Google \u067E\u06CC\u0648\u0646\u062F \u0645\u06CC\u200C\u062F\u0647\u062F \u0648 \u0646\u06CC\u0627\u0632\u0645\u0646\u062F \u0641\u0639\u0627\u0644\u200C\u0628\u0648\u062F\u0646 Allow manual linking \u062F\u0631 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A Auth \u067E\u0631\u0648\u0698\u0647\u200C\u06CC Supabase \u0627\u0633\u062A. \u062F\u0631 \u0641\u0627\u06CC\u0644 \u0622\u0641\u0644\u0627\u06CC\u0646\u060C \u0648\u0631\u0648\u062F \u06AF\u0648\u06AF\u0644 \u0627\u0632 \u0637\u0631\u06CC\u0642 \u067E\u0646\u062C\u0631\u0647\u200C\u06CC \u0648\u0627\u0633\u0637 \u0646\u0633\u062E\u0647\u200C\u06CC \u0648\u0628 \u0627\u0646\u062C\u0627\u0645 \u0645\u06CC\u200C\u0634\u0648\u062F."), /*#__PURE__*/React.createElement("div", {
+  }, "\u0628\u0631\u0627\u06CC \u0627\u0634\u062A\u0631\u0627\u06A9 \u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0628\u06CC\u0646 \u062F\u0633\u062A\u06AF\u0627\u0647\u200C\u0647\u0627\u060C \u0628\u0627 \u0647\u0645\u0627\u0646 \u062D\u0633\u0627\u0628 Google \u062F\u0631 \u0647\u0645\u0647\u200C\u06CC \u062F\u0633\u062A\u06AF\u0627\u0647\u200C\u0647\u0627 \u0648\u0627\u0631\u062F \u0634\u0648\u06CC\u062F. \u06AF\u0632\u06CC\u0646\u0647\u200C\u06CC \xAB\u0627\u062A\u0635\u0627\u0644 \u06AF\u0648\u06AF\u0644 \u0628\u0647 \u0647\u0645\u06CC\u0646 \u062F\u0633\u062A\u06AF\u0627\u0647\xBB \u062D\u0633\u0627\u0628 \u0645\u0648\u0642\u062A \u0631\u0627 \u0628\u0647 Google \u067E\u06CC\u0648\u0646\u062F \u0645\u06CC\u200C\u062F\u0647\u062F \u0648 \u0646\u06CC\u0627\u0632\u0645\u0646\u062F \u0641\u0639\u0627\u0644\u200C\u0628\u0648\u062F\u0646 Allow manual linking \u062F\u0631 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A Auth \u067E\u0631\u0648\u0698\u0647\u200C\u06CC Supabase \u0627\u0633\u062A. \u0648\u0631\u0648\u062F Google \u062F\u0631 \u0646\u0633\u062E\u0647\u200C\u06CC \u0622\u0646\u0644\u0627\u06CC\u0646 \u0648 \u0641\u0627\u06CC\u0644 \u0622\u0641\u0644\u0627\u06CC\u0646 \u0627\u0632 \u067E\u0646\u062C\u0631\u0647\u200C\u06CC \u062C\u062F\u0627 \u0627\u0646\u062C\u0627\u0645 \u0645\u06CC\u200C\u0634\u0648\u062F\u061B \u062F\u0631 \u0641\u0627\u06CC\u0644 \u0622\u0641\u0644\u0627\u06CC\u0646\u060C \u062A\u0623\u06CC\u06CC\u062F \u0646\u0647\u0627\u06CC\u06CC \u0627\u0646\u062A\u0642\u0627\u0644 \u0646\u0634\u0633\u062A \u0644\u0627\u0632\u0645 \u0627\u0633\u062A."), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap gap-2 mt-4"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: handleCloudLinkGoogle,
@@ -21459,71 +21605,81 @@ const AY_CLOUD = (() => {
     }
     return value;
   };
-  const waitForOfflineOAuthBridge = (popup, sb, nonce) => new Promise((resolve, reject) => {
+  const waitForOAuthPopup = (popup, sb, nonce) => new Promise((resolve, reject) => {
     let finished = false;
+    let processing = false;
+    let channel = null;
     const finish = (err, value) => {
       if (finished) return;
       finished = true;
       clearTimeout(timer);
       window.removeEventListener('message', onMessage);
+      if (channel) channel.close();
       if (err) reject(err);else resolve(value);
     };
     const timer = setTimeout(() => finish(new Error('ورود گوگل به پایان نرسید؛ دوباره تلاش کنید.')), 180000);
-    const onMessage = async event => {
-      if (event.origin !== AY_CLOUD_SITE_ORIGIN || event.source !== popup || event.data?.type !== 'ANBARYAR_AUTH_BRIDGE' || event.data?.nonce !== nonce) return;
+    const accept = async data => {
+      if (finished || processing || data?.type !== 'ANBARYAR_AUTH_BRIDGE' || data?.nonce !== nonce) return;
+      processing = true;
       try {
         const {
-          data,
+          data: sessionData,
           error
         } = await sb.auth.setSession({
-          access_token: event.data.access_token,
-          refresh_token: event.data.refresh_token
+          access_token: data.access_token,
+          refresh_token: data.refresh_token
         });
         if (error) throw error;
-        finish(null, data);
+        finish(null, sessionData);
       } catch (e) {
+        processing = false;
         finish(e);
       }
     };
+    const onMessage = event => {
+      if (event.origin !== AY_CLOUD_SITE_ORIGIN || event.source !== popup) return;
+      accept(event.data);
+    };
     window.addEventListener('message', onMessage);
+    // Fallback for browsers whose COOP policy severs window.opener on same-origin hosted tabs.
+    if (window.location.origin === AY_CLOUD_SITE_ORIGIN && typeof BroadcastChannel === 'function') {
+      channel = new BroadcastChannel('anbaryar-auth-bridge');
+      channel.addEventListener('message', event => accept(event.data));
+    }
   });
   const oauth = async (provider, link = false) => {
     const isLocalFile = window.location.protocol === 'file:';
-    // file:// cannot be an OAuth redirect. Authenticate on the hosted copy and explicitly
-    // approve returning the session to the opener once the Google flow is complete.
-    const popup = isLocalFile ? window.open('about:blank', 'anbaryar-google-auth', 'popup,width=560,height=760') : null;
-    if (isLocalFile && !popup) throw new Error('برای ورود گوگل، اجازه‌ی بازشدن پنجره‌ی جدید را بدهید.');
-    const nonce = isLocalFile ? crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random() : '';
-    if (popup) popup.name = 'anbaryar-auth-bridge:' + nonce;
+    // Never redirect the main app. Complete OAuth in a separate popup and return the session.
+    const popup = window.open('about:blank', 'anbaryar-google-auth', 'popup,width=540,height=720');
+    if (!popup) throw new Error('مرورگر پنجره‌ی ورود را مسدود کرد؛ اجازه‌ی بازشدن Pop-up برای انباریار را فعال کن.');
+    const nonce = window.crypto?.randomUUID ? crypto.randomUUID() : 'ay-' + Date.now() + '-' + Math.random().toString(36).slice(2);
     try {
+      try {
+        popup.document.title = 'ورود امن به انباریار';
+        popup.document.body.innerHTML = '<main dir="rtl" style="font:16px Tahoma,Arial,sans-serif;background:#f1f5f9;color:#0f172a;min-height:100vh;display:grid;place-items:center;text-align:center;padding:24px"><div><strong style="font-size:20px">انبار یار</strong><p style="line-height:2;color:#64748b">در حال آماده‌سازی ورود امن با Google…</p></div></main>';
+      } catch (_) {}
       const sb = await client();
-      let result;
-      let redirectTo = window.location.href;
-      if (isLocalFile) {
-        const redirect = new URL(AY_CLOUD_SITE_URL);
-        redirect.searchParams.set('ay_auth_bridge', nonce);
-        redirectTo = redirect.toString();
-      }
-      const options = isLocalFile ? {
-        redirectTo,
-        skipBrowserRedirect: true
-      } : {
-        redirectTo
+      // Linking must preserve the anonymous/current account before the Google provider is attached.
+      if (link) await session();
+      const redirect = new URL(AY_CLOUD_SITE_URL);
+      redirect.searchParams.set('ay_auth_bridge', nonce);
+      redirect.searchParams.set('ay_auth_mode', isLocalFile ? 'offline' : 'popup');
+      const options = {
+        redirectTo: redirect.toString(),
+        skipBrowserRedirect: true,
+        scopes: 'openid email profile'
       };
-      if (link) result = await sb.auth.linkIdentity({
+      const result = link ? await sb.auth.linkIdentity({
         provider,
         options
-      });else result = await sb.auth.signInWithOAuth({
+      }) : await sb.auth.signInWithOAuth({
         provider,
         options
       });
       if (result.error) throw result.error;
-      if (isLocalFile) {
-        if (!result.data?.url) throw new Error('نشانی ورود گوگل دریافت نشد.');
-        popup.location.href = result.data.url;
-        return await waitForOfflineOAuthBridge(popup, sb, nonce);
-      }
-      return result.data;
+      if (!result.data?.url) throw new Error('نشانی ورود گوگل دریافت نشد.');
+      popup.location.replace(result.data.url);
+      return await waitForOAuthPopup(popup, sb, nonce);
     } catch (e) {
       try {
         if (popup && !popup.closed) popup.close();
@@ -21557,6 +21713,13 @@ const AY_CLOUD = (() => {
         user: current.user,
         identities: data?.identities || []
       };
+    },
+    watchAuth: async callback => {
+      const sb = await client();
+      const {
+        data
+      } = sb.auth.onAuthStateChange(callback);
+      return data.subscription;
     },
     linkGoogle: async () => await oauth('google', true),
     signInGoogle: async () => await oauth('google', false),
@@ -21613,7 +21776,9 @@ const AY_CLOUD = (() => {
       return await decodeGzipResponse(response);
     },
     forwardAuthToOpener: async nonce => {
-      if (!window.opener || window.opener === window || !nonce) return false;
+      const canPost = !!window.opener && window.opener !== window;
+      const canBroadcast = window.location.origin === AY_CLOUD_SITE_ORIGIN && typeof BroadcastChannel === 'function';
+      if (!nonce || !canPost && !canBroadcast) return false;
       if (new URLSearchParams(window.location.search).get('ay_auth_bridge') !== nonce) return false;
       // Do not rely on window.name; privacy protections may clear it across OAuth domains.
       const sb = await client();
@@ -21643,32 +21808,71 @@ const AY_CLOUD = (() => {
         });
       }
       if (!current?.access_token || !current?.refresh_token) return false;
-      window.opener.postMessage({
+      const payload = {
         type: 'ANBARYAR_AUTH_BRIDGE',
         access_token: current.access_token,
         refresh_token: current.refresh_token,
         nonce
-      }, '*');
+      };
+      if (canPost) {
+        try {
+          window.opener.postMessage(payload, '*');
+        } catch (_) {}
+      }
+      // Same-origin channel fallback for the hosted app if COOP isolates popup handles.
+      if (canBroadcast) {
+        try {
+          const channel = new BroadcastChannel('anbaryar-auth-bridge');
+          channel.postMessage(payload);
+          channel.close();
+        } catch (_) {}
+      }
       setTimeout(() => {
         try {
           window.close();
         } catch (e) {}
-      }, 300);
+      }, 450);
       return true;
     }
   };
 })();
 
-// در ورود از file://، تحویل توکن به پنجره‌ی آفلاین فقط با تأیید صریح کاربر انجام می‌شود.
+// Hosted callback returns the session to its opener using a one-time nonce.
+// Offline file authentication still requires explicit approval before sharing the session.
 (() => {
-  const nonce = new URLSearchParams(window.location.search).get('ay_auth_bridge');
-  if (!window.opener || !nonce) return;
+  const params = new URLSearchParams(window.location.search);
+  const nonce = params.get('ay_auth_bridge');
+  const mode = params.get('ay_auth_mode') || 'offline';
+  if (!nonce || !window.opener && !(mode === 'popup' && typeof BroadcastChannel === 'function')) return;
   const show = () => {
     if (!document.body || document.getElementById('ay-auth-bridge-approval')) return;
     const panel = document.createElement('div');
     panel.id = 'ay-auth-bridge-approval';
     panel.dir = 'rtl';
     panel.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(15,23,42,.94);display:flex;align-items:center;justify-content:center;padding:24px;font-family:Tahoma,Arial,sans-serif;color:white';
+    if (mode === 'popup') {
+      panel.innerHTML = '<div style="max-width:440px;background:#fff;color:#0f172a;border-radius:20px;padding:24px;text-align:center;box-shadow:0 20px 60px #0006"><div style="font-size:20px;font-weight:800;margin-bottom:12px">ورود امن به انبار یار</div><p style="font-size:14px;line-height:2;margin:0 0 18px">حساب Google تأیید شد؛ در حال بازگرداندن اتصال به صفحه‌ی اصلی…</p><button id="ay-auth-bridge-retry" style="border:0;border-radius:12px;background:#4f46e5;color:white;font-weight:800;padding:12px 20px;cursor:pointer">تکمیل اتصال</button><p id="ay-auth-bridge-status" style="font-size:12px;color:#64748b;margin:12px 0 0">لطفاً این پنجره را نبندید.</p></div>';
+      document.body.appendChild(panel);
+      const button = panel.querySelector('#ay-auth-bridge-retry');
+      const status = panel.querySelector('#ay-auth-bridge-status');
+      const forward = async () => {
+        button.disabled = true;
+        button.textContent = 'در حال اتصال…';
+        status.textContent = 'در حال انتقال امن نشست به صفحه‌ی اصلی…';
+        try {
+          const ok = await AY_CLOUD.forwardAuthToOpener(nonce);
+          if (!ok) throw new Error('نشست ورود آماده نشد؛ اتصال اینترنت را بررسی و دوباره تلاش کن.');
+          status.textContent = 'اتصال انجام شد؛ این پنجره بسته می‌شود.';
+        } catch (e) {
+          status.textContent = e?.message || 'انتقال ورود انجام نشد.';
+          button.disabled = false;
+          button.textContent = 'تلاش دوباره';
+        }
+      };
+      button.addEventListener('click', forward);
+      forward();
+      return;
+    }
     panel.innerHTML = '<div style="max-width:440px;background:#fff;color:#0f172a;border-radius:20px;padding:24px;text-align:center;box-shadow:0 20px 60px #0006"><div style="font-size:20px;font-weight:800;margin-bottom:12px">اتصال نسخه آفلاین انباریار</div><p style="font-size:14px;line-height:2;margin:0 0 18px">ورود گوگل انجام شده است. با انتخاب دکمه زیر، نشست این حساب به فایل آفلاینی که ورود را آغاز کرده منتقل می‌شود.</p><button id="ay-auth-bridge-approve" style="border:0;border-radius:12px;background:#4f46e5;color:white;font-weight:800;padding:12px 20px;cursor:pointer">تأیید و بازگشت به فایل آفلاین</button><p id="ay-auth-bridge-status" style="font-size:12px;color:#64748b;margin:12px 0 0"></p></div>';
     document.body.appendChild(panel);
     panel.querySelector('#ay-auth-bridge-approve').addEventListener('click', async () => {
@@ -21687,7 +21891,7 @@ const AY_CLOUD = (() => {
       }
     });
   };
-  setTimeout(show, 1400);
+  setTimeout(show, mode === 'popup' ? 500 : 1400);
 })();
 window.addEventListener('error', e => {
   console.error('AnbarYar runtime error:', e.error || e.message);
