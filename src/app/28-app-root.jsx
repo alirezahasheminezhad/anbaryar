@@ -1263,6 +1263,13 @@
                         return result;
                     };
 
+                    // اگر از بکاپ تاریخی قدیمی مهاجرت کرده‌ایم، آن را به رکورد همگام‌سازی فعال تبدیل کن.
+                    // در غیر این صورت revision صفر باقی می‌ماند و هر بار مثل ورود اولیه تعارض نشان می‌دهد.
+                    if (sameOwner && localRevision === 0 && remoteMeta.exists && remoteMeta.legacy) {
+                        await pushLocal(0);
+                        return;
+                    }
+
                     // در poll عادی فقط متادیتا خوانده می‌شود؛ snapshot حجیم تنها هنگام تغییر revision دریافت می‌شود.
                     if (sameOwner && localRevision > 0 && remoteMeta.exists && Number(remoteMeta.revision) === localRevision) {
                         if (localDirty) await pushLocal(localRevision);
@@ -1722,7 +1729,7 @@
 
                                 <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mt-5">
                                     <div className="flex items-center justify-between gap-3"><div><h3 className="text-lg font-black text-slate-800">حساب ابری انباریار</h3><p className="text-xs text-slate-400 mt-1">{cloudAccount?.user?.email || (cloudAccount?.user?.is_anonymous ? "حساب موقت این دستگاه" : "برای بررسی وضعیت، فهرست را تازه‌سازی کنید")}</p></div><span className="text-xs font-bold text-emerald-700">Supabase Auth</span></div>
-                                    <p className="mt-3 text-xs text-slate-500">برای اشتراک اطلاعات بین دستگاه‌ها، گوگل را به حساب همین دستگاه متصل کنید یا با حساب Google قبلی وارد شوید. در فایل آفلاین نیز ورود گوگل از طریق پنجره‌ی واسط نسخه‌ی وب انجام می‌شود.</p>
+                                    <p className="mt-3 text-xs text-slate-500">برای اشتراک اطلاعات بین دستگاه‌ها، با همان حساب Google در همه‌ی دستگاه‌ها وارد شوید. گزینه‌ی «اتصال گوگل به همین دستگاه» حساب موقت را به Google پیوند می‌دهد و نیازمند فعال‌بودن Allow manual linking در تنظیمات Auth پروژه‌ی Supabase است. در فایل آفلاین، ورود گوگل از طریق پنجره‌ی واسط نسخه‌ی وب انجام می‌شود.</p>
                                     <div className="flex flex-wrap gap-2 mt-4"><button onClick={handleCloudLinkGoogle} className="rounded-full bg-slate-900 px-4 py-2.5 text-xs font-bold text-white">اتصال گوگل به همین دستگاه</button><button onClick={handleCloudGoogleLogin} className="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700">ورود با حساب Google</button></div>
                                     <div className="mt-5 border-t border-slate-100 pt-4">
                                         <label className="block text-xs font-bold text-slate-700 mb-2">ورود با ایمیل</label>
