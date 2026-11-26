@@ -1201,7 +1201,7 @@
                     const lastSyncedLocalUpdated = sameOwner ? (localStorage.getItem('anbary_cloud_sync_local_updated_at') || '') : '';
                     const forceDirty = localStorage.getItem('anbary_cloud_sync_force_dirty') === '1';
                     const localHasData = !!(items.length || invoices.length || notes.length || transactions.length || purchases.length || processingOrders.length || consignments.length || currentLocalUpdated || forceDirty);
-                    const localDirty = forceDirty || (currentLocalUpdated && currentLocalUpdated !== lastSyncedLocalUpdated) || reason === 'local-change';
+                    const localDirty = forceDirty || (currentLocalUpdated && currentLocalUpdated !== lastSyncedLocalUpdated);
                     const remote = await AY_CLOUD.syncGet();
 
                     const deviceId = getCloudDeviceId();
@@ -1310,7 +1310,7 @@
 
             const handleCloudEmailLogin = async () => {
                 const email = String(cloudEmail || '').trim();
-                if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+                if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
                     setCloudError('یک نشانی ایمیل معتبر وارد کنید.');
                     return;
                 }
