@@ -1221,6 +1221,7 @@
                 if (cloudSyncConflict) return;
                 ayCloudSyncBusyRef.current = true;
                 setCloudSyncStatus('syncing');
+                let retryAfterSync = false;
                 try {
                     const account = await AY_CLOUD.account();
                     setCloudAccount(account);
@@ -1229,12 +1230,11 @@
                     const localRevision = sameOwner ? Number(localStorage.getItem('anbary_cloud_sync_revision') || 0) : 0;
                     const currentLocalUpdated = localStorage.getItem('anbary_local_updated_at') || '';
                     const lastSyncedLocalUpdated = sameOwner ? (localStorage.getItem('anbary_cloud_sync_local_updated_at') || '') : '';
-                    const forceDirty = localStorage.getItem('anbary_cloud_sync_force_dirty') === '1';
+                    const forceDirty = !!localStorage.getItem('anbary_cloud_sync_force_dirty');
                     const localHasData = !!(items.length || invoices.length || notes.length || transactions.length || purchases.length || processingOrders.length || consignments.length || currentLocalUpdated || forceDirty);
                     const localDirty = forceDirty || (currentLocalUpdated && currentLocalUpdated !== lastSyncedLocalUpdated);
                     const remoteMeta = await AY_CLOUD.syncMeta();
                     const deviceId = getCloudDeviceId();
-                    let retryAfterSync = false;
                     const pushLocal = async (baseRevision) => {
                         const mutationAtStart = ayCloudMutationSeqRef.current;
                         const snapshot = await makeCloudBackupSnapshot();
@@ -1349,16 +1349,28 @@
                     setCloudError('');
                     const account = await AY_CLOUD.account();
                     const ownerId = account?.user?.id || '';
+                    const mutationAtStart = ayCloudMutationSeqRef.current;
                     const snapshot = await makeCloudBackupSnapshot();
-                    const result = await AY_CLOUD.syncPush(snapshot, Number(cloudSyncConflict.revision || 0), getCloudDeviceId());
+                    if (mutationAtStart !== ayCloudMutationSeqRef.current) {
+                        setCloudError('هنگام آماده‌سازی نسخه، اطلاعات تغییر کرد؛ همگام‌سازی دوباره تلاش می‌شود.');
+                        setTimeout(() => handleCloudSync('queued-change'), 700);
+                        return;
+                    }
                     const updatedAt = localStorage.getItem('anbary_local_updated_at') || '';
+                    const forceMarker = localStorage.getItem('anbary_cloud_sync_force_dirty') || '';
+                    const result = await AY_CLOUD.syncPush(snapshot, Number(cloudSyncConflict.revision || 0), getCloudDeviceId());
                     localStorage.setItem('anbary_cloud_sync_revision', String(result.revision));
                     localStorage.setItem('anbary_cloud_sync_owner', ownerId);
                     localStorage.setItem('anbary_cloud_sync_local_updated_at', updatedAt);
-                    localStorage.removeItem('anbary_cloud_sync_force_dirty');
+                    if ((localStorage.getItem('anbary_cloud_sync_force_dirty') || '') === forceMarker) localStorage.removeItem('anbary_cloud_sync_force_dirty');
                     setCloudSyncRevision(Number(result.revision));
                     setCloudSyncConflict(null);
-                    setCloudSyncStatus('synced');
+                    const changedDuringUpload =
+                        mutationAtStart !== ayCloudMutationSeqRef.current ||
+                        (localStorage.getItem('anbary_local_updated_at') || '') !== updatedAt ||
+                        !!localStorage.getItem('anbary_cloud_sync_force_dirty');
+                    setCloudSyncStatus(changedDuringUpload ? 'syncing' : 'synced');
+                    if (changedDuringUpload) setTimeout(() => handleCloudSync('queued-change'), 700);
                     toast.show('نسخه‌ی همین دستگاه روی فضای ابری ثبت شد.');
                 } catch (err) {
                     setCloudError(err?.message || 'ثبت نسخه‌ی این دستگاه ناموفق بود.');
