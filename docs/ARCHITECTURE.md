@@ -29,7 +29,7 @@ CI (`.github/workflows/check.yml`) با setup-node + `npm ci` و سپس `python3
 | `src/app/04-excel-services.jsx` | 11 KB | سرویس‌های اکسل: خروجی موجودی/فاکتورها و خواندن فایل اکسل. |
 | `src/app/05-storage-security.jsx` | 16 KB | ذخیره‌سازی (localStorage + IndexedDB رمزنگاری‌شده)، قفل امنیتی، تنظیمات، loadData/saveData. |
 | `src/app/06-calculations.jsx` | 12 KB | قوانین محاسبه: هزینه‌ی بارگیری، وزن مؤثر ردیف، کیسه‌ی مادر و قالب‌های توضیحات. |
-| `src/app/07-header.jsx` | 3 KB | کامپوننت TopNav (نوار بالا: لوگو، منوی گرد شناور، اعلان بحرانی، قفل). |
+| `src/app/07-header.jsx` | 5 KB | کامپوننت TopNav (نوار بالا: لوگو، ناوبری، اعلان‌ها، امنیت، وضعیت اتصال ابری و عکس پروفایل Google). |
 | `src/app/08-mahak-import.jsx` | 83 KB | ورود/همگام‌سازی از محک: نرمال‌سازی نام، smartSearchMatch، MahakImportView، parseMahakExcelFile. |
 | `src/app/09-mother-bag-row.jsx` | 17 KB | ردیف تنظیمات کیسه‌ی مادر (MotherBagRow). |
 | `src/app/10-app-docs.jsx` | 29 KB | مستندات داخلی برنامه (APP_DOCS_MD) و AppDocsView. با هر تغییر، نسخه/تاریخ این مستندات را به‌روز کن. |
@@ -52,6 +52,7 @@ CI (`.github/workflows/check.yml`) با setup-node + `npm ci` و سپس `python3
 | `src/assets/estelam-app.js` | 719 KB | برنامه‌ی «استعلام» (base64) — ویرایش نکن |
 | `src/app/27-embedded-tools.jsx` | 2 KB | رمزگشایی و نمایش افزونه‌های داخلی (EmbeddedToolView). |
 | `src/app/28-app-root.jsx` | 112 KB | کامپوننت ریشه‌ی App: state سراسری، handlerهای ثبت/ویرایش/حذف و مسیریابی بین view‌ها. |
+| `src/app/30-cloud-backup.js` | 21 KB | اتصال اختیاری Supabase: ورود Google پنجره‌ای، انتقال امن نشست از popup/file://، حساب، پشتیبان و همگام‌سازی ابری. |
 | `src/app/29-boot.jsx` | 0 KB | راه‌اندازی: لاگ خطاها و render ریشه. |
 | `src/99-html-tail.html` | 0 KB | بستن تگ‌های script/body/html. (خطوط 10684–10686 نسخه‌ی اولیه) |
 
