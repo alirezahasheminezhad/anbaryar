@@ -94,6 +94,53 @@
             const toast = useToast();
             const confirmAction = useConfirm();
 
+            // وضعیت ورود ابری با تغییر نشست Supabase همگام می‌ماند؛ در حالت آفلاین کتابخانه‌ی ابری اصلاً بارگذاری نمی‌شود.
+            useEffect(() => {
+                if (new URLSearchParams(window.location.search).has('ay_auth_bridge')) return;
+                let alive = true;
+                let starting = false;
+                let subscription = null;
+                const startWatching = () => {
+                    if (!alive || !navigator.onLine || starting || subscription) return;
+                    starting = true;
+                    AY_CLOUD.watchAuth((event, session) => {
+                        if (!alive) return;
+                        if (event === 'SIGNED_OUT') {
+                            setCloudAccount(null);
+                            setCloudSyncStatus('idle');
+                            return;
+                        }
+                        if (!session?.user) return;
+                        setCloudAccount(prev => ({
+                            user: session.user,
+                            identities: prev?.user?.id === session.user.id ? (prev.identities || []) : []
+                        }));
+                        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+                            // فراخوانی account را از callback رویداد خارج می‌کنیم تا قفل داخلی Auth ایجاد نشود.
+                            setTimeout(() => {
+                                AY_CLOUD.account().then(account => {
+                                    if (alive) setCloudAccount(account);
+                                }).catch(err => console.warn('Cloud account refresh failed:', err));
+                            }, 0);
+                        }
+                    }).then(next => {
+                        starting = false;
+                        subscription = next;
+                        if (!alive) subscription?.unsubscribe();
+                    }).catch(err => {
+                        starting = false;
+                        console.warn('Cloud auth listener failed:', err);
+                    });
+                };
+                startWatching();
+                window.addEventListener('online', startWatching);
+                return () => {
+                    alive = false;
+                    window.removeEventListener('online', startWatching);
+                    subscription?.unsubscribe();
+                };
+            }, []);
+
             // نسل داده: هر بازیابی پشتیبان آن را جلو می‌برد تا اگر بارگذاری اولیه هنوز در جریان بود،
             // نتیجه‌ی قدیمیِ آن روی داده‌ی تازه بازیابی‌شده نوشته نشود (باگ پریدن داده بعد از رفرش).
             const ayDataGenRef = useRef(0);
@@ -1501,12 +1548,28 @@
             }, [view]);
 
             const handleCloudLinkGoogle = async () => {
-                try { setCloudError(''); await AY_CLOUD.linkGoogle(); }
-                catch(err) { setCloudError(err?.message || 'اتصال گوگل انجام نشد'); }
+                try {
+                    setCloudBusy(true); setCloudError('');
+                    await AY_CLOUD.linkGoogle();
+                    const account = await AY_CLOUD.account();
+                    setCloudAccount(account);
+                    toast.show('حساب Google به همین دستگاه متصل شد.');
+                    await handleCloudSync('google-link');
+                } catch(err) {
+                    setCloudError(err?.message || 'اتصال گوگل انجام نشد');
+                } finally { setCloudBusy(false); }
             };
             const handleCloudGoogleLogin = async () => {
-                try { setCloudError(''); await AY_CLOUD.signInGoogle(); }
-                catch(err) { setCloudError(err?.message || 'ورود با گوگل انجام نشد'); }
+                try {
+                    setCloudBusy(true); setCloudError('');
+                    await AY_CLOUD.signInGoogle();
+                    const account = await AY_CLOUD.account();
+                    setCloudAccount(account);
+                    toast.show('ورود با Google انجام شد؛ همگام‌سازی بررسی می‌شود.');
+                    await handleCloudSync('google-login');
+                } catch(err) {
+                    setCloudError(err?.message || 'ورود با گوگل انجام نشد');
+                } finally { setCloudBusy(false); }
             };
 
             const handleCloudRestore = async (id) => {
@@ -1699,7 +1762,7 @@
 
             return (
                 <div className="app-shell flex flex-col h-screen font-[Vazirmatn]">
-                    <TopNav view={view} setView={navigateTo} items={items} invoices={invoices} reservedCounts={reservedCounts} lowStockThreshold={appSettings.lowStockThreshold ?? 100} lastSaved={lastSaved} saveError={saveError} />
+                    <TopNav view={view} setView={navigateTo} items={items} invoices={invoices} reservedCounts={reservedCounts} lowStockThreshold={appSettings.lowStockThreshold ?? 100} lastSaved={lastSaved} saveError={saveError} cloudAccount={cloudAccount} cloudSyncStatus={cloudSyncStatus} />
                     <main className="flex-1 min-h-0 overflow-y-auto px-4 md:px-8 pb-8">
                       <div className="max-w-[1400px] mx-auto">
                         {!getSecurityConfig() && !securityNudgeDismissed && (
@@ -1812,8 +1875,23 @@
                                 </div>
 
                                 <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mt-5">
-                                    <div className="flex items-center justify-between gap-3"><div><h3 className="text-lg font-black text-slate-800">حساب ابری انباریار</h3><p className="text-xs text-slate-400 mt-1">{cloudAccount?.user?.email || (cloudAccount?.user?.is_anonymous ? "حساب موقت این دستگاه" : "برای بررسی وضعیت، فهرست را تازه‌سازی کنید")}</p></div><span className="text-xs font-bold text-emerald-700">Supabase Auth</span></div>
-                                    <p className="mt-3 text-xs text-slate-500">برای اشتراک اطلاعات بین دستگاه‌ها، با همان حساب Google در همه‌ی دستگاه‌ها وارد شوید. گزینه‌ی «اتصال گوگل به همین دستگاه» حساب موقت را به Google پیوند می‌دهد و نیازمند فعال‌بودن Allow manual linking در تنظیمات Auth پروژه‌ی Supabase است. در فایل آفلاین، ورود گوگل از طریق پنجره‌ی واسط نسخه‌ی وب انجام می‌شود.</p>
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-12 h-12 shrink-0 rounded-full bg-slate-100 overflow-hidden flex items-center justify-center">
+                                                {(cloudAccount?.identities || []).some(identity => identity.provider === 'google') && (cloudAccount?.user?.user_metadata?.avatar_url || cloudAccount?.user?.user_metadata?.picture)
+                                                    ? <img src={cloudAccount.user.user_metadata.avatar_url || cloudAccount.user.user_metadata.picture} alt="عکس پروفایل Google" referrerPolicy="no-referrer" className="w-full h-full object-cover"/>
+                                                    : <Cloud size={21} className="text-slate-500"/>}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h3 className="text-lg font-black text-slate-800">حساب ابری انباریار</h3>
+                                                <p className="text-xs text-slate-400 mt-1 truncate">{cloudAccount?.user?.email || (cloudAccount?.user?.is_anonymous ? "حساب موقت این دستگاه" : "برای بررسی وضعیت، فهرست را تازه‌سازی کنید")}</p>
+                                            </div>
+                                        </div>
+                                        <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${(cloudAccount?.identities || []).some(identity => identity.provider === 'google') ? 'text-emerald-700 bg-emerald-50' : 'text-amber-700 bg-amber-50'}`}>
+                                            {(cloudAccount?.identities || []).some(identity => identity.provider === 'google') ? 'Google متصل' : 'Google متصل نیست'}
+                                        </span>
+                                    </div>
+                                    <p className="mt-3 text-xs text-slate-500">برای اشتراک اطلاعات بین دستگاه‌ها، با همان حساب Google در همه‌ی دستگاه‌ها وارد شوید. گزینه‌ی «اتصال گوگل به همین دستگاه» حساب موقت را به Google پیوند می‌دهد و نیازمند فعال‌بودن Allow manual linking در تنظیمات Auth پروژه‌ی Supabase است. ورود Google در نسخه‌ی آنلاین و فایل آفلاین از پنجره‌ی جدا انجام می‌شود؛ در فایل آفلاین، تأیید نهایی انتقال نشست لازم است.</p>
                                     <div className="flex flex-wrap gap-2 mt-4"><button onClick={handleCloudLinkGoogle} className="rounded-full bg-slate-900 px-4 py-2.5 text-xs font-bold text-white">اتصال گوگل به همین دستگاه</button><button onClick={handleCloudGoogleLogin} className="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700">ورود با حساب Google</button></div>
                                     <div className="mt-5 border-t border-slate-100 pt-4">
                                         <label className="block text-xs font-bold text-slate-700 mb-2">ورود با ایمیل</label>
