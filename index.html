@@ -21461,10 +21461,8 @@ const AY_CLOUD_KEY = 'sb_publishable_AhAgG-9rYk_PwD3cFjNCAA_bzK06eO2';
 const AY_CLOUD_FUNCTION = AY_CLOUD_URL + '/functions/v1/anbaryar-cloud-backup';
 const AY_CLOUD_SITE_URL = 'https://alirezahasheminezhad.github.io/anbaryar/';
 const AY_CLOUD_SITE_ORIGIN = 'https://alirezahasheminezhad.github.io';
-// کلید ابری از رمز دستگاه آغازکننده مشتق می‌شود. برای جلوگیری از درخواست تکراری،
-// نسخه‌ی محلیِ کلید با کلید امنیتی همان دستگاه رمز می‌شود و در IndexedDB می‌ماند؛
-// دستگاه دیگر همچنان باید بار اول رمز ابری را وارد کند.
-// کلید داده‌های ابری مستقل از رمز قفل محلی است؛ قفل محلی فقط از cache همین دستگاه محافظت می‌کند.
+// Google حساب و فضای ابری را مشخص می‌کند؛ کلید داده با رمز بازیابی مستقل محافظت می‌شود.
+// رمز قفل محلی فقط cache کلید را روی همین دستگاه محافظت می‌کند و در ساخت کلید مشترک نقشی ندارد.
 const AY_CLOUD_CRYPTO = {
   key: null,
   saltB64: '',
@@ -21473,6 +21471,17 @@ const AY_CLOUD_CRYPTO = {
   keyEnvelope: null
 };
 const AY_CLOUD_KEY_SESSION_CACHE = 'anbaryar_cloud_key_cache_v1';
+window.addEventListener('anbaryar:lock', () => {
+  // با قفل شدن برنامه، کلیدهای ابریِ در حافظه و cache نشست هم پاک شوند.
+  AY_CLOUD_CRYPTO.key = null;
+  AY_CLOUD_CRYPTO.saltB64 = '';
+  AY_CLOUD_CRYPTO.hashB64 = '';
+  AY_CLOUD_CRYPTO.keyMode = '';
+  AY_CLOUD_CRYPTO.keyEnvelope = null;
+  try {
+    sessionStorage.removeItem(AY_CLOUD_KEY_SESSION_CACHE);
+  } catch (_) {}
+});
 const readAyCloudKeySessionCache = () => {
   try {
     const entries = JSON.parse(sessionStorage.getItem(AY_CLOUD_KEY_SESSION_CACHE) || '[]');
@@ -21591,6 +21600,7 @@ const rememberAyCloudKeyForSession = async (key, saltB64, hashB64, keyMode, keyE
   await rememberAyCloudKeyForDevice(key, saltB64, hashB64, keyMode, keyEnvelope);
 };
 const restoreAyCloudKeyForSession = async (saltB64, hashB64) => {
+  if (isAyCloudLocalLockClosed()) return null;
   const record = readAyCloudKeySessionCache().find(x => x.saltB64 === saltB64 && x.hashB64 === hashB64);
   if (!record) return null;
   try {
@@ -21622,6 +21632,7 @@ const restoreLatestAyCloudKeyForDevice = async () => {
   return true;
 };
 const restoreLatestAyCloudKeyForSession = async () => {
+  if (isAyCloudLocalLockClosed()) return false;
   if (AY_CLOUD_CRYPTO.key) return true;
   const entries = readAyCloudKeySessionCache();
   const record = entries[entries.length - 1];
@@ -21767,6 +21778,9 @@ const AY_CLOUD = (() => {
     const stream = response.body.pipeThrough(new DecompressionStream('gzip'));
     const decoded = JSON.parse(await new Response(stream).text());
     if (decoded?.format !== 'ANBARYAR_CLOUD_ENCRYPTED') return decoded;
+    if (isAyCloudLocalLockClosed()) {
+      throw new Error('ابتدا قفل محلی انباریار را باز کن؛ سپس همگام‌سازی امن انجام می‌شود.');
+    }
 
     // نسخه‌ی ۳: کلید تصادفی داده با کلید مشتق‌شده از رمز بازیابی پوشانده می‌شود.
     // verifier نیز با salt دامنه‌ای جدا ساخته شده و خودِ کلید رمزگذاری را افشا نمی‌کند.
@@ -21900,6 +21914,9 @@ const AY_CLOUD = (() => {
     return legacyValue;
   };
   const secureValue = async value => {
+    if (isAyCloudLocalLockClosed()) {
+      throw new Error('ابتدا قفل محلی انباریار را باز کن؛ سپس همگام‌سازی امن انجام می‌شود.');
+    }
     if (!AY_CLOUD_CRYPTO.key) {
       const deviceRestored = await restoreLatestAyCloudKeyForDevice();
       if (!deviceRestored) await restoreLatestAyCloudKeyForSession();
