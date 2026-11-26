@@ -160,7 +160,7 @@ const AY_CLOUD = (() => {
             const sb = await client();
             const { data, error } = await sb.auth.signInWithOtp({
                 email,
-                options: { emailRedirectTo: window.location.href, shouldCreateUser: true }
+                options: { emailRedirectTo: AY_CLOUD_SITE_URL, shouldCreateUser: true }
             });
             if (error) throw error;
             return data;
@@ -199,16 +199,27 @@ const AY_CLOUD = (() => {
         forwardAuthToOpener: async (nonce) => {
             if (!window.opener || window.opener === window || !nonce) return false;
             if (new URLSearchParams(window.location.search).get('ay_auth_bridge') !== nonce) return false;
-            if (window.name !== 'anbaryar-auth-bridge:' + nonce) return false;
+            // Do not rely on window.name; privacy protections may clear it across OAuth domains.
             const sb = await client();
             let { data: { session: current } } = await sb.auth.getSession();
             if (!current) {
                 await new Promise((resolve) => {
                     let done = false;
-                    const timer = setTimeout(() => { if (!done) { done = true; subscription.unsubscribe(); resolve(); } }, 25000);
-                    const { data: { subscription } } = sb.auth.onAuthStateChange((event, next) => {
-                        if (next && !done) { done = true; clearTimeout(timer); subscription.unsubscribe(); current = next; resolve(); }
+                    let subscription = null;
+                    let timer = null;
+                    const finish = (next) => {
+                        if (done) return;
+                        done = true;
+                        if (timer) clearTimeout(timer);
+                        subscription?.unsubscribe();
+                        if (next) current = next;
+                        resolve();
+                    };
+                    const result = sb.auth.onAuthStateChange((event, next) => {
+                        if (next) finish(next);
                     });
+                    subscription = result.data.subscription;
+                    timer = setTimeout(() => finish(null), 25000);
                 });
             }
             if (!current?.access_token || !current?.refresh_token) return false;
@@ -227,7 +238,7 @@ const AY_CLOUD = (() => {
 // در ورود از file://، تحویل توکن به پنجره‌ی آفلاین فقط با تأیید صریح کاربر انجام می‌شود.
 (() => {
     const nonce = new URLSearchParams(window.location.search).get('ay_auth_bridge');
-    if (!window.opener || !nonce || window.name !== 'anbaryar-auth-bridge:' + nonce) return;
+    if (!window.opener || !nonce) return;
     const show = () => {
         if (!document.body || document.getElementById('ay-auth-bridge-approval')) return;
         const panel = document.createElement('div');
