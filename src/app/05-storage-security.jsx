@@ -119,7 +119,7 @@
             try {
                 localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
                 // تغییر تنظیمات هم باید در همگام‌سازی ابری بعدی لحاظ شود.
-                localStorage.setItem('anbary_cloud_sync_force_dirty', '1');
+                localStorage.setItem('anbary_cloud_sync_force_dirty', String(Date.now()) + ':' + Math.random().toString(36).slice(2));
             } catch(e) {}
         };
         const loadSettings = () => {
