@@ -20065,6 +20065,9 @@ const App = () => {
       setCloudBusy(false);
     }
   };
+  useEffect(() => {
+    if (view === 'backup') refreshCloudBackups();
+  }, [view]);
   const handleCloudLinkGoogle = async () => {
     try {
       setCloudError('');
@@ -20857,6 +20860,7 @@ const AY_CLOUD_KEY = 'sb_publishable_AhAgG-9rYk_PwD3cFjNCAA_bzK06eO2';
 const AY_CLOUD_FUNCTION = AY_CLOUD_URL + '/functions/v1/anbaryar-cloud-backup';
 const AY_CLOUD = (() => {
   let clientPromise = null;
+  let sessionPromise = null;
   const client = () => {
     if (!clientPromise) clientPromise = import('https://esm.sh/@supabase/supabase-js@2').then(({
       createClient
@@ -20870,19 +20874,27 @@ const AY_CLOUD = (() => {
     return clientPromise;
   };
   const session = async () => {
-    const sb = await client();
-    let {
-      data: {
-        session
+    if (sessionPromise) return await sessionPromise;
+    sessionPromise = (async () => {
+      const sb = await client();
+      let {
+        data: {
+          session
+        }
+      } = await sb.auth.getSession();
+      if (!session) {
+        const result = await sb.auth.signInAnonymously();
+        if (result.error) throw result.error;
+        session = result.data.session;
       }
-    } = await sb.auth.getSession();
-    if (!session) {
-      const result = await sb.auth.signInAnonymously();
-      if (result.error) throw result.error;
-      session = result.data.session;
+      if (!session?.access_token) throw new Error('ورود ابری انجام نشد.');
+      return session;
+    })();
+    try {
+      return await sessionPromise;
+    } finally {
+      sessionPromise = null;
     }
-    if (!session?.access_token) throw new Error('ورود ابری انجام نشد.');
-    return session;
   };
   const call = async (action, options = {}) => {
     const current = await session();
