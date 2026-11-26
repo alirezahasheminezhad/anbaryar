@@ -218,6 +218,7 @@ const AY_CLOUD = (() => {
             if (error) throw error;
             return data;
         },
+        syncMeta: async () => await call('sync-meta'),
         syncGet: async () => {
             const response = await callRaw('sync-get');
             if (response.status === 204) return null;
