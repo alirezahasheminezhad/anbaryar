@@ -127,33 +127,33 @@
 
 
             useEffect(() => {
-                if (loading) return;
+                if (loading || !navigator.onLine || new URLSearchParams(window.location.search).has('ay_auth_bridge')) return;
                 const last = Date.parse(localStorage.getItem('anbaryar_cloud_last_backup') || '');
                 if (!last || Date.now() - last >= 24 * 60 * 60 * 1000) {
                     const timer=setTimeout(() => { handleCloudUpload(true); }, 2500);
                     return () => clearTimeout(timer);
                 }
-            }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings]);
+            }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings, cloudSyncConflict]);
 
             // همگام‌سازی خودکار: ذخیره‌ی محلی همیشه اول انجام می‌شود؛ بعد از آن نسخه‌ی کامل به ابر می‌رود.
             // شروع اولیه از داده‌ی محلی/ابری تشخیص داده می‌شود و تغییرات بعدی با تأخیر کوتاه تجمیع می‌شوند.
             useEffect(() => {
-                if (loading) return;
+                if (loading || new URLSearchParams(window.location.search).has('ay_auth_bridge')) return;
                 const reason = ayCloudSyncStartupRef.current ? 'local-change' : 'startup';
                 ayCloudSyncStartupRef.current = true;
                 const timer = setTimeout(() => handleCloudSync(reason), reason === 'startup' ? 2400 : 1600);
                 return () => clearTimeout(timer);
-            }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings]);
+            }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings, cloudSyncConflict]);
 
             useEffect(() => {
-                if (loading) return;
+                if (loading || new URLSearchParams(window.location.search).has('ay_auth_bridge')) return;
                 const retry = () => {
                     if (navigator.onLine && document.visibilityState === 'visible') handleCloudSync('poll');
                 };
                 window.addEventListener('online', retry);
                 const timer = setInterval(retry, 15000);
                 return () => { window.removeEventListener('online', retry); clearInterval(timer); };
-            }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings]);
+            }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings, cloudSyncConflict]);
 
             const logTransaction = (item, type, quantity, newStock, invoiceId, recipient, desc, txId) => {
                 const id = txId || generateId();
@@ -1065,7 +1065,7 @@
             const handleSystemBackup = async () => {
                 try {
                     const local = {};
-                    for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k!==TRUSTED_UNLOCK_KEY) local[k]=localStorage.getItem(k); }
+                    for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && (k !== TRUSTED_UNLOCK_KEY && !k.startsWith('sb-') && !k.startsWith('anbary_cloud_sync_') && k !== 'anbary_cloud_last_backup' && k !== 'anbary_local_updated_at' && k !== 'anbary_cloud_device_id')) local[k]=localStorage.getItem(k); }
                     let secureEnvelope=null; try { secureEnvelope=await idbGet(IDB_DATA_KEY); } catch(e) {}
                     const data = {
                         format:'ANBARYAR_FULL_BACKUP', version:2, appBuild:APP_BUILD, schemaVersion:APP_SCHEMA_VERSION, date:new Date().toISOString(),
@@ -1422,7 +1422,7 @@
                         // ابزارهای داخلیِ بکاپ کامل همچنان برگردانده شوند، ولی کلید امنیتی/ورود موقت دست‌نخورده بماند.
                         if(raw?.localStorage && typeof raw.localStorage === 'object') {
                             Object.entries(raw.localStorage).forEach(([k,v]) => {
-                                if(k === TRUSTED_UNLOCK_KEY || k === SECURITY_KEY || k === STORAGE_KEY) return;
+                                if(k === TRUSTED_UNLOCK_KEY || k === SECURITY_KEY || k === STORAGE_KEY || k.startsWith('sb-') || k.startsWith('anbary_cloud_sync_') || k === 'anbary_cloud_last_backup' || k === 'anbary_local_updated_at' || k === 'anbary_cloud_device_id') return;
                                 try { localStorage.setItem(k,v); } catch(e) {}
                             });
                         }
