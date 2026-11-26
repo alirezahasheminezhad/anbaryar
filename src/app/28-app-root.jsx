@@ -17,6 +17,9 @@
             const [saveError, setSaveError] = useState(false);
             const [securityNudgeDismissed, setSecurityNudgeDismissed] = useState(false);
             const [loading, setLoading] = useState(true);
+            const [cloudBackups, setCloudBackups] = useState([]);
+            const [cloudBusy, setCloudBusy] = useState(false);
+            const [cloudError, setCloudError] = useState('');
             const [searchTerm, setSearchTerm] = useState('');
             const [editingItem, setEditingItem] = useState(null);
             const [historyItem, setHistoryItem] = useState(null);
@@ -110,6 +113,16 @@
                 }, 400);
                 return () => clearTimeout(t);
             }, [items, invoices, notes, transactions, purchases, processingOrders, consignments, loading]);
+
+
+            useEffect(() => {
+                if (loading) return;
+                const last = Date.parse(localStorage.getItem('anbaryar_cloud_last_backup') || '');
+                if (!last || Date.now() - last >= 24 * 60 * 60 * 1000) {
+                    const timer=setTimeout(() => { handleCloudUpload(true); }, 2500);
+                    return () => clearTimeout(timer);
+                }
+            }, [loading]);
 
             const logTransaction = (item, type, quantity, newStock, invoiceId, recipient, desc, txId) => {
                 const id = txId || generateId();
@@ -1039,6 +1052,56 @@
                 } catch(err){ console.error(err); toast.show('ساخت پشتیبان کامل ناموفق بود'); return false; }
             };
 
+
+            const makeCloudBackupSnapshot = async () => {
+                const local = {};
+                for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k!==TRUSTED_UNLOCK_KEY) local[k]=localStorage.getItem(k); }
+                let secureEnvelope=null; try { secureEnvelope=await idbGet(IDB_DATA_KEY); } catch(e) {}
+                return {
+                    format:'ANBARYAR_FULL_BACKUP', version:2, appBuild:APP_BUILD, schemaVersion:APP_SCHEMA_VERSION, date:new Date().toISOString(),
+                    data:{items,invoices,notes,transactions,purchases,processingOrders,consignments},
+                    settings:appSettings, localStorage:local, securityConfig:getSecurityConfig(), secureEnvelope,
+                    embedded:{
+                        estelamLocal:localStorage.getItem('freightAppData_v2'),
+                        userPurchasesLocal:{autoBackup:localStorage.getItem('autoBackup'),theme:localStorage.getItem('theme')},
+                        invDb:{products:await getIDBAll('InvDB_v4','products'),history:await getIDBAll('InvDB_v4','history')}
+                    }
+                };
+            };
+            const handleCloudUpload = async (automatic=false) => {
+                if(cloudBusy) return;
+                setCloudBusy(true); setCloudError('');
+                try {
+                    const snapshot = await makeCloudBackupSnapshot();
+                    const result = await AY_CLOUD.upload(snapshot);
+                    localStorage.setItem('anbaryar_cloud_last_backup', new Date().toISOString());
+                    const list = await AY_CLOUD.list();
+                    setCloudBackups(list.backups || []);
+                    if(!automatic) toast.show('پشتیبان ابری با موفقیت ذخیره شد');
+                    return result;
+                } catch(err) {
+                    setCloudError(err?.message || 'پشتیبان ابری انجام نشد');
+                    if(!automatic) toast.show('پشتیبان ابری ناموفق بود: ' + (err?.message || 'خطای نامشخص'));
+                } finally { setCloudBusy(false); }
+            };
+            const refreshCloudBackups = async () => {
+                setCloudBusy(true); setCloudError('');
+                try { const list=await AY_CLOUD.list(); setCloudBackups(list.backups || []); }
+                catch(err) { setCloudError(err?.message || 'دریافت فهرست پشتیبان‌ها ناموفق بود'); }
+                finally { setCloudBusy(false); }
+            };
+            const handleCloudRestore = async (id) => {
+                const ok=await confirmAction('این نسخه ابری جایگزین اطلاعات فعلی انباریار می‌شود. قبل از ادامه یک فایل پشتیبان محلی بسازید. ادامه می‌دهید؟');
+                if(!ok) return;
+                try {
+                    setCloudBusy(true);
+                    const backup=await AY_CLOUD.restore(id);
+                    const file=new File([JSON.stringify(backup)],'anbaryar-cloud-restore.aybackup.json',{type:'application/json'});
+                    handleSystemRestore({target:{files:[file]}});
+                } catch(err) { toast.show('بازیابی ابری ناموفق بود: '+(err?.message||'خطای نامشخص')); }
+                finally { setCloudBusy(false); }
+            };
+
             const handleSystemRestore = (e) => {
                 const file = e.target.files?.[0];
                 if(!file) return;
@@ -1326,8 +1389,17 @@
                                 <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
                                     <div className="flex items-center gap-3"><div className="bg-indigo-100 text-indigo-600 p-3 rounded-2xl"><Save size={22}/></div><div><h2 className="text-xl font-black text-slate-800">پشتیبان‌گیری کلی</h2><p className="text-xs text-slate-400 mt-1">تمام اطلاعات، تنظیمات و داده‌های ابزارهای داخلی در یک فایل ذخیره می‌شوند.</p></div></div>
                                     <div className="grid md:grid-cols-2 gap-3 mt-5"><div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 text-xs text-slate-600 leading-6"><b>شامل:</b> کالاها، فاکتورها، خرید، بار در راه، امانی، پردازش، یادداشت‌ها، تنظیمات و داده‌های ابزارهای داخلی.</div><div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4 text-xs text-emerald-700 leading-6"><b>امنیت:</b> کلید ورود موقت ۳۰ دقیقه‌ای در Backup ذخیره نمی‌شود.</div></div>
-                                    <div className="flex flex-wrap gap-3 mt-5"><button onClick={handleSystemBackup} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-full text-sm font-black transition"><Save size={18}/> ساخت پشتیبان کامل</button><label className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-3 rounded-full text-sm font-black cursor-pointer hover:bg-slate-50 transition"><Upload size={18}/> بازیابی<input type="file" accept=".json,.aybackup" className="hidden" onChange={handleSystemRestore}/></label></div>
+                                    <div className="flex flex-wrap gap-3 mt-5"><button onClick={()=>handleCloudUpload(false)} disabled={cloudBusy} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-5 py-3 rounded-full text-sm font-black transition"><Save size={18}/>{cloudBusy?'در حال انجام...':'ذخیره در فضای ابری'}</button><button onClick={refreshCloudBackups} disabled={cloudBusy} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-3 rounded-full text-sm font-black transition"><Upload size={18}/>دریافت فهرست ابری</button><button onClick={handleSystemBackup} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-full text-sm font-black transition"><Save size={18}/> ساخت پشتیبان کامل</button><label className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-3 rounded-full text-sm font-black cursor-pointer hover:bg-slate-50 transition"><Upload size={18}/> بازیابی<input type="file" accept=".json,.aybackup" className="hidden" onChange={handleSystemRestore}/></label></div>
                                 </div>
+
+                                <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mt-5">
+                                    <div className="flex items-center justify-between gap-3"><div><h3 className="text-lg font-black text-slate-800">پشتیبان‌های ابری Supabase</h3><p className="text-xs text-slate-400 mt-1">نسخه خودکار روزانه؛ حداکثر ۳۰ نسخه یا ۶۰۰ مگابایت. قدیمی‌ترین نسخه‌ها پس از ذخیره موفق نسخه جدید حذف می‌شوند.</p></div><span className="text-xs font-bold text-emerald-700">فضای خصوصی</span></div>
+                                    {cloudError && <p className="mt-3 text-xs text-rose-600">{cloudError}</p>}
+                                    <div className="mt-4 space-y-2">
+                                        {cloudBackups.length===0 ? <p className="text-xs text-slate-400">برای مشاهده نسخه‌ها، «دریافت فهرست ابری» را بزنید.</p> : cloudBackups.map(b=><div key={b.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-3"><div className="text-xs"><b>{new Date(b.created_at).toLocaleString('fa-IR')}</b><div className="text-slate-400 mt-1">{(Number(b.size_bytes)/1024/1024).toFixed(2)} مگابایت · {b.app_build||'نسخه نامشخص'}</div></div><button onClick={()=>handleCloudRestore(b.id)} disabled={cloudBusy} className="rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">بازیابی این نسخه</button></div>)}
+                                    </div>
+                                </div>
+
                                 <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mt-5">
                                     <div className="flex items-center gap-3"><div className="bg-teal-100 text-teal-600 p-3 rounded-2xl"><Wrench size={22}/></div><div><h2 className="text-xl font-black text-slate-800">تعمیر ارجاع‌های ادغام قدیمی</h2><p className="text-xs text-slate-400 mt-1">اگر قبل از این نسخه، بارهایی را ادغام کرده بودی که هنوز در امانی/خرید/پردازش گم می‌شدند، اینجا یک‌باره اصلاح می‌شود.</p></div></div>
                                     <button onClick={handleRepairMergedReferences} className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-5 py-3 rounded-full text-sm font-black mt-4 transition"><Wrench size={18}/> بررسی و تعمیر ارجاع‌های قدیمی</button>
