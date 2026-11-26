@@ -132,58 +132,70 @@ const AY_CLOUD = (() => {
         }
         return value;
     };
-    const waitForOfflineOAuthBridge = (popup, sb, nonce) => new Promise((resolve, reject) => {
+    const waitForOAuthPopup = (popup, sb, nonce) => new Promise((resolve, reject) => {
         let finished = false;
+        let processing = false;
+        let channel = null;
         const finish = (err, value) => {
             if (finished) return;
             finished = true;
             clearTimeout(timer);
             window.removeEventListener('message', onMessage);
+            if (channel) channel.close();
             if (err) reject(err); else resolve(value);
         };
         const timer = setTimeout(() => finish(new Error('ورود گوگل به پایان نرسید؛ دوباره تلاش کنید.')), 180000);
-        const onMessage = async (event) => {
-            if (event.origin !== AY_CLOUD_SITE_ORIGIN || event.source !== popup || event.data?.type !== 'ANBARYAR_AUTH_BRIDGE' || event.data?.nonce !== nonce) return;
+        const accept = async (data) => {
+            if (finished || processing || data?.type !== 'ANBARYAR_AUTH_BRIDGE' || data?.nonce !== nonce) return;
+            processing = true;
             try {
-                const { data, error } = await sb.auth.setSession({
-                    access_token: event.data.access_token,
-                    refresh_token: event.data.refresh_token
+                const { data: sessionData, error } = await sb.auth.setSession({
+                    access_token: data.access_token,
+                    refresh_token: data.refresh_token
                 });
                 if (error) throw error;
-                finish(null, data);
-            } catch (e) { finish(e); }
+                finish(null, sessionData);
+            } catch (e) {
+                processing = false;
+                finish(e);
+            }
+        };
+        const onMessage = (event) => {
+            if (event.origin !== AY_CLOUD_SITE_ORIGIN || event.source !== popup) return;
+            accept(event.data);
         };
         window.addEventListener('message', onMessage);
+        // Fallback for browsers whose COOP policy severs window.opener on same-origin hosted tabs.
+        if (window.location.origin === AY_CLOUD_SITE_ORIGIN && typeof BroadcastChannel === 'function') {
+            channel = new BroadcastChannel('anbaryar-auth-bridge');
+            channel.addEventListener('message', event => accept(event.data));
+        }
     });
     const oauth = async (provider, link = false) => {
         const isLocalFile = window.location.protocol === 'file:';
-        // file:// cannot be an OAuth redirect. Authenticate on the hosted copy and explicitly
-        // approve returning the session to the opener once the Google flow is complete.
-        const popup = isLocalFile ? window.open('about:blank', 'anbaryar-google-auth', 'popup,width=560,height=760') : null;
-        if (isLocalFile && !popup) throw new Error('برای ورود گوگل، اجازه‌ی بازشدن پنجره‌ی جدید را بدهید.');
-        const nonce = isLocalFile ? (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()) : '';
-        if (popup) popup.name = 'anbaryar-auth-bridge:' + nonce;
+        // Never redirect the main app. Complete OAuth in a separate popup and return the session.
+        const popup = window.open('about:blank', 'anbaryar-google-auth', 'popup,width=540,height=720');
+        if (!popup) throw new Error('مرورگر پنجره‌ی ورود را مسدود کرد؛ اجازه‌ی بازشدن Pop-up برای انباریار را فعال کن.');
+        const nonce = (window.crypto?.randomUUID ? crypto.randomUUID() : 'ay-' + Date.now() + '-' + Math.random().toString(36).slice(2));
         try {
+            try {
+                popup.document.title = 'ورود امن به انباریار';
+                popup.document.body.innerHTML = '<main dir="rtl" style="font:16px Tahoma,Arial,sans-serif;background:#f1f5f9;color:#0f172a;min-height:100vh;display:grid;place-items:center;text-align:center;padding:24px"><div><strong style="font-size:20px">انبار یار</strong><p style="line-height:2;color:#64748b">در حال آماده‌سازی ورود امن با Google…</p></div></main>';
+            } catch (_) {}
             const sb = await client();
-            let result;
-            let redirectTo = window.location.href;
-            if (isLocalFile) {
-                const redirect = new URL(AY_CLOUD_SITE_URL);
-                redirect.searchParams.set('ay_auth_bridge', nonce);
-                redirectTo = redirect.toString();
-            }
-            const options = isLocalFile
-                ? { redirectTo, skipBrowserRedirect: true }
-                : { redirectTo };
-            if (link) result = await sb.auth.linkIdentity({ provider, options });
-            else result = await sb.auth.signInWithOAuth({ provider, options });
+            // Linking must preserve the anonymous/current account before the Google provider is attached.
+            if (link) await session();
+            const redirect = new URL(AY_CLOUD_SITE_URL);
+            redirect.searchParams.set('ay_auth_bridge', nonce);
+            redirect.searchParams.set('ay_auth_mode', isLocalFile ? 'offline' : 'popup');
+            const options = { redirectTo: redirect.toString(), skipBrowserRedirect: true, scopes: 'openid email profile' };
+            const result = link
+                ? await sb.auth.linkIdentity({ provider, options })
+                : await sb.auth.signInWithOAuth({ provider, options });
             if (result.error) throw result.error;
-            if (isLocalFile) {
-                if (!result.data?.url) throw new Error('نشانی ورود گوگل دریافت نشد.');
-                popup.location.href = result.data.url;
-                return await waitForOfflineOAuthBridge(popup, sb, nonce);
-            }
-            return result.data;
+            if (!result.data?.url) throw new Error('نشانی ورود گوگل دریافت نشد.');
+            popup.location.replace(result.data.url);
+            return await waitForOAuthPopup(popup, sb, nonce);
         } catch (e) {
             try { if (popup && !popup.closed) popup.close(); } catch (_) {}
             throw e;
@@ -206,6 +218,11 @@ const AY_CLOUD = (() => {
             const { data, error } = await sb.auth.getUserIdentities();
             if (error) throw error;
             return { user: current.user, identities: data?.identities || [] };
+        },
+        watchAuth: async (callback) => {
+            const sb = await client();
+            const { data } = sb.auth.onAuthStateChange(callback);
+            return data.subscription;
         },
         linkGoogle: async () => await oauth('google', true),
         signInGoogle: async () => await oauth('google', false),
@@ -251,7 +268,9 @@ const AY_CLOUD = (() => {
             return await decodeGzipResponse(response);
         },
         forwardAuthToOpener: async (nonce) => {
-            if (!window.opener || window.opener === window || !nonce) return false;
+            const canPost = !!window.opener && window.opener !== window;
+            const canBroadcast = window.location.origin === AY_CLOUD_SITE_ORIGIN && typeof BroadcastChannel === 'function';
+            if (!nonce || (!canPost && !canBroadcast)) return false;
             if (new URLSearchParams(window.location.search).get('ay_auth_bridge') !== nonce) return false;
             // Do not rely on window.name; privacy protections may clear it across OAuth domains.
             const sb = await client();
@@ -277,28 +296,65 @@ const AY_CLOUD = (() => {
                 });
             }
             if (!current?.access_token || !current?.refresh_token) return false;
-            window.opener.postMessage({
+            const payload = {
                 type: 'ANBARYAR_AUTH_BRIDGE',
                 access_token: current.access_token,
                 refresh_token: current.refresh_token,
                 nonce
-            }, '*');
-            setTimeout(() => { try { window.close(); } catch(e) {} }, 300);
+            };
+            if (canPost) {
+                try { window.opener.postMessage(payload, '*'); } catch (_) {}
+            }
+            // Same-origin channel fallback for the hosted app if COOP isolates popup handles.
+            if (canBroadcast) {
+                try {
+                    const channel = new BroadcastChannel('anbaryar-auth-bridge');
+                    channel.postMessage(payload);
+                    channel.close();
+                } catch (_) {}
+            }
+            setTimeout(() => { try { window.close(); } catch(e) {} }, 450);
             return true;
         }
     };
 })();
 
-// در ورود از file://، تحویل توکن به پنجره‌ی آفلاین فقط با تأیید صریح کاربر انجام می‌شود.
+// Hosted callback returns the session to its opener using a one-time nonce.
+// Offline file authentication still requires explicit approval before sharing the session.
 (() => {
-    const nonce = new URLSearchParams(window.location.search).get('ay_auth_bridge');
-    if (!window.opener || !nonce) return;
+    const params = new URLSearchParams(window.location.search);
+    const nonce = params.get('ay_auth_bridge');
+    const mode = params.get('ay_auth_mode') || 'offline';
+    if (!nonce || (!window.opener && !(mode === 'popup' && typeof BroadcastChannel === 'function'))) return;
     const show = () => {
         if (!document.body || document.getElementById('ay-auth-bridge-approval')) return;
         const panel = document.createElement('div');
         panel.id = 'ay-auth-bridge-approval';
         panel.dir = 'rtl';
         panel.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(15,23,42,.94);display:flex;align-items:center;justify-content:center;padding:24px;font-family:Tahoma,Arial,sans-serif;color:white';
+        if (mode === 'popup') {
+            panel.innerHTML = '<div style="max-width:440px;background:#fff;color:#0f172a;border-radius:20px;padding:24px;text-align:center;box-shadow:0 20px 60px #0006"><div style="font-size:20px;font-weight:800;margin-bottom:12px">ورود امن به انبار یار</div><p style="font-size:14px;line-height:2;margin:0 0 18px">حساب Google تأیید شد؛ در حال بازگرداندن اتصال به صفحه‌ی اصلی…</p><button id="ay-auth-bridge-retry" style="border:0;border-radius:12px;background:#4f46e5;color:white;font-weight:800;padding:12px 20px;cursor:pointer">تکمیل اتصال</button><p id="ay-auth-bridge-status" style="font-size:12px;color:#64748b;margin:12px 0 0">لطفاً این پنجره را نبندید.</p></div>';
+            document.body.appendChild(panel);
+            const button = panel.querySelector('#ay-auth-bridge-retry');
+            const status = panel.querySelector('#ay-auth-bridge-status');
+            const forward = async () => {
+                button.disabled = true;
+                button.textContent = 'در حال اتصال…';
+                status.textContent = 'در حال انتقال امن نشست به صفحه‌ی اصلی…';
+                try {
+                    const ok = await AY_CLOUD.forwardAuthToOpener(nonce);
+                    if (!ok) throw new Error('نشست ورود آماده نشد؛ اتصال اینترنت را بررسی و دوباره تلاش کن.');
+                    status.textContent = 'اتصال انجام شد؛ این پنجره بسته می‌شود.';
+                } catch (e) {
+                    status.textContent = e?.message || 'انتقال ورود انجام نشد.';
+                    button.disabled = false;
+                    button.textContent = 'تلاش دوباره';
+                }
+            };
+            button.addEventListener('click', forward);
+            forward();
+            return;
+        }
         panel.innerHTML = '<div style="max-width:440px;background:#fff;color:#0f172a;border-radius:20px;padding:24px;text-align:center;box-shadow:0 20px 60px #0006"><div style="font-size:20px;font-weight:800;margin-bottom:12px">اتصال نسخه آفلاین انباریار</div><p style="font-size:14px;line-height:2;margin:0 0 18px">ورود گوگل انجام شده است. با انتخاب دکمه زیر، نشست این حساب به فایل آفلاینی که ورود را آغاز کرده منتقل می‌شود.</p><button id="ay-auth-bridge-approve" style="border:0;border-radius:12px;background:#4f46e5;color:white;font-weight:800;padding:12px 20px;cursor:pointer">تأیید و بازگشت به فایل آفلاین</button><p id="ay-auth-bridge-status" style="font-size:12px;color:#64748b;margin:12px 0 0"></p></div>';
         document.body.appendChild(panel);
         panel.querySelector('#ay-auth-bridge-approve').addEventListener('click', async () => {
@@ -317,5 +373,5 @@ const AY_CLOUD = (() => {
             }
         });
     };
-    setTimeout(show, 1400);
+    setTimeout(show, mode === 'popup' ? 500 : 1400);
 })();
