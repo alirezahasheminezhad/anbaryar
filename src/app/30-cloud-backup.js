@@ -5,6 +5,7 @@ const AY_CLOUD_KEY = 'sb_publishable_AhAgG-9rYk_PwD3cFjNCAA_bzK06eO2';
 const AY_CLOUD_FUNCTION = AY_CLOUD_URL + '/functions/v1/anbaryar-cloud-backup';
 const AY_CLOUD = (() => {
     let clientPromise = null;
+    let sessionPromise = null;
     const client = () => {
         if (!clientPromise) clientPromise = import('https://esm.sh/@supabase/supabase-js@2')
             .then(({ createClient }) => createClient(AY_CLOUD_URL, AY_CLOUD_KEY, {
@@ -13,15 +14,20 @@ const AY_CLOUD = (() => {
         return clientPromise;
     };
     const session = async () => {
-        const sb = await client();
-        let { data: { session } } = await sb.auth.getSession();
-        if (!session) {
-            const result = await sb.auth.signInAnonymously();
-            if (result.error) throw result.error;
-            session = result.data.session;
-        }
-        if (!session?.access_token) throw new Error('ورود ابری انجام نشد.');
-        return session;
+        if (sessionPromise) return await sessionPromise;
+        sessionPromise = (async () => {
+            const sb = await client();
+            let { data: { session } } = await sb.auth.getSession();
+            if (!session) {
+                const result = await sb.auth.signInAnonymously();
+                if (result.error) throw result.error;
+                session = result.data.session;
+            }
+            if (!session?.access_token) throw new Error('ورود ابری انجام نشد.');
+            return session;
+        })();
+        try { return await sessionPromise; }
+        finally { sessionPromise = null; }
     };
     const call = async (action, options = {}) => {
         const current = await session();
