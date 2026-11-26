@@ -9,7 +9,7 @@
         const IDB_DATA_KEY = 'secure-data';
         const IDB_FALLBACK_KEY = 'plain-data-fallback';
         const APP_SCHEMA_VERSION = 11;
-        const APP_BUILD = '10.20-google-popup-profile';
+        const APP_BUILD = '10.21-cloud-key-session-cache';
 
         // ------------------------------------------------------------------
         // امنیت و ذخیره‌سازی محلی، IndexedDB
