@@ -18461,6 +18461,7 @@ const App = () => {
   const [cloudBackups, setCloudBackups] = useState([]);
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudError, setCloudError] = useState('');
+  const [cloudAccount, setCloudAccount] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingItem, setEditingItem] = useState(null);
   const [historyItem, setHistoryItem] = useState(null);
@@ -20055,12 +20056,29 @@ const App = () => {
     setCloudBusy(true);
     setCloudError('');
     try {
-      const list = await AY_CLOUD.list();
+      const [list, account] = await Promise.all([AY_CLOUD.list(), AY_CLOUD.account()]);
       setCloudBackups(list.backups || []);
+      setCloudAccount(account);
     } catch (err) {
       setCloudError(err?.message || 'دریافت فهرست پشتیبان‌ها ناموفق بود');
     } finally {
       setCloudBusy(false);
+    }
+  };
+  const handleCloudLinkGoogle = async () => {
+    try {
+      setCloudError('');
+      await AY_CLOUD.linkGoogle();
+    } catch (err) {
+      setCloudError(err?.message || 'اتصال گوگل انجام نشد');
+    }
+  };
+  const handleCloudGoogleLogin = async () => {
+    try {
+      setCloudError('');
+      await AY_CLOUD.signInGoogle();
+    } catch (err) {
+      setCloudError(err?.message || 'ورود با گوگل انجام نشد');
     }
   };
   const handleCloudRestore = async id => {
@@ -20633,6 +20651,26 @@ const App = () => {
     className: "flex items-center justify-between gap-3"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
     className: "text-lg font-black text-slate-800"
+  }, "\u062D\u0633\u0627\u0628 \u0627\u0628\u0631\u06CC \u0627\u0646\u0628\u0627\u0631\u06CC\u0627\u0631"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400 mt-1"
+  }, cloudAccount?.user?.email || (cloudAccount?.user?.is_anonymous ? "حساب موقت این دستگاه" : "برای بررسی وضعیت، فهرست را تازه‌سازی کنید"))), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-emerald-700"
+  }, "Supabase Auth")), /*#__PURE__*/React.createElement("p", {
+    className: "mt-3 text-xs text-slate-500"
+  }, "\u0628\u0631\u0627\u06CC \u062D\u0641\u0638 \u0646\u0633\u062E\u0647\u200C\u0647\u0627\u06CC \u0647\u0645\u06CC\u0646 \u062F\u0633\u062A\u06AF\u0627\u0647\u060C \u06AF\u0648\u06AF\u0644 \u0631\u0627 \u0628\u0647 \u062D\u0633\u0627\u0628 \u0641\u0639\u0644\u06CC \u067E\u06CC\u0648\u0646\u062F \u0628\u0632\u0646\u06CC\u062F. \u0628\u0631\u0627\u06CC \u062F\u0633\u062A\u0631\u0633\u06CC \u0628\u0647 \u062D\u0633\u0627\u0628\u06CC \u06A9\u0647 \u0642\u0628\u0644\u0627\u064B \u0631\u0648\u06CC \u062F\u0633\u062A\u06AF\u0627\u0647 \u062F\u06CC\u06AF\u0631\u06CC \u0645\u062A\u0635\u0644 \u06A9\u0631\u062F\u0647\u200C\u0627\u06CC\u062F\u060C \u0627\u0632 \u0648\u0631\u0648\u062F \u0628\u0627 \u06AF\u0648\u06AF\u0644 \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u06A9\u0646\u06CC\u062F."), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-2 mt-4"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: handleCloudLinkGoogle,
+    className: "rounded-full bg-slate-900 px-4 py-2.5 text-xs font-bold text-white"
+  }, "\u0627\u062A\u0635\u0627\u0644 \u06AF\u0648\u06AF\u0644 \u0628\u0647 \u0647\u0645\u06CC\u0646 \u062F\u0633\u062A\u06AF\u0627\u0647"), /*#__PURE__*/React.createElement("button", {
+    onClick: handleCloudGoogleLogin,
+    className: "rounded-full border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700"
+  }, "\u0648\u0631\u0648\u062F \u0628\u0627 \u062D\u0633\u0627\u0628 Google"))), /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mt-5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-3"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    className: "text-lg font-black text-slate-800"
   }, "\u067E\u0634\u062A\u06CC\u0628\u0627\u0646\u200C\u0647\u0627\u06CC \u0627\u0628\u0631\u06CC Supabase"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-400 mt-1"
   }, "\u0646\u0633\u062E\u0647 \u062E\u0648\u062F\u06A9\u0627\u0631 \u0631\u0648\u0632\u0627\u0646\u0647\u061B \u062D\u062F\u0627\u06A9\u062B\u0631 \u06F3\u06F0 \u0646\u0633\u062E\u0647 \u06CC\u0627 \u06F6\u06F0\u06F0 \u0645\u06AF\u0627\u0628\u0627\u06CC\u062A. \u0642\u062F\u06CC\u0645\u06CC\u200C\u062A\u0631\u06CC\u0646 \u0646\u0633\u062E\u0647\u200C\u0647\u0627 \u067E\u0633 \u0627\u0632 \u0630\u062E\u06CC\u0631\u0647 \u0645\u0648\u0641\u0642 \u0646\u0633\u062E\u0647 \u062C\u062F\u06CC\u062F \u062D\u0630\u0641 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F.")), /*#__PURE__*/React.createElement("span", {
@@ -20826,7 +20864,7 @@ const AY_CLOUD = (() => {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: false
+        detectSessionInUrl: true
       }
     }));
     return clientPromise;
@@ -20894,6 +20932,48 @@ const AY_CLOUD = (() => {
       });
     },
     list: async () => await call('list'),
+    account: async () => {
+      const sb = await client();
+      const current = await session();
+      const {
+        data,
+        error
+      } = await sb.auth.getUserIdentities();
+      if (error) throw error;
+      return {
+        user: current.user,
+        identities: data?.identities || []
+      };
+    },
+    linkGoogle: async () => {
+      const sb = await client();
+      await session();
+      const {
+        data,
+        error
+      } = await sb.auth.linkIdentity({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.href
+        }
+      });
+      if (error) throw error;
+      return data;
+    },
+    signInGoogle: async () => {
+      const sb = await client();
+      const {
+        data,
+        error
+      } = await sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.href
+        }
+      });
+      if (error) throw error;
+      return data;
+    },
     restore: async id => {
       const response = await call('restore', {
         body: JSON.stringify({
