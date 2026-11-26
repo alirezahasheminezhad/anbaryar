@@ -21177,6 +21177,12 @@ const AY_CLOUD_KEY = 'sb_publishable_AhAgG-9rYk_PwD3cFjNCAA_bzK06eO2';
 const AY_CLOUD_FUNCTION = AY_CLOUD_URL + '/functions/v1/anbaryar-cloud-backup';
 const AY_CLOUD_SITE_URL = 'https://alirezahasheminezhad.github.io/anbaryar/';
 const AY_CLOUD_SITE_ORIGIN = 'https://alirezahasheminezhad.github.io';
+// کلید ابری از رمز اولین دستگاه مشتق می‌شود و در حافظه‌ی همین تب می‌ماند؛ هر دستگاه با واردکردن رمز آن را باز می‌کند.
+const AY_CLOUD_CRYPTO = {
+  key: null,
+  saltB64: '',
+  hashB64: ''
+};
 const AY_CLOUD = (() => {
   let clientPromise = null;
   let sessionPromise = null;
@@ -21258,16 +21264,64 @@ const AY_CLOUD = (() => {
     if (!('DecompressionStream' in window)) throw new Error('مرورگر از بازکردن پشتیبان فشرده پشتیبانی نمی‌کند.');
     const stream = response.body.pipeThrough(new DecompressionStream('gzip'));
     const decoded = JSON.parse(await new Response(stream).text());
-    if (decoded?.format === 'ANBARYAR_CLOUD_ENCRYPTED') {
-      if (!AY_SECURITY.key) throw new Error('این نسخه رمزنگاری شده است؛ ابتدا با همان رمز انباریار وارد شوید.');
-      return await decryptAY(decoded.envelope);
+    if (decoded?.format !== 'ANBARYAR_CLOUD_ENCRYPTED') return decoded;
+
+    // فرمت جدید: کلید رمزنگاری ابری با PBKDF2 از رمز مشترک و salt ذخیره‌شده در envelope مشتق می‌شود؛
+    // به این ترتیب رمز محلی هر مرورگر می‌تواند متفاوت باشد و داده همچنان بین دستگاه‌ها قابل بازیابی است.
+    if (decoded.saltB64 && decoded.hashB64) {
+      const cachedMatches = AY_CLOUD_CRYPTO.key && AY_CLOUD_CRYPTO.saltB64 === decoded.saltB64 && AY_CLOUD_CRYPTO.hashB64 === decoded.hashB64;
+      if (cachedMatches) return await decryptAY(decoded.envelope, AY_CLOUD_CRYPTO.key);
+      const localConfig = typeof getSecurityConfig === 'function' ? getSecurityConfig() : null;
+      if (AY_SECURITY?.key && localConfig?.salt === decoded.saltB64 && localConfig?.hash === decoded.hashB64) {
+        AY_CLOUD_CRYPTO.key = AY_SECURITY.key;
+        AY_CLOUD_CRYPTO.saltB64 = decoded.saltB64;
+        AY_CLOUD_CRYPTO.hashB64 = decoded.hashB64;
+        return await decryptAY(decoded.envelope, AY_CLOUD_CRYPTO.key);
+      }
+      const password = window.prompt('برای بازکردن داده‌های ابری انباریار، رمز ابریِ دستگاهی را وارد کن که نخستین بار این همگام‌سازی را راه‌اندازی کرده است:');
+      if (!password) throw new Error('بازکردن نسخه‌ی ابری لغو شد؛ رمز ابری وارد نشد.');
+      const verifier = await passwordVerifier(password, decoded.saltB64);
+      if (verifier !== decoded.hashB64) throw new Error('رمز ابری نادرست است. اطلاعات محلی دست‌نخورده باقی ماند.');
+      const key = await deriveAYKey(password, decoded.saltB64);
+      const value = await decryptAY(decoded.envelope, key);
+      AY_CLOUD_CRYPTO.key = key;
+      AY_CLOUD_CRYPTO.saltB64 = decoded.saltB64;
+      AY_CLOUD_CRYPTO.hashB64 = decoded.hashB64;
+      return value;
     }
-    return decoded;
+
+    // سازگاری با بکاپ‌های رمزنگاری‌شده‌ی قدیمی که salt همراه envelope ذخیره نمی‌شد.
+    if (!AY_SECURITY?.key) throw new Error('این نسخه از بکاپ با رمزنگاری قدیمی ساخته شده و فقط روی دستگاه اصلی قابل بازشدن است.');
+    return await decryptAY(decoded.envelope);
   };
-  const secureValue = async value => typeof AY_SECURITY !== 'undefined' && AY_SECURITY.key ? {
-    format: 'ANBARYAR_CLOUD_ENCRYPTED',
-    envelope: await encryptAY(value)
-  } : value;
+  const secureValue = async value => {
+    // پس از اولین دریافت، از همان کلید مشترک ابری استفاده می‌کنیم؛ قفل محلی هر دستگاه مستقل باقی می‌ماند.
+    if (AY_CLOUD_CRYPTO.key) {
+      return {
+        format: 'ANBARYAR_CLOUD_ENCRYPTED',
+        version: 2,
+        saltB64: AY_CLOUD_CRYPTO.saltB64,
+        hashB64: AY_CLOUD_CRYPTO.hashB64,
+        envelope: await encryptAY(value, AY_CLOUD_CRYPTO.key)
+      };
+    }
+    const localConfig = typeof getSecurityConfig === 'function' ? getSecurityConfig() : null;
+    if (localConfig) {
+      if (!AY_SECURITY?.key) throw new Error('برای همگام‌سازی امن، ابتدا قفل انباریار را با رمز باز کن.');
+      if (!localConfig.salt || !localConfig.hash) throw new Error('تنظیمات رمزنگاری این دستگاه کامل نیست.');
+      AY_CLOUD_CRYPTO.key = AY_SECURITY.key;
+      AY_CLOUD_CRYPTO.saltB64 = localConfig.salt;
+      AY_CLOUD_CRYPTO.hashB64 = localConfig.hash;
+      return {
+        format: 'ANBARYAR_CLOUD_ENCRYPTED',
+        version: 2,
+        saltB64: localConfig.salt,
+        hashB64: localConfig.hash,
+        envelope: await encryptAY(value, AY_CLOUD_CRYPTO.key)
+      };
+    }
+    return value;
+  };
   const waitForOfflineOAuthBridge = (popup, sb, nonce) => new Promise((resolve, reject) => {
     let finished = false;
     const finish = (err, value) => {
