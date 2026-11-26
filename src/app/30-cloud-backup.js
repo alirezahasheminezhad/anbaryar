@@ -79,7 +79,7 @@ const AY_CLOUD = (() => {
             ? { format: 'ANBARYAR_CLOUD_ENCRYPTED', envelope: await encryptAY(value) }
             : value
     );
-    const waitForOfflineOAuthBridge = (popup, sb) => new Promise((resolve, reject) => {
+    const waitForOfflineOAuthBridge = (popup, sb, nonce) => new Promise((resolve, reject) => {
         let finished = false;
         const finish = (err, value) => {
             if (finished) return;
@@ -90,7 +90,7 @@ const AY_CLOUD = (() => {
         };
         const timer = setTimeout(() => finish(new Error('ورود گوگل به پایان نرسید؛ دوباره تلاش کنید.')), 180000);
         const onMessage = async (event) => {
-            if (event.origin !== AY_CLOUD_SITE_ORIGIN || event.source !== popup || event.data?.type !== 'ANBARYAR_AUTH_BRIDGE') return;
+            if (event.origin !== AY_CLOUD_SITE_ORIGIN || event.source !== popup || event.data?.type !== 'ANBARYAR_AUTH_BRIDGE' || event.data?.nonce !== nonce) return;
             try {
                 const { data, error } = await sb.auth.setSession({
                     access_token: event.data.access_token,
@@ -104,23 +104,31 @@ const AY_CLOUD = (() => {
     });
     const oauth = async (provider, link = false) => {
         const isLocalFile = window.location.protocol === 'file:';
-        // در فایل file:// پنجره‌ی بازگشت OAuth نمی‌تواند به آدرس فایل برگردد؛
-        // ورود در صفحه‌ی وب انجام می‌شود و نشست امن با postMessage به فایل برمی‌گردد.
+        // file:// cannot be an OAuth redirect. Authenticate on the hosted copy and explicitly
+        // approve returning the session to the opener once the Google flow is complete.
         const popup = isLocalFile ? window.open('about:blank', 'anbaryar-google-auth', 'popup,width=560,height=760') : null;
         if (isLocalFile && !popup) throw new Error('برای ورود گوگل، اجازه‌ی بازشدن پنجره‌ی جدید را بدهید.');
+        const nonce = isLocalFile ? (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()) : '';
+        if (popup) popup.name = 'anbaryar-auth-bridge:' + nonce;
         try {
             const sb = await client();
             let result;
+            let redirectTo = window.location.href;
+            if (isLocalFile) {
+                const redirect = new URL(AY_CLOUD_SITE_URL);
+                redirect.searchParams.set('ay_auth_bridge', nonce);
+                redirectTo = redirect.toString();
+            }
             const options = isLocalFile
-                ? { redirectTo: AY_CLOUD_SITE_URL, skipBrowserRedirect: true }
-                : { redirectTo: window.location.href };
+                ? { redirectTo, skipBrowserRedirect: true }
+                : { redirectTo };
             if (link) result = await sb.auth.linkIdentity({ provider, options });
             else result = await sb.auth.signInWithOAuth({ provider, options });
             if (result.error) throw result.error;
             if (isLocalFile) {
                 if (!result.data?.url) throw new Error('نشانی ورود گوگل دریافت نشد.');
                 popup.location.href = result.data.url;
-                return await waitForOfflineOAuthBridge(popup, sb);
+                return await waitForOfflineOAuthBridge(popup, sb, nonce);
             }
             return result.data;
         } catch (e) {
@@ -188,8 +196,10 @@ const AY_CLOUD = (() => {
             const response = await callRaw('restore', { body: JSON.stringify({ action: 'restore', id }) });
             return await decodeGzipResponse(response);
         },
-        forwardAuthToOpener: async () => {
-            if (!window.opener || window.opener === window) return false;
+        forwardAuthToOpener: async (nonce) => {
+            if (!window.opener || window.opener === window || !nonce) return false;
+            if (new URLSearchParams(window.location.search).get('ay_auth_bridge') !== nonce) return false;
+            if (window.name !== 'anbaryar-auth-bridge:' + nonce) return false;
             const sb = await client();
             let { data: { session: current } } = await sb.auth.getSession();
             if (!current) {
@@ -205,7 +215,8 @@ const AY_CLOUD = (() => {
             window.opener.postMessage({
                 type: 'ANBARYAR_AUTH_BRIDGE',
                 access_token: current.access_token,
-                refresh_token: current.refresh_token
+                refresh_token: current.refresh_token,
+                nonce
             }, '*');
             setTimeout(() => { try { window.close(); } catch(e) {} }, 300);
             return true;
@@ -213,5 +224,33 @@ const AY_CLOUD = (() => {
     };
 })();
 
-// اگر این صفحه مقصد یک پنجره‌ی ورود گوگل از نسخه‌ی file:// باشد، نشست را به پنجره‌ی مبدأ تحویل بده.
-if (window.opener) setTimeout(() => AY_CLOUD.forwardAuthToOpener().catch(e => console.warn('Auth bridge:', e)), 900);
+// در ورود از file://، تحویل توکن به پنجره‌ی آفلاین فقط با تأیید صریح کاربر انجام می‌شود.
+(() => {
+    const nonce = new URLSearchParams(window.location.search).get('ay_auth_bridge');
+    if (!window.opener || !nonce || window.name !== 'anbaryar-auth-bridge:' + nonce) return;
+    const show = () => {
+        if (!document.body || document.getElementById('ay-auth-bridge-approval')) return;
+        const panel = document.createElement('div');
+        panel.id = 'ay-auth-bridge-approval';
+        panel.dir = 'rtl';
+        panel.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(15,23,42,.94);display:flex;align-items:center;justify-content:center;padding:24px;font-family:Tahoma,Arial,sans-serif;color:white';
+        panel.innerHTML = '<div style="max-width:440px;background:#fff;color:#0f172a;border-radius:20px;padding:24px;text-align:center;box-shadow:0 20px 60px #0006"><div style="font-size:20px;font-weight:800;margin-bottom:12px">اتصال نسخه آفلاین انباریار</div><p style="font-size:14px;line-height:2;margin:0 0 18px">ورود گوگل انجام شده است. با انتخاب دکمه زیر، نشست این حساب به فایل آفلاینی که ورود را آغاز کرده منتقل می‌شود.</p><button id="ay-auth-bridge-approve" style="border:0;border-radius:12px;background:#4f46e5;color:white;font-weight:800;padding:12px 20px;cursor:pointer">تأیید و بازگشت به فایل آفلاین</button><p id="ay-auth-bridge-status" style="font-size:12px;color:#64748b;margin:12px 0 0"></p></div>';
+        document.body.appendChild(panel);
+        panel.querySelector('#ay-auth-bridge-approve').addEventListener('click', async () => {
+            const button = panel.querySelector('#ay-auth-bridge-approve');
+            const status = panel.querySelector('#ay-auth-bridge-status');
+            button.disabled = true;
+            button.textContent = 'در حال انتقال ورود...';
+            try {
+                const ok = await AY_CLOUD.forwardAuthToOpener(nonce);
+                if (!ok) throw new Error('نشست ورود هنوز آماده نیست. چند لحظه بعد دوباره تلاش کن.');
+                status.textContent = 'ورود منتقل شد؛ می‌توانی این پنجره را ببندی.';
+            } catch (e) {
+                status.textContent = e?.message || 'انتقال ورود انجام نشد.';
+                button.disabled = false;
+                button.textContent = 'تلاش دوباره';
+            }
+        });
+    };
+    setTimeout(show, 1400);
+})();
