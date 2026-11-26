@@ -1092,6 +1092,10 @@
                 finally { setCloudBusy(false); }
             };
 
+            useEffect(() => {
+                if (view === 'backup') refreshCloudBackups();
+            }, [view]);
+
             const handleCloudLinkGoogle = async () => {
                 try { setCloudError(''); await AY_CLOUD.linkGoogle(); }
                 catch(err) { setCloudError(err?.message || 'اتصال گوگل انجام نشد'); }
