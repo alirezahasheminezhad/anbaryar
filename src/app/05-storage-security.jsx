@@ -115,7 +115,13 @@
             return { items:data.items||[], invoices:data.invoices||[], notes:data.notes||[], transactions:data.transactions||[], purchases:data.purchases||[], processingOrders:data.processingOrders||[], consignments:data.consignments||[] };
         };
 
-        const saveSettings = (settings) => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch(e) {} };
+        const saveSettings = (settings) => {
+            try {
+                localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+                // تغییر تنظیمات هم باید در همگام‌سازی ابری بعدی لحاظ شود.
+                localStorage.setItem('anbary_cloud_sync_force_dirty', String(Date.now()) + ':' + Math.random().toString(36).slice(2));
+            } catch(e) {}
+        };
         const loadSettings = () => {
             const defaults = { loadingCostPerTon: 200000, loadingWeightIncrementKg: 1000, loadingWeightRoundUpThreshold: 0.9, loadingMinWeightEnabled: false, loadingMinWeightKg: 1000, lowStockThreshold: 100, standardNotices: [], warehouses: [], criticalMutes: {}, criticalGroups: [], autoLockMinutes: 30, mahakMappings: {}, mahakLastSync: null, mahakDefaultWarehouseId: '',
                 // موجودی کیسه‌ی مادر (خالی) به تفکیک رنگ/محصول — خودِ انبار اصلی این را به حساب نمی‌آورد؛

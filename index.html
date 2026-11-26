@@ -2844,6 +2844,8 @@ const normalizeData = data => {
 const saveSettings = settings => {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    // تغییر تنظیمات هم باید در همگام‌سازی ابری بعدی لحاظ شود.
+    localStorage.setItem('anbary_cloud_sync_force_dirty', String(Date.now()) + ':' + Math.random().toString(36).slice(2));
   } catch (e) {}
 };
 const loadSettings = () => {
@@ -18462,6 +18464,11 @@ const App = () => {
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudError, setCloudError] = useState('');
   const [cloudAccount, setCloudAccount] = useState(null);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState('idle');
+  const [cloudSyncRevision, setCloudSyncRevision] = useState(() => Number(localStorage.getItem('anbary_cloud_sync_revision') || 0));
+  const [cloudSyncConflict, setCloudSyncConflict] = useState(null);
+  const [cloudEmail, setCloudEmail] = useState('');
+  const [cloudEmailSent, setCloudEmailSent] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingItem, setEditingItem] = useState(null);
   const [historyItem, setHistoryItem] = useState(null);
@@ -18485,6 +18492,11 @@ const App = () => {
   // hash (که از خودِ view می‌آید) در listener نادیده گرفته می‌شود تا editingInvoice هنگام ویرایش فاکتور پاک نشود.
   const lastProgHashRef = useRef(null);
   useEffect(() => {
+    // Supabase باید callback ورود را بخواند؛ تغییر زودهنگام hash می‌تواند token/code را پاک کند.
+    const search = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+    const isAuthCallback = search.has('code') || search.has('token_hash') || search.has('ay_auth_bridge') || search.has('access_token') || hash.has('access_token') || hash.has('code') || hash.has('error') || hash.has('error_description');
+    if (isAuthCallback) return;
     const target = '#' + view;
     if (window.location.hash !== target) {
       lastProgHashRef.current = target;
@@ -18536,6 +18548,10 @@ const App = () => {
   // نسل داده: هر بازیابی پشتیبان آن را جلو می‌برد تا اگر بارگذاری اولیه هنوز در جریان بود،
   // نتیجه‌ی قدیمیِ آن روی داده‌ی تازه بازیابی‌شده نوشته نشود (باگ پریدن داده بعد از رفرش).
   const ayDataGenRef = useRef(0);
+  const ayInitialSaveRef = useRef(true);
+  const ayCloudSyncBusyRef = useRef(false);
+  const ayCloudSyncStartupRef = useRef(false);
+  const ayCloudMutationSeqRef = useRef(0);
   useEffect(() => {
     let alive = true;
     const gen = ayDataGenRef.current;
@@ -18557,6 +18573,11 @@ const App = () => {
   }, []);
   useEffect(() => {
     if (loading) return;
+    // اولین اجرا فقط داده‌ی موجود را hydrate کرده است؛ ذخیره‌ی مجدد لازم نیست.
+    if (ayInitialSaveRef.current) {
+      ayInitialSaveRef.current = false;
+      return;
+    }
     // debounce کوتاه: تغییرهای پشت‌سرهم (تایپ/چند setState) یک‌بار ذخیره شوند.
     const t = setTimeout(async () => {
       try {
@@ -18572,7 +18593,7 @@ const App = () => {
     return () => clearTimeout(t);
   }, [items, invoices, notes, transactions, purchases, processingOrders, consignments, loading]);
   useEffect(() => {
-    if (loading) return;
+    if (loading || !navigator.onLine || new URLSearchParams(window.location.search).has('ay_auth_bridge')) return;
     const last = Date.parse(localStorage.getItem('anbaryar_cloud_last_backup') || '');
     if (!last || Date.now() - last >= 24 * 60 * 60 * 1000) {
       const timer = setTimeout(() => {
@@ -18580,7 +18601,54 @@ const App = () => {
       }, 2500);
       return () => clearTimeout(timer);
     }
+  }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings, cloudSyncConflict]);
+
+  // همگام‌سازی خودکار: ذخیره‌ی محلی همیشه اول انجام می‌شود؛ بعد از آن نسخه‌ی کامل به ابر می‌رود.
+  // شروع اولیه از داده‌ی محلی/ابری تشخیص داده می‌شود و تغییرات بعدی با تأخیر کوتاه تجمیع می‌شوند.
+  useEffect(() => {
+    if (loading || new URLSearchParams(window.location.search).has('ay_auth_bridge')) return;
+    ayCloudMutationSeqRef.current += 1;
   }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings]);
+  useEffect(() => {
+    if (loading || new URLSearchParams(window.location.search).has('ay_auth_bridge')) return;
+    const reason = ayCloudSyncStartupRef.current ? 'local-change' : 'startup';
+    ayCloudSyncStartupRef.current = true;
+    const timer = setTimeout(() => handleCloudSync(reason), reason === 'startup' ? 2400 : 1600);
+    return () => clearTimeout(timer);
+  }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings, cloudSyncConflict]);
+  useEffect(() => {
+    if (loading || new URLSearchParams(window.location.search).has('ay_auth_bridge')) return;
+    const retry = () => {
+      if (navigator.onLine && document.visibilityState === 'visible') {
+        handleCloudSync('poll');
+        const last = Date.parse(localStorage.getItem('anbary_cloud_last_backup') || '');
+        if (!last || Date.now() - last >= 24 * 60 * 60 * 1000) handleCloudUpload(true);
+      }
+    };
+    window.addEventListener('online', retry);
+    window.addEventListener('focus', retry);
+    document.addEventListener('visibilitychange', retry);
+    const timer = setInterval(retry, 15000);
+    return () => {
+      window.removeEventListener('online', retry);
+      window.removeEventListener('focus', retry);
+      document.removeEventListener('visibilitychange', retry);
+      clearInterval(timer);
+    };
+  }, [loading, items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings, cloudSyncConflict]);
+
+  // ابزار استعلام در iframe هم‌مبدأ است؛ تغییر localStorage آن از پنجره‌ی اصلی با storage event دیده می‌شود.
+  useEffect(() => {
+    const embeddedKeys = new Set(['freightAppData_v2', 'autoBackup', 'theme']);
+    const onStorage = event => {
+      if (event.key && embeddedKeys.has(event.key)) {
+        localStorage.setItem('anbary_cloud_sync_force_dirty', String(Date.now()) + ':' + Math.random().toString(36).slice(2));
+        handleCloudSync('embedded-change');
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [items, invoices, notes, transactions, purchases, processingOrders, consignments, appSettings, cloudSyncConflict]);
   const logTransaction = (item, type, quantity, newStock, invoiceId, recipient, desc, txId) => {
     const id = txId || generateId();
     const newTx = {
@@ -19935,7 +20003,7 @@ const App = () => {
       const local = {};
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && k !== TRUSTED_UNLOCK_KEY) local[k] = localStorage.getItem(k);
+        if (k && k !== TRUSTED_UNLOCK_KEY && !k.startsWith('sb-') && !k.startsWith('anbary_cloud_sync_') && k !== 'anbary_cloud_last_backup' && k !== 'anbary_local_updated_at' && k !== 'anbary_cloud_device_id') local[k] = localStorage.getItem(k);
       }
       let secureEnvelope = null;
       try {
@@ -20065,6 +20133,279 @@ const App = () => {
       setCloudBusy(false);
     }
   };
+  const getCloudDeviceId = () => {
+    let id = localStorage.getItem('anbaryar_cloud_device_id');
+    if (!id) {
+      id = window.crypto?.randomUUID ? crypto.randomUUID() : 'ay-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+      localStorage.setItem('anbaryar_cloud_device_id', id);
+    }
+    return id;
+  };
+  const applyCloudSyncRecord = async (record, ownerId) => {
+    const raw = record?.snapshot || {};
+    const source = raw?.format === 'ANBARYAR_FULL_BACKUP' ? raw.data || {} : raw?.data && (raw.data.items || raw.data.invoices) ? raw.data : raw;
+    const restored = normalizeData(JSON.parse(JSON.stringify(source || {})));
+    if (!Array.isArray(restored.items) || !Array.isArray(restored.invoices)) throw new Error('ساختار نسخه‌ی ابری معتبر نیست.');
+    ayDataGenRef.current++;
+    setItems(restored.items);
+    setInvoices(restored.invoices);
+    setNotes(restored.notes);
+    setTransactions(restored.transactions);
+    setPurchases(restored.purchases);
+    setProcessingOrders(restored.processingOrders);
+    setConsignments(restored.consignments);
+    if (raw?.settings && typeof raw.settings === 'object') {
+      const merged = {
+        ...appSettings,
+        ...raw.settings
+      };
+      setAppSettings(merged);
+      saveSettings(merged);
+    }
+    if (raw?.localStorage && typeof raw.localStorage === 'object') {
+      Object.entries(raw.localStorage).forEach(([key, value]) => {
+        if (key === TRUSTED_UNLOCK_KEY || key === SECURITY_KEY || key === STORAGE_KEY) return;
+        if (key.startsWith('anbary_cloud_sync_') || key === 'anbary_cloud_last_backup' || key === 'anbary_local_updated_at' || key === 'anbary_cloud_device_id' || key.startsWith('sb-')) return;
+        try {
+          localStorage.setItem(key, value);
+        } catch (e) {}
+      });
+    }
+    if (raw?.embedded?.estelamLocal != null) {
+      try {
+        localStorage.setItem('freightAppData_v2', raw.embedded.estelamLocal);
+      } catch (e) {}
+    }
+    if (raw?.embedded?.userPurchasesLocal) {
+      Object.entries(raw.embedded.userPurchasesLocal).forEach(([key, value]) => {
+        if (value != null) try {
+          localStorage.setItem(key, value);
+        } catch (e) {}
+      });
+    }
+    if (raw?.embedded?.invDb) {
+      await restoreIDBAll('InvDB_v4', 'products', raw.embedded.invDb.products || []);
+      await restoreIDBAll('InvDB_v4', 'history', raw.embedded.invDb.history || []);
+    }
+    await saveData(restored.items, restored.invoices, restored.notes, restored.transactions, restored.purchases, restored.processingOrders, restored.consignments);
+    await new Promise(resolve => setTimeout(resolve, 900));
+    const localUpdated = localStorage.getItem('anbary_local_updated_at') || '';
+    localStorage.setItem('anbary_cloud_sync_revision', String(record.revision || 0));
+    localStorage.setItem('anbary_cloud_sync_owner', ownerId || '');
+    localStorage.setItem('anbary_cloud_sync_local_updated_at', localUpdated);
+    localStorage.removeItem('anbary_cloud_sync_force_dirty');
+    setCloudSyncRevision(Number(record.revision || 0));
+    setCloudSyncConflict(null);
+    setCloudSyncStatus('synced');
+  };
+  const handleCloudSync = async (reason = 'manual') => {
+    if (ayCloudSyncBusyRef.current) return;
+    if (!navigator.onLine) {
+      setCloudSyncStatus('offline');
+      return;
+    }
+    if (cloudSyncConflict) return;
+    ayCloudSyncBusyRef.current = true;
+    setCloudSyncStatus('syncing');
+    let retryAfterSync = false;
+    try {
+      const account = await AY_CLOUD.account();
+      setCloudAccount(account);
+      const ownerId = account?.user?.id || '';
+      const sameOwner = !!ownerId && localStorage.getItem('anbary_cloud_sync_owner') === ownerId;
+      const localRevision = sameOwner ? Number(localStorage.getItem('anbary_cloud_sync_revision') || 0) : 0;
+      const currentLocalUpdated = localStorage.getItem('anbary_local_updated_at') || '';
+      const lastSyncedLocalUpdated = sameOwner ? localStorage.getItem('anbary_cloud_sync_local_updated_at') || '' : '';
+      const forceDirty = !!localStorage.getItem('anbary_cloud_sync_force_dirty');
+      const localHasData = !!(items.length || invoices.length || notes.length || transactions.length || purchases.length || processingOrders.length || consignments.length || currentLocalUpdated || forceDirty);
+      const localDirty = forceDirty || currentLocalUpdated && currentLocalUpdated !== lastSyncedLocalUpdated;
+      const remoteMeta = await AY_CLOUD.syncMeta();
+      const deviceId = getCloudDeviceId();
+      const pushLocal = async baseRevision => {
+        const mutationAtStart = ayCloudMutationSeqRef.current;
+        const snapshot = await makeCloudBackupSnapshot();
+        // اگر داده هنگام آماده‌سازی snapshot عوض شد، نسخه‌ی ناقص را به ابر نفرست.
+        if (mutationAtStart !== ayCloudMutationSeqRef.current) {
+          retryAfterSync = true;
+          return null;
+        }
+        const snapshotUpdatedAt = localStorage.getItem('anbary_local_updated_at') || '';
+        const snapshotForceMarker = localStorage.getItem('anbary_cloud_sync_force_dirty') || '';
+        const result = await AY_CLOUD.syncPush(snapshot, baseRevision, deviceId);
+        localStorage.setItem('anbary_cloud_sync_revision', String(result.revision));
+        localStorage.setItem('anbary_cloud_sync_owner', ownerId);
+        localStorage.setItem('anbary_cloud_sync_local_updated_at', snapshotUpdatedAt);
+        if ((localStorage.getItem('anbary_cloud_sync_force_dirty') || '') === snapshotForceMarker) {
+          localStorage.removeItem('anbary_cloud_sync_force_dirty');
+        }
+        setCloudSyncRevision(Number(result.revision));
+        setCloudSyncConflict(null);
+        const changedDuringUpload = mutationAtStart !== ayCloudMutationSeqRef.current || (localStorage.getItem('anbary_local_updated_at') || '') !== snapshotUpdatedAt || (localStorage.getItem('anbary_cloud_sync_force_dirty') || '') !== '';
+        retryAfterSync = retryAfterSync || changedDuringUpload;
+        setCloudSyncStatus(changedDuringUpload ? 'syncing' : 'synced');
+        return result;
+      };
+
+      // اگر از بکاپ تاریخی قدیمی مهاجرت کرده‌ایم، آن را به رکورد همگام‌سازی فعال تبدیل کن.
+      // در غیر این صورت revision صفر باقی می‌ماند و هر بار مثل ورود اولیه تعارض نشان می‌دهد.
+      if (sameOwner && localRevision === 0 && remoteMeta.exists && remoteMeta.legacy) {
+        await pushLocal(0);
+        return;
+      }
+
+      // در poll عادی فقط متادیتا خوانده می‌شود؛ snapshot حجیم تنها هنگام تغییر revision دریافت می‌شود.
+      if (sameOwner && localRevision > 0 && remoteMeta.exists && Number(remoteMeta.revision) === localRevision) {
+        if (localDirty) await pushLocal(localRevision);else setCloudSyncStatus('synced');
+        return;
+      }
+      if (sameOwner && localRevision === 0 && !remoteMeta.exists) {
+        await pushLocal(0);
+        return;
+      }
+      const remote = remoteMeta.exists ? await AY_CLOUD.syncGet() : null;
+      if (!remote) {
+        if (localRevision > 0) {
+          setCloudSyncConflict({
+            remote: null,
+            revision: 0,
+            reason: 'missing'
+          });
+          setCloudSyncStatus('conflict');
+          toast.show('نسخه‌ی ابری قبلی پیدا نشد؛ برای جلوگیری از حذف داده‌ها، از بخش پشتیبان‌گیری نسخه‌ی مبنا را انتخاب کن.');
+        } else {
+          await pushLocal(0);
+        }
+        return;
+      }
+      if (!sameOwner || localRevision === 0) {
+        if (!localHasData) {
+          await applyCloudSyncRecord(remote, ownerId);
+        } else {
+          setCloudSyncConflict({
+            remote,
+            revision: remote.revision,
+            reason: 'first-link'
+          });
+          setCloudSyncStatus('conflict');
+          toast.show('نسخه‌ی محلی و ابری هر دو اطلاعات دارند؛ برای همگام‌سازی اولیه، نسخه‌ی مبنا را انتخاب کن.');
+        }
+        return;
+      }
+      if (remote.revision === localRevision) {
+        if (localDirty) await pushLocal(localRevision);else setCloudSyncStatus('synced');
+        return;
+      }
+      if (remote.revision > localRevision) {
+        if (localDirty) {
+          setCloudSyncConflict({
+            remote,
+            revision: remote.revision,
+            reason: 'both-changed'
+          });
+          setCloudSyncStatus('conflict');
+          toast.show('تغییر هم‌زمان در چند دستگاه شناسایی شد؛ هیچ نسخه‌ای خودکار جایگزین نشد.');
+        } else {
+          await applyCloudSyncRecord(remote, ownerId);
+        }
+        return;
+      }
+      setCloudSyncConflict({
+        remote,
+        revision: remote.revision,
+        reason: 'server-older'
+      });
+      setCloudSyncStatus('conflict');
+      toast.show('نسخه‌ی محلی از نسخه‌ی ابری جدیدتر است؛ قبل از ادامه، نسخه‌ی مبنا را انتخاب کن.');
+    } catch (err) {
+      console.warn('Cloud sync did not complete:', err);
+      setCloudSyncStatus(navigator.onLine ? 'error' : 'offline');
+      setCloudError(err?.message || 'همگام‌سازی ابری انجام نشد؛ اطلاعات محلی محفوظ است.');
+    } finally {
+      ayCloudSyncBusyRef.current = false;
+      if (typeof retryAfterSync !== 'undefined' && retryAfterSync) {
+        setTimeout(() => handleCloudSync('queued-change'), 700);
+      }
+    }
+  };
+  const handleResolveCloudUseRemote = async () => {
+    if (!cloudSyncConflict?.remote) return;
+    try {
+      setCloudBusy(true);
+      const account = await AY_CLOUD.account();
+      await applyCloudSyncRecord(cloudSyncConflict.remote, account?.user?.id || '');
+      toast.show('نسخه‌ی ابری دریافت و روی این دستگاه اعمال شد.');
+    } catch (err) {
+      setCloudError(err?.message || 'دریافت نسخه‌ی ابری ناموفق بود.');
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+  const handleResolveCloudUseLocal = async () => {
+    if (!cloudSyncConflict) return;
+    try {
+      setCloudBusy(true);
+      setCloudError('');
+      const account = await AY_CLOUD.account();
+      const ownerId = account?.user?.id || '';
+      const mutationAtStart = ayCloudMutationSeqRef.current;
+      const snapshot = await makeCloudBackupSnapshot();
+      if (mutationAtStart !== ayCloudMutationSeqRef.current) {
+        setCloudError('هنگام آماده‌سازی نسخه، اطلاعات تغییر کرد؛ همگام‌سازی دوباره تلاش می‌شود.');
+        setTimeout(() => handleCloudSync('queued-change'), 700);
+        return;
+      }
+      const updatedAt = localStorage.getItem('anbary_local_updated_at') || '';
+      const forceMarker = localStorage.getItem('anbary_cloud_sync_force_dirty') || '';
+      const result = await AY_CLOUD.syncPush(snapshot, Number(cloudSyncConflict.revision || 0), getCloudDeviceId());
+      localStorage.setItem('anbary_cloud_sync_revision', String(result.revision));
+      localStorage.setItem('anbary_cloud_sync_owner', ownerId);
+      localStorage.setItem('anbary_cloud_sync_local_updated_at', updatedAt);
+      if ((localStorage.getItem('anbary_cloud_sync_force_dirty') || '') === forceMarker) localStorage.removeItem('anbary_cloud_sync_force_dirty');
+      setCloudSyncRevision(Number(result.revision));
+      setCloudSyncConflict(null);
+      const changedDuringUpload = mutationAtStart !== ayCloudMutationSeqRef.current || (localStorage.getItem('anbary_local_updated_at') || '') !== updatedAt || !!localStorage.getItem('anbary_cloud_sync_force_dirty');
+      setCloudSyncStatus(changedDuringUpload ? 'syncing' : 'synced');
+      if (changedDuringUpload) setTimeout(() => handleCloudSync('queued-change'), 700);
+      toast.show('نسخه‌ی همین دستگاه روی فضای ابری ثبت شد.');
+    } catch (err) {
+      setCloudError(err?.message || 'ثبت نسخه‌ی این دستگاه ناموفق بود.');
+      if (err?.code === 'SYNC_CONFLICT') {
+        try {
+          const remote = await AY_CLOUD.syncGet();
+          setCloudSyncConflict({
+            remote,
+            revision: remote?.revision || 0,
+            reason: 'changed-again'
+          });
+          setCloudSyncStatus('conflict');
+        } catch (_) {}
+      }
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+  const handleCloudEmailLogin = async () => {
+    if (window.location.protocol === 'file:') {
+      setCloudError('ورود با ایمیل از نسخه وب انجام می‌شود؛ در فایل آفلاین برای ورود ابری از اتصال گوگل استفاده کن.');
+      return;
+    }
+    const email = String(cloudEmail || '').trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setCloudError('یک نشانی ایمیل معتبر وارد کنید.');
+      return;
+    }
+    try {
+      setCloudBusy(true);
+      setCloudError('');
+      await AY_CLOUD.signInEmail(email);
+      setCloudEmailSent(true);
+      toast.show('لینک ورود به ایمیل شما ارسال شد؛ صندوق ورودی و پوشه‌ی Spam را بررسی کنید.');
+    } catch (err) {
+      setCloudError(err?.message || 'ارسال لینک ورود ایمیلی ناموفق بود.');
+    } finally {
+      setCloudBusy(false);
+    }
+  };
   useEffect(() => {
     if (view === 'backup') refreshCloudBackups();
   }, [view]);
@@ -20169,7 +20510,7 @@ const App = () => {
         // ابزارهای داخلیِ بکاپ کامل همچنان برگردانده شوند، ولی کلید امنیتی/ورود موقت دست‌نخورده بماند.
         if (raw?.localStorage && typeof raw.localStorage === 'object') {
           Object.entries(raw.localStorage).forEach(([k, v]) => {
-            if (k === TRUSTED_UNLOCK_KEY || k === SECURITY_KEY || k === STORAGE_KEY) return;
+            if (k === TRUSTED_UNLOCK_KEY || k === SECURITY_KEY || k === STORAGE_KEY || k.startsWith('sb-') || k.startsWith('anbary_cloud_sync_') || k === 'anbary_cloud_last_backup' || k === 'anbary_local_updated_at' || k === 'anbary_cloud_device_id') return;
             try {
               localStorage.setItem(k, v);
             } catch (e) {}
@@ -20660,7 +21001,7 @@ const App = () => {
     className: "text-xs font-bold text-emerald-700"
   }, "Supabase Auth")), /*#__PURE__*/React.createElement("p", {
     className: "mt-3 text-xs text-slate-500"
-  }, "\u0628\u0631\u0627\u06CC \u062D\u0641\u0638 \u0646\u0633\u062E\u0647\u200C\u0647\u0627\u06CC \u0647\u0645\u06CC\u0646 \u062F\u0633\u062A\u06AF\u0627\u0647\u060C \u06AF\u0648\u06AF\u0644 \u0631\u0627 \u0628\u0647 \u062D\u0633\u0627\u0628 \u0641\u0639\u0644\u06CC \u067E\u06CC\u0648\u0646\u062F \u0628\u0632\u0646\u06CC\u062F. \u0628\u0631\u0627\u06CC \u062F\u0633\u062A\u0631\u0633\u06CC \u0628\u0647 \u062D\u0633\u0627\u0628\u06CC \u06A9\u0647 \u0642\u0628\u0644\u0627\u064B \u0631\u0648\u06CC \u062F\u0633\u062A\u06AF\u0627\u0647 \u062F\u06CC\u06AF\u0631\u06CC \u0645\u062A\u0635\u0644 \u06A9\u0631\u062F\u0647\u200C\u0627\u06CC\u062F\u060C \u0627\u0632 \u0648\u0631\u0648\u062F \u0628\u0627 \u06AF\u0648\u06AF\u0644 \u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u06A9\u0646\u06CC\u062F."), /*#__PURE__*/React.createElement("div", {
+  }, "\u0628\u0631\u0627\u06CC \u0627\u0634\u062A\u0631\u0627\u06A9 \u0627\u0637\u0644\u0627\u0639\u0627\u062A \u0628\u06CC\u0646 \u062F\u0633\u062A\u06AF\u0627\u0647\u200C\u0647\u0627\u060C \u0628\u0627 \u0647\u0645\u0627\u0646 \u062D\u0633\u0627\u0628 Google \u062F\u0631 \u0647\u0645\u0647\u200C\u06CC \u062F\u0633\u062A\u06AF\u0627\u0647\u200C\u0647\u0627 \u0648\u0627\u0631\u062F \u0634\u0648\u06CC\u062F. \u06AF\u0632\u06CC\u0646\u0647\u200C\u06CC \xAB\u0627\u062A\u0635\u0627\u0644 \u06AF\u0648\u06AF\u0644 \u0628\u0647 \u0647\u0645\u06CC\u0646 \u062F\u0633\u062A\u06AF\u0627\u0647\xBB \u062D\u0633\u0627\u0628 \u0645\u0648\u0642\u062A \u0631\u0627 \u0628\u0647 Google \u067E\u06CC\u0648\u0646\u062F \u0645\u06CC\u200C\u062F\u0647\u062F \u0648 \u0646\u06CC\u0627\u0632\u0645\u0646\u062F \u0641\u0639\u0627\u0644\u200C\u0628\u0648\u062F\u0646 Allow manual linking \u062F\u0631 \u062A\u0646\u0638\u06CC\u0645\u0627\u062A Auth \u067E\u0631\u0648\u0698\u0647\u200C\u06CC Supabase \u0627\u0633\u062A. \u062F\u0631 \u0641\u0627\u06CC\u0644 \u0622\u0641\u0644\u0627\u06CC\u0646\u060C \u0648\u0631\u0648\u062F \u06AF\u0648\u06AF\u0644 \u0627\u0632 \u0637\u0631\u06CC\u0642 \u067E\u0646\u062C\u0631\u0647\u200C\u06CC \u0648\u0627\u0633\u0637 \u0646\u0633\u062E\u0647\u200C\u06CC \u0648\u0628 \u0627\u0646\u062C\u0627\u0645 \u0645\u06CC\u200C\u0634\u0648\u062F."), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap gap-2 mt-4"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: handleCloudLinkGoogle,
@@ -20668,7 +21009,62 @@ const App = () => {
   }, "\u0627\u062A\u0635\u0627\u0644 \u06AF\u0648\u06AF\u0644 \u0628\u0647 \u0647\u0645\u06CC\u0646 \u062F\u0633\u062A\u06AF\u0627\u0647"), /*#__PURE__*/React.createElement("button", {
     onClick: handleCloudGoogleLogin,
     className: "rounded-full border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700"
-  }, "\u0648\u0631\u0648\u062F \u0628\u0627 \u062D\u0633\u0627\u0628 Google"))), /*#__PURE__*/React.createElement("div", {
+  }, "\u0648\u0631\u0648\u062F \u0628\u0627 \u062D\u0633\u0627\u0628 Google")), /*#__PURE__*/React.createElement("div", {
+    className: "mt-5 border-t border-slate-100 pt-4"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs font-bold text-slate-700 mb-2"
+  }, "\u0648\u0631\u0648\u062F \u0628\u0627 \u0627\u06CC\u0645\u06CC\u0644"), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-2"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "email",
+    dir: "ltr",
+    autoComplete: "email",
+    value: cloudEmail,
+    onChange: e => {
+      setCloudEmail(e.target.value);
+      setCloudEmailSent(false);
+    },
+    placeholder: "name@example.com",
+    className: "min-w-[220px] flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: handleCloudEmailLogin,
+    disabled: cloudBusy,
+    className: "rounded-full bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+  }, cloudBusy ? 'در حال ارسال...' : 'ارسال لینک ورود')), cloudEmailSent && /*#__PURE__*/React.createElement("p", {
+    className: "mt-2 text-xs text-emerald-700"
+  }, "\u0644\u06CC\u0646\u06A9 \u0648\u0631\u0648\u062F \u0627\u0631\u0633\u0627\u0644 \u0634\u062F. \u0631\u0648\u06CC \u0647\u0645\u0627\u0646 \u062F\u0633\u062A\u06AF\u0627\u0647 \u0648 \u0645\u0631\u0648\u0631\u06AF\u0631\u06CC \u06A9\u0647 \u0628\u0631\u0646\u0627\u0645\u0647 \u0631\u0627 \u0628\u0627\u0632 \u06A9\u0631\u062F\u0647\u200C\u0627\u06CC\u060C \u0644\u06CC\u0646\u06A9 \u0627\u06CC\u0645\u06CC\u0644 \u0631\u0627 \u0628\u0627\u0632 \u06A9\u0646.")), /*#__PURE__*/React.createElement("div", {
+    className: "mt-5 border-t border-slate-100 pt-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap items-center justify-between gap-2"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    className: "text-sm font-bold text-slate-800"
+  }, "\u0647\u0645\u06AF\u0627\u0645\u200C\u0633\u0627\u0632\u06CC \u062E\u0648\u062F\u06A9\u0627\u0631 \u0627\u0637\u0644\u0627\u0639\u0627\u062A"), /*#__PURE__*/React.createElement("p", {
+    className: "mt-1 text-xs text-slate-500"
+  }, cloudSyncStatus === 'synced' ? 'همه‌ی تغییرات با فضای ابری هماهنگ است.' : cloudSyncStatus === 'syncing' ? 'در حال همگام‌سازی اطلاعات...' : cloudSyncStatus === 'offline' ? 'آفلاین؛ تغییرات روی همین دستگاه می‌ماند و پس از اتصال ارسال می‌شود.' : cloudSyncStatus === 'conflict' ? 'تعارض بین نسخه‌ی محلی و ابری؛ تا انتخاب شما هیچ نسخه‌ای جایگزین نمی‌شود.' : cloudSyncStatus === 'error' ? 'ارتباط ابری برقرار نشد؛ داده‌های محلی محفوظ است.' : 'آماده‌سازی همگام‌سازی...')), /*#__PURE__*/React.createElement("button", {
+    onClick: () => handleCloudSync('manual'),
+    disabled: cloudBusy || cloudSyncStatus === 'syncing',
+    className: "rounded-full border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 disabled:opacity-50"
+  }, "\u0647\u0645\u06AF\u0627\u0645\u200C\u0633\u0627\u0632\u06CC \u0647\u0645\u06CC\u0646 \u0627\u0644\u0627\u0646")), /*#__PURE__*/React.createElement("p", {
+    className: "mt-2 text-[11px] text-slate-400"
+  }, "\u062A\u063A\u06CC\u06CC\u0631\u0627\u062A \u0647\u0631 \u062F\u0633\u062A\u06AF\u0627\u0647 \u067E\u0633 \u0627\u0632 \u0630\u062E\u06CC\u0631\u0647\u200C\u06CC \u0645\u062D\u0644\u06CC \u062E\u0648\u062F\u06A9\u0627\u0631 \u0627\u0631\u0633\u0627\u0644 \u0645\u06CC\u200C\u0634\u0648\u0646\u062F \u0648 \u062F\u0633\u062A\u06AF\u0627\u0647\u200C\u0647\u0627\u06CC \u062F\u06CC\u06AF\u0631 \u062F\u0631 \u0646\u0648\u0628\u062A \u0628\u0631\u0631\u0633\u06CC \u0628\u0639\u062F\u06CC (\u062D\u062F\u0627\u06A9\u062B\u0631 \u062D\u062F\u0648\u062F \u06F1\u06F5 \u062B\u0627\u0646\u06CC\u0647) \u0622\u0646 \u0631\u0627 \u062F\u0631\u06CC\u0627\u0641\u062A \u0645\u06CC\u200C\u06A9\u0646\u0646\u062F. \u0647\u0646\u06AF\u0627\u0645 \u0642\u0637\u0639 \u0627\u06CC\u0646\u062A\u0631\u0646\u062A\u060C \u06A9\u0627\u0631 \u0627\u062F\u0627\u0645\u0647 \u062F\u0627\u0631\u062F \u0648 \u067E\u0633 \u0627\u0632 \u0627\u062A\u0635\u0627\u0644 \u0635\u0641 \u062A\u063A\u06CC\u06CC\u0631\u0627\u062A \u0627\u0631\u0633\u0627\u0644 \u0645\u06CC\u200C\u0634\u0648\u062F."), /*#__PURE__*/React.createElement("p", {
+    className: "mt-2 text-[11px] text-slate-400"
+  }, "\u0627\u06AF\u0631 \u0631\u0645\u0632 \u0627\u0645\u0646\u06CC\u062A\u06CC \u0645\u062D\u0644\u06CC \u0641\u0639\u0627\u0644 \u0628\u0627\u0634\u062F\u060C \u062F\u0627\u062F\u0647\u200C\u06CC \u0627\u0628\u0631\u06CC \u0631\u0645\u0632\u0646\u06AF\u0627\u0631\u06CC \u0645\u06CC\u200C\u0634\u0648\u062F\u061B \u0627\u0648\u0644\u06CC\u0646 \u0627\u062A\u0635\u0627\u0644 \u062F\u0633\u062A\u06AF\u0627\u0647 \u062C\u062F\u06CC\u062F \u0645\u0645\u06A9\u0646 \u0627\u0633\u062A \u06CC\u06A9\u200C\u0628\u0627\u0631 \u0631\u0645\u0632 \u062F\u0633\u062A\u06AF\u0627\u0647\u06CC \u0631\u0627 \u0628\u062E\u0648\u0627\u0647\u062F \u06A9\u0647 \u0631\u0645\u0632\u0646\u06AF\u0627\u0631\u06CC \u0627\u0628\u0631\u06CC \u0631\u0627 \u0634\u0631\u0648\u0639 \u06A9\u0631\u062F\u0647 \u0627\u0633\u062A."), cloudSyncConflict && /*#__PURE__*/React.createElement("div", {
+    className: "mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs font-bold text-amber-900"
+  }, "\u062F\u0648 \u0646\u0633\u062E\u0647\u200C\u06CC \u0645\u062A\u0641\u0627\u0648\u062A \u067E\u06CC\u062F\u0627 \u0634\u062F. \u0628\u0631\u0627\u06CC \u062C\u0644\u0648\u06AF\u06CC\u0631\u06CC \u0627\u0632 \u062D\u0630\u0641 \u0646\u0627\u062E\u0648\u0627\u0633\u062A\u0647\u200C\u06CC \u0627\u0637\u0644\u0627\u0639\u0627\u062A\u060C \u0627\u0646\u062A\u062E\u0627\u0628 \u06A9\u0646 \u06A9\u062F\u0627\u0645 \u0646\u0633\u062E\u0647 \u0645\u0628\u0646\u0627 \u0628\u0627\u0634\u062F."), /*#__PURE__*/React.createElement("div", {
+    className: "mt-3 flex flex-wrap gap-2"
+  }, cloudSyncConflict.remote && /*#__PURE__*/React.createElement("button", {
+    onClick: handleResolveCloudUseRemote,
+    disabled: cloudBusy,
+    className: "rounded-full bg-indigo-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+  }, "\u0627\u0633\u062A\u0641\u0627\u062F\u0647 \u0627\u0632 \u0646\u0633\u062E\u0647\u200C\u06CC \u0627\u0628\u0631\u06CC"), /*#__PURE__*/React.createElement("button", {
+    onClick: handleResolveCloudUseLocal,
+    disabled: cloudBusy,
+    className: "rounded-full border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-900 disabled:opacity-50"
+  }, "\u062B\u0628\u062A \u0646\u0633\u062E\u0647\u200C\u06CC \u0647\u0645\u06CC\u0646 \u062F\u0633\u062A\u06AF\u0627\u0647 \u0631\u0648\u06CC \u0627\u0628\u0631")))), cloudError && /*#__PURE__*/React.createElement("p", {
+    className: "mt-3 text-xs text-rose-600"
+  }, cloudError)), /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mt-5"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between gap-3"
@@ -20858,11 +21254,19 @@ const App = () => {
 const AY_CLOUD_URL = 'https://foyttvvpscenkxbobazs.supabase.co';
 const AY_CLOUD_KEY = 'sb_publishable_AhAgG-9rYk_PwD3cFjNCAA_bzK06eO2';
 const AY_CLOUD_FUNCTION = AY_CLOUD_URL + '/functions/v1/anbaryar-cloud-backup';
+const AY_CLOUD_SITE_URL = 'https://alirezahasheminezhad.github.io/anbaryar/';
+const AY_CLOUD_SITE_ORIGIN = 'https://alirezahasheminezhad.github.io';
+// کلید ابری از رمز اولین دستگاه مشتق می‌شود و در حافظه‌ی همین تب می‌ماند؛ هر دستگاه با واردکردن رمز آن را باز می‌کند.
+const AY_CLOUD_CRYPTO = {
+  key: null,
+  saltB64: '',
+  hashB64: ''
+};
 const AY_CLOUD = (() => {
   let clientPromise = null;
   let sessionPromise = null;
   const client = () => {
-    if (!clientPromise) clientPromise = import('https://esm.sh/@supabase/supabase-js@2').then(({
+    if (!clientPromise) clientPromise = import('https://esm.sh/@supabase/supabase-js@2.119.2').then(({
       createClient
     }) => createClient(AY_CLOUD_URL, AY_CLOUD_KEY, {
       auth: {
@@ -20896,14 +21300,15 @@ const AY_CLOUD = (() => {
       sessionPromise = null;
     }
   };
-  const call = async (action, options = {}) => {
+  const callRaw = async (action, options = {}) => {
     const current = await session();
     const headers = {
       'apikey': AY_CLOUD_KEY,
       'Authorization': 'Bearer ' + current.access_token,
+      'Content-Type': 'application/json',
       ...(options.headers || {})
     };
-    const response = await fetch(AY_CLOUD_FUNCTION, {
+    const response = await fetch(options.url || AY_CLOUD_FUNCTION, {
       method: 'POST',
       headers,
       body: options.body || JSON.stringify({
@@ -20911,12 +21316,20 @@ const AY_CLOUD = (() => {
       })
     });
     if (!response.ok) {
-      let message = 'ارتباط با سرویس پشتیبان ابری ناموفق بود.';
+      let details = {};
       try {
-        message = (await response.json()).error || message;
+        details = await response.json();
       } catch (e) {}
-      throw new Error(message);
+      const error = new Error(details.error || 'ارتباط با سرویس ابری ناموفق بود.');
+      error.code = details.code || null;
+      error.status = response.status;
+      error.revision = Number(details.revision || 0);
+      throw error;
     }
+    return response;
+  };
+  const call = async (action, options = {}) => {
+    const response = await callRaw(action, options);
     return options.raw ? response : response.json();
   };
   const gzip = async value => {
@@ -20926,13 +21339,143 @@ const AY_CLOUD = (() => {
     }).stream().pipeThrough(new CompressionStream('gzip'));
     return await new Response(stream).blob();
   };
+  const decodeGzipResponse = async response => {
+    if (!('DecompressionStream' in window)) throw new Error('مرورگر از بازکردن پشتیبان فشرده پشتیبانی نمی‌کند.');
+    const stream = response.body.pipeThrough(new DecompressionStream('gzip'));
+    const decoded = JSON.parse(await new Response(stream).text());
+    if (decoded?.format !== 'ANBARYAR_CLOUD_ENCRYPTED') return decoded;
+
+    // فرمت جدید: کلید رمزنگاری ابری با PBKDF2 از رمز مشترک و salt ذخیره‌شده در envelope مشتق می‌شود؛
+    // به این ترتیب رمز محلی هر مرورگر می‌تواند متفاوت باشد و داده همچنان بین دستگاه‌ها قابل بازیابی است.
+    if (decoded.saltB64 && decoded.hashB64) {
+      const cachedMatches = AY_CLOUD_CRYPTO.key && AY_CLOUD_CRYPTO.saltB64 === decoded.saltB64 && AY_CLOUD_CRYPTO.hashB64 === decoded.hashB64;
+      if (cachedMatches) return await decryptAY(decoded.envelope, AY_CLOUD_CRYPTO.key);
+      const localConfig = typeof getSecurityConfig === 'function' ? getSecurityConfig() : null;
+      if (AY_SECURITY?.key && localConfig?.salt === decoded.saltB64 && localConfig?.hash === decoded.hashB64) {
+        AY_CLOUD_CRYPTO.key = AY_SECURITY.key;
+        AY_CLOUD_CRYPTO.saltB64 = decoded.saltB64;
+        AY_CLOUD_CRYPTO.hashB64 = decoded.hashB64;
+        return await decryptAY(decoded.envelope, AY_CLOUD_CRYPTO.key);
+      }
+      const password = window.prompt('برای بازکردن داده‌های ابری انباریار، رمز ابریِ دستگاهی را وارد کن که نخستین بار این همگام‌سازی را راه‌اندازی کرده است:');
+      if (!password) throw new Error('بازکردن نسخه‌ی ابری لغو شد؛ رمز ابری وارد نشد.');
+      const verifier = await passwordVerifier(password, decoded.saltB64);
+      if (verifier !== decoded.hashB64) throw new Error('رمز ابری نادرست است. اطلاعات محلی دست‌نخورده باقی ماند.');
+      const key = await deriveAYKey(password, decoded.saltB64);
+      const value = await decryptAY(decoded.envelope, key);
+      AY_CLOUD_CRYPTO.key = key;
+      AY_CLOUD_CRYPTO.saltB64 = decoded.saltB64;
+      AY_CLOUD_CRYPTO.hashB64 = decoded.hashB64;
+      return value;
+    }
+
+    // سازگاری با بکاپ‌های رمزنگاری‌شده‌ی قدیمی که salt همراه envelope ذخیره نمی‌شد.
+    if (!AY_SECURITY?.key) throw new Error('این نسخه از بکاپ با رمزنگاری قدیمی ساخته شده و فقط روی دستگاه اصلی قابل بازشدن است.');
+    return await decryptAY(decoded.envelope);
+  };
+  const secureValue = async value => {
+    // پس از اولین دریافت، از همان کلید مشترک ابری استفاده می‌کنیم؛ قفل محلی هر دستگاه مستقل باقی می‌ماند.
+    if (AY_CLOUD_CRYPTO.key) {
+      return {
+        format: 'ANBARYAR_CLOUD_ENCRYPTED',
+        version: 2,
+        saltB64: AY_CLOUD_CRYPTO.saltB64,
+        hashB64: AY_CLOUD_CRYPTO.hashB64,
+        envelope: await encryptAY(value, AY_CLOUD_CRYPTO.key)
+      };
+    }
+    const localConfig = typeof getSecurityConfig === 'function' ? getSecurityConfig() : null;
+    if (localConfig) {
+      if (!AY_SECURITY?.key) throw new Error('برای همگام‌سازی امن، ابتدا قفل انباریار را با رمز باز کن.');
+      if (!localConfig.salt || !localConfig.hash) throw new Error('تنظیمات رمزنگاری این دستگاه کامل نیست.');
+      AY_CLOUD_CRYPTO.key = AY_SECURITY.key;
+      AY_CLOUD_CRYPTO.saltB64 = localConfig.salt;
+      AY_CLOUD_CRYPTO.hashB64 = localConfig.hash;
+      return {
+        format: 'ANBARYAR_CLOUD_ENCRYPTED',
+        version: 2,
+        saltB64: localConfig.salt,
+        hashB64: localConfig.hash,
+        envelope: await encryptAY(value, AY_CLOUD_CRYPTO.key)
+      };
+    }
+    return value;
+  };
+  const waitForOfflineOAuthBridge = (popup, sb, nonce) => new Promise((resolve, reject) => {
+    let finished = false;
+    const finish = (err, value) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      window.removeEventListener('message', onMessage);
+      if (err) reject(err);else resolve(value);
+    };
+    const timer = setTimeout(() => finish(new Error('ورود گوگل به پایان نرسید؛ دوباره تلاش کنید.')), 180000);
+    const onMessage = async event => {
+      if (event.origin !== AY_CLOUD_SITE_ORIGIN || event.source !== popup || event.data?.type !== 'ANBARYAR_AUTH_BRIDGE' || event.data?.nonce !== nonce) return;
+      try {
+        const {
+          data,
+          error
+        } = await sb.auth.setSession({
+          access_token: event.data.access_token,
+          refresh_token: event.data.refresh_token
+        });
+        if (error) throw error;
+        finish(null, data);
+      } catch (e) {
+        finish(e);
+      }
+    };
+    window.addEventListener('message', onMessage);
+  });
+  const oauth = async (provider, link = false) => {
+    const isLocalFile = window.location.protocol === 'file:';
+    // file:// cannot be an OAuth redirect. Authenticate on the hosted copy and explicitly
+    // approve returning the session to the opener once the Google flow is complete.
+    const popup = isLocalFile ? window.open('about:blank', 'anbaryar-google-auth', 'popup,width=560,height=760') : null;
+    if (isLocalFile && !popup) throw new Error('برای ورود گوگل، اجازه‌ی بازشدن پنجره‌ی جدید را بدهید.');
+    const nonce = isLocalFile ? crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random() : '';
+    if (popup) popup.name = 'anbaryar-auth-bridge:' + nonce;
+    try {
+      const sb = await client();
+      let result;
+      let redirectTo = window.location.href;
+      if (isLocalFile) {
+        const redirect = new URL(AY_CLOUD_SITE_URL);
+        redirect.searchParams.set('ay_auth_bridge', nonce);
+        redirectTo = redirect.toString();
+      }
+      const options = isLocalFile ? {
+        redirectTo,
+        skipBrowserRedirect: true
+      } : {
+        redirectTo
+      };
+      if (link) result = await sb.auth.linkIdentity({
+        provider,
+        options
+      });else result = await sb.auth.signInWithOAuth({
+        provider,
+        options
+      });
+      if (result.error) throw result.error;
+      if (isLocalFile) {
+        if (!result.data?.url) throw new Error('نشانی ورود گوگل دریافت نشد.');
+        popup.location.href = result.data.url;
+        return await waitForOfflineOAuthBridge(popup, sb, nonce);
+      }
+      return result.data;
+    } catch (e) {
+      try {
+        if (popup && !popup.closed) popup.close();
+      } catch (_) {}
+      throw e;
+    }
+  };
   return {
     upload: async value => {
-      const secured = typeof AY_SECURITY !== 'undefined' && AY_SECURITY.key ? {
-        format: 'ANBARYAR_CLOUD_ENCRYPTED',
-        envelope: await encryptAY(value)
-      } : value;
-      const blob = await gzip(secured);
+      const blob = await gzip(await secureValue(value));
       if (blob.size > 45 * 1024 * 1024) throw new Error('حجم نسخه پشتیبان از سقف ۴۵ مگابایت بیشتر است.');
       return await call('upload', {
         body: blob,
@@ -20957,53 +21500,136 @@ const AY_CLOUD = (() => {
         identities: data?.identities || []
       };
     },
-    linkGoogle: async () => {
+    linkGoogle: async () => await oauth('google', true),
+    signInGoogle: async () => await oauth('google', false),
+    signInEmail: async email => {
       const sb = await client();
-      await session();
       const {
         data,
         error
-      } = await sb.auth.linkIdentity({
-        provider: 'google',
+      } = await sb.auth.signInWithOtp({
+        email,
         options: {
-          redirectTo: window.location.href
+          emailRedirectTo: AY_CLOUD_SITE_URL,
+          shouldCreateUser: true
         }
       });
       if (error) throw error;
       return data;
     },
-    signInGoogle: async () => {
-      const sb = await client();
-      const {
-        data,
-        error
-      } = await sb.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.href
+    syncMeta: async () => await call('sync-meta'),
+    syncGet: async () => {
+      const response = await callRaw('sync-get');
+      if (response.status === 204) return null;
+      const snapshot = await decodeGzipResponse(response);
+      return {
+        snapshot,
+        revision: Number(response.headers.get('X-AY-Sync-Revision') || 0),
+        updatedAt: response.headers.get('X-AY-Sync-Updated-At') || '',
+        legacy: response.headers.get('X-AY-Sync-Legacy') === 'true'
+      };
+    },
+    syncPush: async (value, expectedRevision, deviceId) => {
+      const blob = await gzip(await secureValue(value));
+      if (blob.size > 45 * 1024 * 1024) throw new Error('حجم اطلاعات همگام‌سازی از سقف ۴۵ مگابایت بیشتر است.');
+      const response = await callRaw('sync-push', {
+        url: AY_CLOUD_FUNCTION + '?action=sync-push',
+        body: blob,
+        headers: {
+          'Content-Type': 'application/gzip',
+          'X-AY-Sync-Revision': String(expectedRevision || 0),
+          'X-AY-Device-ID': String(deviceId || ''),
+          'X-AY-App-Build': String(value.appBuild || ''),
+          'X-AY-Schema-Version': String(value.schemaVersion || '')
         }
       });
-      if (error) throw error;
-      return data;
+      return await response.json();
     },
     restore: async id => {
-      const response = await call('restore', {
+      const response = await callRaw('restore', {
         body: JSON.stringify({
           action: 'restore',
           id
-        }),
-        raw: true
+        })
       });
-      if (!('DecompressionStream' in window)) throw new Error('مرورگر از بازکردن پشتیبان فشرده پشتیبانی نمی‌کند.');
-      const stream = response.body.pipeThrough(new DecompressionStream('gzip'));
-      const decoded = JSON.parse(await new Response(stream).text());
-      if (decoded?.format === 'ANBARYAR_CLOUD_ENCRYPTED') {
-        if (!AY_SECURITY.key) throw new Error('این نسخه رمزنگاری شده است؛ ابتدا با رمز انباریار وارد شوید.');
-        return await decryptAY(decoded.envelope);
+      return await decodeGzipResponse(response);
+    },
+    forwardAuthToOpener: async nonce => {
+      if (!window.opener || window.opener === window || !nonce) return false;
+      if (new URLSearchParams(window.location.search).get('ay_auth_bridge') !== nonce) return false;
+      // Do not rely on window.name; privacy protections may clear it across OAuth domains.
+      const sb = await client();
+      let {
+        data: {
+          session: current
+        }
+      } = await sb.auth.getSession();
+      if (!current) {
+        await new Promise(resolve => {
+          let done = false;
+          let subscription = null;
+          let timer = null;
+          const finish = next => {
+            if (done) return;
+            done = true;
+            if (timer) clearTimeout(timer);
+            subscription?.unsubscribe();
+            if (next) current = next;
+            resolve();
+          };
+          const result = sb.auth.onAuthStateChange((event, next) => {
+            if (next) finish(next);
+          });
+          subscription = result.data.subscription;
+          timer = setTimeout(() => finish(null), 25000);
+        });
       }
-      return decoded;
+      if (!current?.access_token || !current?.refresh_token) return false;
+      window.opener.postMessage({
+        type: 'ANBARYAR_AUTH_BRIDGE',
+        access_token: current.access_token,
+        refresh_token: current.refresh_token,
+        nonce
+      }, '*');
+      setTimeout(() => {
+        try {
+          window.close();
+        } catch (e) {}
+      }, 300);
+      return true;
     }
   };
+})();
+
+// در ورود از file://، تحویل توکن به پنجره‌ی آفلاین فقط با تأیید صریح کاربر انجام می‌شود.
+(() => {
+  const nonce = new URLSearchParams(window.location.search).get('ay_auth_bridge');
+  if (!window.opener || !nonce) return;
+  const show = () => {
+    if (!document.body || document.getElementById('ay-auth-bridge-approval')) return;
+    const panel = document.createElement('div');
+    panel.id = 'ay-auth-bridge-approval';
+    panel.dir = 'rtl';
+    panel.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(15,23,42,.94);display:flex;align-items:center;justify-content:center;padding:24px;font-family:Tahoma,Arial,sans-serif;color:white';
+    panel.innerHTML = '<div style="max-width:440px;background:#fff;color:#0f172a;border-radius:20px;padding:24px;text-align:center;box-shadow:0 20px 60px #0006"><div style="font-size:20px;font-weight:800;margin-bottom:12px">اتصال نسخه آفلاین انباریار</div><p style="font-size:14px;line-height:2;margin:0 0 18px">ورود گوگل انجام شده است. با انتخاب دکمه زیر، نشست این حساب به فایل آفلاینی که ورود را آغاز کرده منتقل می‌شود.</p><button id="ay-auth-bridge-approve" style="border:0;border-radius:12px;background:#4f46e5;color:white;font-weight:800;padding:12px 20px;cursor:pointer">تأیید و بازگشت به فایل آفلاین</button><p id="ay-auth-bridge-status" style="font-size:12px;color:#64748b;margin:12px 0 0"></p></div>';
+    document.body.appendChild(panel);
+    panel.querySelector('#ay-auth-bridge-approve').addEventListener('click', async () => {
+      const button = panel.querySelector('#ay-auth-bridge-approve');
+      const status = panel.querySelector('#ay-auth-bridge-status');
+      button.disabled = true;
+      button.textContent = 'در حال انتقال ورود...';
+      try {
+        const ok = await AY_CLOUD.forwardAuthToOpener(nonce);
+        if (!ok) throw new Error('نشست ورود هنوز آماده نیست. چند لحظه بعد دوباره تلاش کن.');
+        status.textContent = 'ورود منتقل شد؛ می‌توانی این پنجره را ببندی.';
+      } catch (e) {
+        status.textContent = e?.message || 'انتقال ورود انجام نشد.';
+        button.disabled = false;
+        button.textContent = 'تلاش دوباره';
+      }
+    });
+  };
+  setTimeout(show, 1400);
 })();
 window.addEventListener('error', e => {
   console.error('AnbarYar runtime error:', e.error || e.message);
