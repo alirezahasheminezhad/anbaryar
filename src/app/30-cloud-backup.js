@@ -363,28 +363,10 @@ const AY_CLOUD = (() => {
         Object.assign(AY_CLOUD_CRYPTO, { key: AY_SECURITY.key, saltB64: '', hashB64: '', keyMode: 'legacy-v1', keyEnvelope: null, ownerId });
         return legacyValue;
     };
-    const secureValue = async (value) => {
-        if (isAyCloudLocalLockClosed()) throw new Error('ابتدا قفل محلی انباریار را باز کن؛ سپس همگام‌سازی امن انجام می‌شود.');
-        const current = await session();
-        const ownerId = current?.user?.id;
-        if (!ownerId) throw new Error('حساب ابری معتبر نیست؛ دوباره با Google وارد شو.');
-        if (AY_CLOUD_CRYPTO.ownerId !== ownerId) clearAyCloudCryptoMemory();
-        if (!AY_CLOUD_CRYPTO.key) {
-            const deviceRestored = await restoreLatestAyCloudKeyForDevice(ownerId);
-            if (!deviceRestored) await restoreLatestAyCloudKeyForSession(ownerId);
-        }
-        if (!AY_CLOUD_CRYPTO.key || AY_CLOUD_CRYPTO.ownerId !== ownerId ||
-            AY_CLOUD_CRYPTO.keyMode !== 'recovery-v3' || !AY_CLOUD_CRYPTO.keyEnvelope) {
-            await createAyCloudRecoveryKey(ownerId);
-        }
-        return {
-            format: 'ANBARYAR_CLOUD_ENCRYPTED', version: 3, keyMode: 'recovery-v3',
-            kdf: 'PBKDF2-SHA256-150000-domain-separated-verifier',
-            saltB64: AY_CLOUD_CRYPTO.saltB64, hashB64: AY_CLOUD_CRYPTO.hashB64,
-            keyEnvelope: AY_CLOUD_CRYPTO.keyEnvelope,
-            envelope: await encryptAY(value, AY_CLOUD_CRYPTO.key)
-        };
-    };
+    // رمز بازیابی ابری حذف شد: هویت و دسترسی را خودِ حساب Google/Supabase تعیین می‌کند و داده‌ی هر حساب
+    // فقط از طریق Edge Function با توکن همان حساب خوانده می‌شود. قالب بدون رمز را decodeGzipResponse مستقیم می‌خواند؛
+    // داده‌ی قدیمیِ رمزشده هم همچنان (فقط هنگام خواندن) با رمز قبلی باز می‌شود.
+    const secureValue = async (value) => value;
     const waitForOAuthPopup = (popup, sb, nonce) => new Promise((resolve, reject) => {
         let finished = false;
         let processing = false;
