@@ -9,7 +9,7 @@
         const IDB_DATA_KEY = 'secure-data';
         const IDB_FALLBACK_KEY = 'plain-data-fallback';
         const APP_SCHEMA_VERSION = 11;
-        const APP_BUILD = '10.24-cloud-account-key-scope';
+        const APP_BUILD = '10.25-live-sync';
 
         // ------------------------------------------------------------------
         // امنیت و ذخیره‌سازی محلی، IndexedDB
@@ -201,7 +201,7 @@
             AY_LAST_SAVE_SIGNATURE = signature;
             // حتی اگر ذخیره قبلی خطا داده باشد، صف جدید نباید برای همیشه خراب بماند.
             AY_SAVE_QUEUE = AY_SAVE_QUEUE.catch(() => {}).then(async () => {
-                try { localStorage.setItem('anbaryar_local_updated_at', payload.updatedAt); } catch(e) {}
+                try { localStorage.setItem('anbary_local_updated_at', payload.updatedAt); } catch(e) {}
                 const dataArgs = [items, invoices, notes, transactions, purchases, processingOrders, consignments];
                 let saved = false;
                 let secureError = null;

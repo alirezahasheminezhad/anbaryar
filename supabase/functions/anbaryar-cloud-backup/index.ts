@@ -28,6 +28,8 @@ function json(body: unknown, status = 200) {
   });
 }
 
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 function syncConflict(revision: number) {
   return json({ error: "Cloud data changed on another device.", code: "SYNC_CONFLICT", revision }, 409);
 }
@@ -91,6 +93,67 @@ Deno.serve(async (req: Request) => {
       headers: { ...cors, "Content-Type": "application/gzip", "Content-Length": String(row.size_bytes),
         "Content-Disposition": 'attachment; filename="anbaryar-cloud-backup.json.gz"',
         "X-AY-Backup-Id": row.id, "Cache-Control": "no-store" },
+    });
+  }
+
+  // اتصال زنده: یک درخواست هم heartbeat دستگاه را ثبت می‌کند، هم تا ۲۰ ثانیه منتظر تغییر revision می‌ماند
+  // (long-poll) و هم فهرست دستگاه‌های فعال همین حساب را برمی‌گرداند. هیچ داده‌ی کسب‌وکاری در پاسخ نیست.
+  if (payload.action === "live") {
+    const live = payload as unknown as { since?: number; deviceId?: string; label?: string; build?: string; wait?: boolean };
+    const deviceId = String(live.deviceId || "").slice(0, 128);
+    if (!deviceId) return json({ error: "Missing device id" }, 400);
+    const sinceRaw = Number(live.since);
+    const knownRevision = Number.isSafeInteger(sinceRaw) && sinceRaw >= 0 ? sinceRaw : 0;
+    const label = String(live.label || "").slice(0, 80);
+    const build = String(live.build || "").slice(0, 80);
+
+    const { error: beatError } = await admin.from("anbaryar_device_presence").upsert({
+      owner_id: ownerId, device_id: deviceId, label: label || null, app_build: build || null,
+      last_seen: new Date().toISOString(),
+    }, { onConflict: "owner_id,device_id" });
+    if (beatError) console.warn("presence heartbeat failed", beatError.message);
+    if (Math.random() < 0.1) {
+      await admin.from("anbaryar_device_presence").delete()
+        .eq("owner_id", ownerId).lt("last_seen", new Date(Date.now() - 24 * 3600 * 1000).toISOString());
+    }
+
+    const readState = async () => {
+      const { data, error } = await admin.from("anbaryar_backup_files")
+        .select("sync_revision, device_id, created_at")
+        .eq("owner_id", ownerId).eq("is_sync_state", true).maybeSingle();
+      if (error) throw new Error("state read failed");
+      return {
+        revision: Number(data?.sync_revision || 0),
+        writer: (data?.device_id as string | null) || null,
+        updatedAt: (data?.created_at as string | null) || null,
+      };
+    };
+
+    let state;
+    try {
+      state = await readState();
+      const deadline = Date.now() + (live.wait === false ? 0 : 20000);
+      while (state.revision === knownRevision && Date.now() < deadline) {
+        await sleep(1500);
+        state = await readState();
+      }
+    } catch {
+      return json({ error: "Could not read live sync state" }, 500);
+    }
+
+    const { data: devices } = await admin.from("anbaryar_device_presence")
+      .select("device_id, label, last_seen")
+      .eq("owner_id", ownerId)
+      .gte("last_seen", new Date(Date.now() - 75 * 1000).toISOString())
+      .order("last_seen", { ascending: false }).limit(20);
+
+    return json({
+      changed: state.revision !== knownRevision,
+      revision: state.revision,
+      writer: state.writer,
+      updatedAt: state.updatedAt,
+      devices: (devices || []).map((d) => ({ deviceId: d.device_id, label: d.label || "", lastSeen: d.last_seen })),
+      serverTime: new Date().toISOString(),
     });
   }
 

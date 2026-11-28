@@ -11,4 +11,7 @@
         }
 
         const root = createRoot(document.getElementById('root'));
-        root.render(<AYErrorBoundary><ToastProvider><ConfirmProvider><SecurityGate /></ConfirmProvider></ToastProvider></AYErrorBoundary>);
+        // AY_LIVE.ready: اگر تعویض حساب در جریان باشد، پاک‌سازی داده‌ی حساب قبلی باید قبل از خواندن داده‌ها تمام شود.
+        Promise.resolve(typeof AY_LIVE !== 'undefined' ? AY_LIVE.ready : null).catch(() => {}).then(() => {
+            root.render(<AYErrorBoundary><ToastProvider><ConfirmProvider><SecurityGate /></ConfirmProvider></ToastProvider></AYErrorBoundary>);
+        });
