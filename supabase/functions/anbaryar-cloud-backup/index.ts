@@ -167,17 +167,8 @@ Deno.serve(async (req: Request) => {
       return json({ exists: true, revision: Number(current.sync_revision || 0), updatedAt: current.created_at, legacy: false });
     }
 
-    const { data: oldBackup, error: oldError } = await admin.from("anbaryar_backup_files")
-      .select("created_at")
-      .eq("owner_id", ownerId).eq("is_sync_state", false)
-      .order("created_at", { ascending: false }).limit(1).maybeSingle();
-    if (oldError) return json({ error: "Could not read legacy cloud metadata" }, 500);
-    return json({
-      exists: !!oldBackup,
-      revision: 0,
-      updatedAt: oldBackup?.created_at || null,
-      legacy: !!oldBackup,
-    });
+    // پشتیبان‌های تاریخی (is_sync_state=false) دیگر جای رکورد همگام‌سازی را نمی‌گیرند؛ وگرنه نسخه‌ی رمزدارِ قدیمی دوباره درخواست رمز می‌کرد.
+    return json({ exists: false, revision: 0, updatedAt: null, legacy: false });
   }
 
   if (payload.action === "sync-get") {
@@ -186,17 +177,8 @@ Deno.serve(async (req: Request) => {
       .eq("owner_id", ownerId).eq("is_sync_state", true).maybeSingle();
     if (currentError) return json({ error: "Could not read cloud sync state" }, 500);
 
-    let row: BackupRow | null = current as BackupRow | null;
-    let legacy = false;
-    if (!row) {
-      const { data: oldBackup, error: oldError } = await admin.from("anbaryar_backup_files")
-        .select("id, object_path, size_bytes, created_at")
-        .eq("owner_id", ownerId).eq("is_sync_state", false)
-        .order("created_at", { ascending: false }).limit(1).maybeSingle();
-      if (oldError) return json({ error: "Could not read legacy cloud backup" }, 500);
-      row = oldBackup as BackupRow | null;
-      legacy = !!row;
-    }
+    const row: BackupRow | null = current as BackupRow | null;
+    const legacy = false;
 
     if (!row) {
       return new Response(null, { status: 204, headers: { ...cors, "Cache-Control": "no-store" } });
